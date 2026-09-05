@@ -1,0 +1,29 @@
+{
+  "profile": "wechat-release",
+  "purpose": "WECHAT RELEASE: 与 FULL CLONE 共用同一代码库，通过 Feature Flag / Server Capability / Compliance Gate 关闭全部现金类高风险能力，保留游戏性。",
+  "allowCashWallet": false,
+  "allowWithdrawal": false,
+  "allowBetting": false,
+  "allowPaidRandomLoot": false,
+  "allowP2PTrade": false,
+  "allowDigitalAuction": false,
+  "allowAgentDistribution": false,
+  "allowPhysicalPrizeFulfillment": false,
+  "allowCashRedPacket": false,
+  "allowRewardedAds": true,
+  "allowFixedPriceVirtualItems": true,
+  "paymentCapabilityCheckRequired": true,
+  "serverAuthoritativeEconomy": true,
+  "antiAddictionRequired": true,
+  "privacyConsentRequired": true,
+  "contentSafetyRequired": true,
+  "substitution": {
+    "bettingRoom": "free-ticket-or-energy-entry",
+    "cashPrizePool": "season-score-or-soft-currency",
+    "cashRedPacket": "supply-pack",
+    "auctionNft": "collection-gallery-non-tradeable",
+    "assetRaid": "pve-async-score",
+    "oreTrade": "npc-exchange",
+    "paidRandomDraw": "free-task-key-or-fixed-reward"
+  }
+}

@@ -1,0 +1,993 @@
+[
+ {
+  "id": "home",
+  "title": "生态大厅",
+  "family": "hub",
+  "evidence": [
+   "MainActivity",
+   "MailHomeActivity",
+   "WinningListActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "统一入口、活动与消息；移除资金账户语义。",
+  "actions": [
+   {
+    "id": "checkin",
+    "label": "签到"
+   }
+  ],
+  "tab": "mine"
+ },
+ {
+  "id": "ape",
+  "title": "猿系养成/矿场/竞技",
+  "family": "rpg-economy",
+  "evidence": [
+   "ApeActivity",
+   "ApeArenaActivity",
+   "ApeMyGemstoneActivity",
+   "MonkeyKingActivity",
+   "PuzzleIndexActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "保留养成、矿场、PVE/PVP；交易/赠送/租赁独立切除。",
+  "actions": [
+   {
+    "id": "dig",
+    "label": "挖掘"
+   },
+   {
+    "id": "refine",
+    "label": "精炼矿石"
+   },
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "goldMine",
+  "title": "黄金矿场",
+  "family": "mining",
+  "evidence": [
+   "GoldMineActivity",
+   "FineGoldActivity",
+   "OreTradingActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "保留挖矿与精炼；矿石不可提现、不可玩家间交易。",
+  "actions": [
+   {
+    "id": "dig",
+    "label": "挖掘"
+   },
+   {
+    "id": "refine",
+    "label": "精炼矿石"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "gacha",
+  "title": "萌宠扭蛋",
+  "family": "collection",
+  "evidence": [
+   "normal_egg/medal_egg/rock_egg",
+   "assets dress_*",
+   "strengthen/*"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "开蛋→部位装备→战力→挑战/产出循环。",
+  "actions": [
+   {
+    "id": "openEgg",
+    "label": "开蛋"
+   },
+   {
+    "id": "equip",
+    "label": "穿戴"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "universe",
+  "title": "宇宙探索",
+  "family": "exploration",
+  "evidence": [
+   "UniverseActivity",
+   "ExplorePlanetActivity",
+   "UpgradeUFOActivity",
+   "HeroActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "远征、飞船升级、英雄收集。",
+  "actions": [
+   {
+    "id": "explore",
+    "label": "探索星球"
+   },
+   {
+    "id": "upgrade",
+    "label": "升级飞船"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "undertown",
+  "title": "地下城/阶梯",
+  "family": "dungeon",
+  "evidence": [
+   "UndertownActivity",
+   "ApeLadderLogsActivity",
+   "ProbDetailActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "概率展示可保留但奖励只能是不可兑付游戏资源。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "nxArena",
+  "title": "NX 竞技/Boss",
+  "family": "combat",
+  "evidence": [
+   "ArenaHomeActivity",
+   "ChallengeBossActivity",
+   "ArenaRankActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "保留竞技场和 Boss；排行榜不展示充值/赢利。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "monkeyFight",
+  "title": "猿猴格斗",
+  "family": "combat",
+  "evidence": [
+   "MonkeyFightingSiteActivity",
+   "MonkeyFightingHistoryActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "作为核心即时对战/PVE。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "apeRabbit",
+  "title": "猿兔对战",
+  "family": "combat",
+  "evidence": [
+   "ApeRabbitMainActivity",
+   "ApeRabbitResultActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "转为技能卡 PVE/PVP。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "battleRoyal",
+  "title": "大逃杀",
+  "family": "combat",
+  "evidence": [
+   "BattleRoyalActivity",
+   "NewBattleRoyalActivity",
+   "blockBattleRoyal/*"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "保留生存战；去除下注与输赢兑付。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "dagger",
+  "title": "匕首/刺杀",
+  "family": "combat",
+  "evidence": [
+   "DaggerActivity",
+   "DaggerNewActivity",
+   "AssassinationHistoryActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "题材需美术降暴力化，首发后再开。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "robbery",
+  "title": "抢夺玩法",
+  "family": "combat",
+  "evidence": [
+   "RobMainActivity",
+   "RobberyKillerActivity",
+   "RobberyRankActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "改名为资源争夺；禁止玩家定向转移可兑付资产。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "beast",
+  "title": "动物挑战",
+  "family": "combat",
+  "evidence": [
+   "AnimalsMainActivity",
+   "BeastPrizesActivity",
+   "HistoryRecordActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "保留动物闯关；奖品改纯虚拟非付费抽取。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "tug",
+  "title": "拔河",
+  "family": "minigame",
+  "evidence": [
+   "TugActivity",
+   "TugRankActivity",
+   "assets/tug/*"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "低风险短局玩法。",
+  "actions": [
+   {
+    "id": "pull",
+    "label": "拔河"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "marbles",
+  "title": "弹珠",
+  "family": "minigame",
+  "evidence": [
+   "MarblesActivity",
+   "assets/music/marbles/*"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "物理休闲玩法。",
+  "actions": [
+   {
+    "id": "shoot",
+    "label": "发射弹珠"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "escapeTiger",
+  "title": "虎口逃生",
+  "family": "minigame",
+  "evidence": [
+   "EscapeTigerMouthActivity",
+   "assets/pag/escape_animal/*"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "风险选择闯关，奖励纯游戏内。",
+  "actions": [
+   {
+    "id": "advance",
+    "label": "前进一步"
+   },
+   {
+    "id": "bank",
+    "label": "安全结算"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "punchIn",
+  "title": "打卡挑战",
+  "family": "minigame",
+  "evidence": [
+   "PunchInActivity",
+   "PunchInRankActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "签到不可绑定分享/广告提现条件。",
+  "actions": [
+   {
+    "id": "checkin",
+    "label": "签到"
+   }
+  ],
+  "tab": "mine"
+ },
+ {
+  "id": "sports",
+  "title": "运动会",
+  "family": "minigame",
+  "evidence": [
+   "SportsMeetActivity",
+   "SportLogsActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "计时/反应类短局。",
+  "actions": [
+   {
+    "id": "play",
+    "label": "挑战一次"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "chicken",
+  "title": "小鸡养成",
+  "family": "idle",
+  "evidence": [
+   "ChickenActivity",
+   "ChickenLogsActivity",
+   "assets/music/chicken/*"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "喂养-等待-收获循环。",
+  "actions": [
+   {
+    "id": "feed",
+    "label": "喂养"
+   },
+   {
+    "id": "collect",
+    "label": "收蛋"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "cards",
+  "title": "卡牌收集/合成",
+  "family": "collection",
+  "evidence": [
+   "SynthesisCardActivity",
+   "MyCardLibraryActivity",
+   "ApeComposeCardActivity",
+   "ApeSplitCardActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "首发仅通过玩法产出；取消付费随机抽取。",
+  "actions": [
+   {
+    "id": "freeDraw",
+    "label": "免费收集"
+   },
+   {
+    "id": "synth",
+    "label": "合成"
+   }
+  ],
+  "tab": "chaowan"
+ },
+ {
+  "id": "box",
+  "title": "宝箱/潮盒",
+  "family": "loot",
+  "evidence": [
+   "OpenBoxActivity",
+   "TreasureBoxActivity",
+   "TidalBoxSeriesActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "defer",
+  "notes": "完整基线保留免费钥匙开箱；所有付费随机、实物/现金兑付关闭。",
+  "actions": [
+   {
+    "id": "openFree",
+    "label": "开启免费宝箱"
+   },
+   {
+    "id": "earnKey",
+    "label": "完成任务得钥匙"
+   }
+  ],
+  "tab": "chaowan"
+ },
+ {
+  "id": "luckyBag",
+  "title": "幸运袋",
+  "family": "loot",
+  "evidence": [
+   "LuckyBagActivity",
+   "LuckyBagRankingActivity",
+   "assets/luckyBag/*"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "defer",
+  "notes": "仅可改成免费活动掉落；原随机获利链路不首发。",
+  "actions": [
+   {
+    "id": "openFree",
+    "label": "开启免费宝箱"
+   },
+   {
+    "id": "earnKey",
+    "label": "完成任务得钥匙"
+   }
+  ],
+  "tab": "chaowan"
+ },
+ {
+  "id": "flashCard",
+  "title": "闪卡/卡柜",
+  "family": "collection",
+  "evidence": [
+   "FlashCardActivity",
+   "FlashcardTradeActivity",
+   "CardCabinetActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "收集和柜藏保留，玩家交易关闭。",
+  "actions": [
+   {
+    "id": "freeDraw",
+    "label": "免费收集"
+   },
+   {
+    "id": "synth",
+    "label": "合成"
+   }
+  ],
+  "tab": "chaowan"
+ },
+ {
+  "id": "mall",
+  "title": "商城/实物订单",
+  "family": "commerce",
+  "evidence": [
+   "GoodsDetailsActivity",
+   "ConfirmOrderActivity",
+   "LogisticsActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "实物电商与小游戏核心解耦，首发不接。",
+  "actions": [],
+  "tab": "chaowan"
+ },
+ {
+  "id": "digitalTrade",
+  "title": "数字品/拍卖/竞价",
+  "family": "trade",
+  "evidence": [
+   "PrintAuctionActivity",
+   "PrintBiddingActivity",
+   "TideTradeDetailsActivity",
+   "CopyrightSaleActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "高审核与合规风险，不进入小游戏。",
+  "actions": [],
+  "tab": "trade"
+ },
+ {
+  "id": "walletCash",
+  "title": "钱包/余额/提现",
+  "family": "finance",
+  "evidence": [
+   "MyWalletActivity",
+   "WithdrawalActivity",
+   "BalanceActivity",
+   "CoinCashActivity",
+   "WithdrawResultActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "彻底移除现金余额、提现与可兑付账户。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "betting",
+  "title": "下注/输赢记录",
+  "family": "gambling-like",
+  "evidence": [
+   "BettingHistoryActivity",
+   "NewBettingHistoryActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "不允许进入上线版本；战斗奖励改固定/非货币化。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "redPacket",
+  "title": "红包/现金奖励",
+  "family": "cash-reward",
+  "evidence": [
+   "RedPackageInfoActivity",
+   "MyNXRedPackageHistoryActivity",
+   "drop_red_package.pag"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "现金红包与提现链路移除；可替换为纯视觉“补给包”。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "p2pTrade",
+  "title": "玩家交易/赠送/租赁",
+  "family": "trade",
+  "evidence": [
+   "ApeTradeCenterActivity",
+   "RareCardTradeActivity",
+   "ApeGemstoneGiftActivity",
+   "GemstoneLeasingActivity",
+   "GiveCardActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "首发不提供玩家间可转移资产，避免涉赌/资金循环。",
+  "actions": [],
+  "tab": "trade"
+ },
+ {
+  "id": "agent",
+  "title": "代理/店长/库存",
+  "family": "merchant",
+  "evidence": [
+   "AgentMainActivity",
+   "AgentStockActivity",
+   "StoreDataActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "属于商业/分销体系，与小游戏娱乐产品剥离。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "profile",
+  "title": "账号/设置/公告",
+  "family": "account",
+  "evidence": [
+   "SettingActivity",
+   "AvatarActivity",
+   "NicknameActivity",
+   "NoticeCenterActivity",
+   "LomoDeviceDetailActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "用微信登录态映射玩家 ID；手机号、头像昵称均按最小必要原则授权。",
+  "actions": [
+   {
+    "id": "checkin",
+    "label": "签到"
+   }
+  ],
+  "tab": "mine"
+ },
+ {
+  "id": "airship",
+  "title": "飞艇/收藏运输",
+  "family": "collection",
+  "evidence": [
+   "AirshipActivity",
+   "AirshipListActivity",
+   "CollectShipActivity",
+   "ShipLogActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "保留收藏、派遣、日志；物流实物语义不进入核心。",
+  "actions": [
+   {
+    "id": "explore",
+    "label": "探索星球"
+   },
+   {
+    "id": "upgrade",
+    "label": "升级飞船"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "rocksMonkeyKing",
+  "title": "岩石猴王/奖池战",
+  "family": "combat",
+  "evidence": [
+   "RocksMonkeyKingActivity",
+   "RocksMonkeyKingRankActivity",
+   "RocksMonkeyPoolActivity"
+  ],
+  "risk": "review",
+  "release": "keep",
+  "notes": "战斗与排行可保留；“Pool/奖池”改为赛季积分池，不与充值或提现挂钩。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "开始战斗"
+   },
+   {
+    "id": "train",
+    "label": "训练"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "multiplePit",
+  "title": "多人矿坑",
+  "family": "mining",
+  "evidence": [
+   "MultiplePitActivity",
+   "GrandPrizeLogActivity",
+   "ParticipateInLogActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "多人协作挖矿可保留；GrandPrize 机制需改为固定赛季奖励并完成概率/付费审查后上线。",
+  "actions": [
+   {
+    "id": "dig",
+    "label": "挖掘"
+   },
+   {
+    "id": "refine",
+    "label": "精炼矿石"
+   }
+  ],
+  "tab": "ape"
+ },
+ {
+  "id": "creator",
+  "title": "设计师/作品/联名",
+  "family": "ugc-commerce",
+  "evidence": [
+   "BecomeDesignerActivity",
+   "UploadWorkActivity",
+   "MyWorkActivity",
+   "IpCooperationActivity",
+   "TideCreationActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "UGC 需要内容审核、版权授权和举报链路；首发后接入。",
+  "actions": [],
+  "tab": "chaowan"
+ },
+ {
+  "id": "apeHundred",
+  "title": "品牌/趋势内容",
+  "family": "content",
+  "evidence": [
+   "ApeProductActivity",
+   "ApeTrendsActivity",
+   "ApeBrandActivity",
+   "ApeBrandDetailActivity"
+  ],
+  "risk": "safe",
+  "release": "defer",
+  "notes": "非核心内容页，首发后作为图鉴/品牌故事远程内容接入。",
+  "actions": [],
+  "tab": "chaowan"
+ },
+ {
+  "id": "superLink",
+  "title": "邀请链路/超级链接",
+  "family": "referral",
+  "evidence": [
+   "SuperBoxLinkActivity",
+   "SuperLinkInviteCodeActivity",
+   "LinkInviteLogsActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "改微信分享卡片与 scene 参数；不把邀请与现金、抽奖、提现绑定。",
+  "actions": [
+   {
+    "id": "checkin",
+    "label": "签到"
+   }
+  ],
+  "tab": "mine"
+ },
+ {
+  "id": "moonEvent",
+  "title": "月饼/扫码/提货活动",
+  "family": "physical-commerce",
+  "evidence": [
+   "MoonCakeMainActivity",
+   "ConfirmMoonOrderActivity",
+   "ScanActivity",
+   "TakeDeliveryActivity"
+  ],
+  "risk": "review",
+  "release": "cut",
+  "notes": "实物购买、券、扫码提货属于独立电商活动，不并入小游戏首发；如后续需要建议独立小程序承接。",
+  "actions": [],
+  "tab": "chaowan"
+ },
+ {
+  "id": "digitalGallery",
+  "title": "数字作品/图鉴",
+  "family": "collection",
+  "evidence": [
+   "DigitalPaintingDetailsActivity",
+   "DigitalCardDetailActivity",
+   "DigitalcardIndexActivity",
+   "GlobalTideActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "仅保留展示、图鉴与不可交易收藏；所有拍卖/竞价/兑付功能由 digitalTrade 切除。",
+  "actions": [
+   {
+    "id": "freeDraw",
+    "label": "免费收集"
+   },
+   {
+    "id": "synth",
+    "label": "合成"
+   }
+  ],
+  "tab": "chaowan"
+ },
+ {
+  "id": "digitalLottery",
+  "title": "数字抽奖",
+  "family": "random-reward",
+  "evidence": [
+   "DigitalLuckyDrawActivity",
+   "LomoLotteryActivity",
+   "LuckyDraw100Win400Activity",
+   "PrintDrawActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "涉及抽奖、中奖与高价值暗示；不上线。",
+  "actions": [],
+  "tab": "chaowan"
+ },
+ {
+  "id": "physicalPrize",
+  "title": "实物奖品/提货/物流",
+  "family": "physical-reward",
+  "evidence": [
+   "ExchangePrizeSuccessActivity",
+   "CashPrizeActivity",
+   "GoldRabbitDeliveryActivity",
+   "PrizeExtractGoodsActivity"
+  ],
+  "risk": "review",
+  "release": "cut",
+  "notes": "首发不做实物兑奖，避免与随机玩法形成兑换闭环；可在独立合规电商项目另评估。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "warcraftFinance",
+  "title": "Warcraft 兑换/提现记录",
+  "family": "finance",
+  "evidence": [
+   "WarcraftWithdrawLogActivity",
+   "WarcraftExchangeLogActivity"
+  ],
+  "risk": "prohibited_for_release",
+  "release": "cut",
+  "notes": "与提现/兑换资金链同类，移除。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "social",
+  "title": "好友/邀请/排行榜",
+  "family": "social",
+  "evidence": [
+   "FriendActivity",
+   "InviteLogsActivity",
+   "ApeFriendActivity",
+   "*RankActivity"
+  ],
+  "risk": "review",
+  "release": "defer",
+  "notes": "保留微信分享/好友排行榜方向；不以分享作为兑奖/提现条件。",
+  "actions": [
+   {
+    "id": "checkin",
+    "label": "签到"
+   }
+  ],
+  "tab": "mine"
+ },
+ {
+  "id": "customerService",
+  "title": "客服/消息",
+  "family": "service",
+  "evidence": [
+   "OnlineServiceActivity",
+   "qiyukf unicorn SDK",
+   "JPush"
+  ],
+  "risk": "safe",
+  "release": "defer",
+  "notes": "改微信客服与订阅消息，不移植原生推送 SDK。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "realName",
+  "title": "实名/防沉迷",
+  "family": "compliance",
+  "evidence": [
+   "CertificationActivity",
+   "FaceVerifyActivity",
+   "BytedCert/Toyger"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "不用原 App 人脸 SDK；接国家实名防沉迷体系和平台能力。",
+  "actions": [],
+  "tab": "mine"
+ },
+ {
+  "id": "arena",
+  "title": "竞技场",
+  "family": "combat",
+  "evidence": [
+   "ApeArenaActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "三回合行为克制对战。",
+  "actions": [
+   {
+    "id": "fight",
+    "label": "挑战"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "boss",
+  "title": "Boss挑战",
+  "family": "combat",
+  "evidence": [
+   "ChallengeBossActivity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "血量制 Boss 战。",
+  "actions": [
+   {
+    "id": "attack",
+    "label": "攻击"
+   }
+  ],
+  "tab": "games"
+ },
+ {
+  "id": "apeMine",
+  "title": "猿岛矿场",
+  "family": "mining",
+  "evidence": [
+   "私人矿场/好友矿场/矿坑 Activity"
+  ],
+  "risk": "safe",
+  "release": "keep",
+  "notes": "矿坑生产-收取循环。",
+  "actions": [
+   {
+    "id": "startPit",
+    "label": "开采"
+   },
+   {
+    "id": "claimPit",
+    "label": "收取"
+   }
+  ],
+  "tab": "ape"
+ }
+]

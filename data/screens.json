@@ -1,0 +1,652 @@
+[
+ {
+  "moduleName": "微信适配",
+  "feature": "微信适配",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "邀请裂变",
+  "feature": "邀请/社交",
+  "screenCount": 8
+ },
+ {
+  "moduleName": "邀请裂变",
+  "feature": "提现/结算",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "邀请裂变",
+  "feature": "抽签/抽奖",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "钱包/资产",
+  "screenCount": 13
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "系统/客服",
+  "screenCount": 7
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "邀请/社交",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "我的/钱包",
+  "screenCount": 14
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "账号/身份",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "提现/结算",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "黄金矿场",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "抽签/抽奖",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "卡牌/闪卡",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "交易/寄售",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "商城/订单",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "我的/钱包",
+  "feature": "竞拍",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "账号/登录",
+  "feature": "账号/登录",
+  "screenCount": 6
+ },
+ {
+  "moduleName": "账号/登录",
+  "feature": "账号/身份",
+  "screenCount": 9
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "商城/订单",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "商城/卡牌",
+  "screenCount": 10
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "提现/结算",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "黄金矿场",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "卡牌/闪卡",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "盲盒/福袋",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "抽签/抽奖",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "交易/寄售",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "邀请/社交",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "商城/卡牌",
+  "feature": "IP/设计师",
+  "screenCount": 6
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "猿石/矿石",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "大逃杀",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "商城/订单",
+  "screenCount": 11
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "主城/潮玩主页",
+  "screenCount": 32
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "交易/寄售",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "钱包/资产",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "抽签/抽奖",
+  "screenCount": 6
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "卡牌/闪卡",
+  "screenCount": 21
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "盲盒/福袋",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "黄金矿场",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "主城/潮玩主页",
+  "feature": "斗猿场",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "数字潮玩",
+  "feature": "数字潮玩",
+  "screenCount": 16
+ },
+ {
+  "moduleName": "数字潮玩",
+  "feature": "竞拍",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "数字潮玩",
+  "feature": "抽签/抽奖",
+  "screenCount": 9
+ },
+ {
+  "moduleName": "数字潮玩",
+  "feature": "商城/订单",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "数字潮玩",
+  "feature": "交易/寄售",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "数字潮玩",
+  "feature": "卡牌/闪卡",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "设计师",
+  "feature": "IP/设计师",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "设计师",
+  "feature": "设计师",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "地下城",
+  "feature": "宝石地下城",
+  "screenCount": 15
+ },
+ {
+  "moduleName": "地下城",
+  "feature": "地下城",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "地下城",
+  "feature": "勋章",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "宇宙探索",
+  "feature": "宇宙探索",
+  "screenCount": 16
+ },
+ {
+  "moduleName": "宇宙探索",
+  "feature": "黄金矿场",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "宇宙探索",
+  "feature": "邀请/社交",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "黄金矿场",
+  "feature": "黄金矿场",
+  "screenCount": 15
+ },
+ {
+  "moduleName": "黄金矿场",
+  "feature": "商城/订单",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "黄金矿场",
+  "feature": "系统/客服",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "月饼/兑换",
+  "feature": "月饼/兑换",
+  "screenCount": 15
+ },
+ {
+  "moduleName": "月饼/兑换",
+  "feature": "商城/订单",
+  "screenCount": 9
+ },
+ {
+  "moduleName": "第三方SDK",
+  "feature": "第三方SDK",
+  "screenCount": 107
+ },
+ {
+  "moduleName": "盲盒",
+  "feature": "盲盒",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "盲盒",
+  "feature": "商城/订单",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "盲盒",
+  "feature": "盲盒/福袋",
+  "screenCount": 7
+ },
+ {
+  "moduleName": "盲盒",
+  "feature": "卡牌/闪卡",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "宝藏盲盒",
+  "feature": "盲盒/福袋",
+  "screenCount": 6
+ },
+ {
+  "moduleName": "宝藏盲盒",
+  "feature": "商城/订单",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "消息/未成年人",
+  "feature": "系统/客服",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "消息/未成年人",
+  "feature": "消息/未成年人",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "猿宇宙",
+  "screenCount": 30
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "宝石",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "卡牌/闪卡",
+  "screenCount": 12
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "金沙",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "勋章",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "交易/寄售",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "商城/订单",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "邀请/社交",
+  "screenCount": 6
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "竞技场",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "黄金矿场",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "炸猴王",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "盲盒/福袋",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "拼团",
+  "screenCount": 6
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "拼图矿场",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "猿宇宙",
+  "feature": "IP/设计师",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "猿石魔兽",
+  "feature": "猿石魔兽",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "猿兔战斗",
+  "feature": "猿兔战斗",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "小游戏集合",
+  "feature": "弹珠",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "小游戏集合",
+  "feature": "虎口逃生",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "小游戏集合",
+  "feature": "小游戏集合",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "小游戏集合",
+  "feature": "运动会",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "小游戏集合",
+  "feature": "今晚吃鸡",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "小游戏集合",
+  "feature": "大逃杀",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "NX竞技",
+  "screenCount": 8
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "商城/订单",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "猿石/矿石",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "Boss挑战",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "邀请/社交",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "宝石",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "黄金矿场",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "NX竞技",
+  "feature": "竞技场",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "店长/代理",
+  "feature": "黄金矿场",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "店长/代理",
+  "feature": "卡牌/闪卡",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "店长/代理",
+  "feature": "店长/代理",
+  "screenCount": 14
+ },
+ {
+  "moduleName": "店长/代理",
+  "feature": "商城/订单",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "方块兽/动物玩法",
+  "feature": "方块兽/动物玩法",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "百人/IP内容",
+  "feature": "百人/IP内容",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "百人/IP内容",
+  "feature": "商城/订单",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "炸猴王",
+  "feature": "炸猴王",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "炸猴王",
+  "feature": "猿石/矿石",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "超级链接",
+  "feature": "盲盒/福袋",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "超级链接",
+  "feature": "超级链接",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "超级链接",
+  "feature": "邀请/社交",
+  "screenCount": 4
+ },
+ {
+  "moduleName": "抢夺",
+  "feature": "抢夺/抢劫",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "方块兽",
+  "screenCount": 5
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "商城/订单",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "多人矿坑",
+  "feature": "多人矿坑",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "拔河",
+  "feature": "拔河",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "匕首/刺杀",
+  "screenCount": 7
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "交易/寄售",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "邀请/社交",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "抢夺/抢劫",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "方块兽",
+  "feature": "大逃杀",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "公共/飞船",
+  "feature": "公共/飞船",
+  "screenCount": 3
+ },
+ {
+  "moduleName": "公共/飞船",
+  "feature": "账号/身份",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "公共/飞船",
+  "feature": "宇宙探索",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "公共/飞船",
+  "feature": "商城/订单",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "系统入口",
+  "feature": "系统入口",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "第三方SDK",
+  "feature": "系统/客服",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "第三方SDK",
+  "feature": "卡牌/闪卡",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "第三方SDK",
+  "feature": "账号/身份",
+  "screenCount": 2
+ },
+ {
+  "moduleName": "第三方SDK",
+  "feature": "邀请/社交",
+  "screenCount": 1
+ },
+ {
+  "moduleName": "第三方SDK",
+  "feature": "商城/订单",
+  "screenCount": 1
+ }
+]

@@ -1,0 +1,10 @@
+{
+  "name": "lomo-wechat-minigame-cleanroom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clean-room WeChat Mini Game migration baseline reconstructed from static APK evidence.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node tests/smoke.js && node tests/runtime-mock.js"
+  }
+}

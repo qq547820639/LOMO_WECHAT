@@ -1,0 +1,13 @@
+{
+  "description": "ApeIsland mini game",
+  "compileType": "game",
+  "appid": "touristappid",
+  "projectname": "ape-island",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "urlCheck": false,
+    "postcss": false,
+    "uglifyFileName": false
+  }
+}

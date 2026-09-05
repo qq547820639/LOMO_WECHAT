@@ -1,0 +1,18 @@
+{
+  "profile": "wechat-release",
+  "allowCashWallet": false,
+  "allowWithdrawal": false,
+  "allowBetting": false,
+  "allowPaidRandomLoot": false,
+  "allowP2PTrade": false,
+  "allowDigitalAuction": false,
+  "allowAgentDistribution": false,
+  "allowPhysicalPrizeFulfillment": false,
+  "allowRewardedAds": true,
+  "allowFixedPriceVirtualItems": true,
+  "paymentCapabilityCheckRequired": true,
+  "serverAuthoritativeEconomy": true,
+  "antiAddictionRequired": true,
+  "privacyConsentRequired": true,
+  "contentSafetyRequired": true
+}

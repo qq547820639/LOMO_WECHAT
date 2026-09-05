@@ -1,0 +1,11 @@
+{
+  "description": "LOMO clean-room migration baseline",
+  "compileType": "game",
+  "appid": "touristappid",
+  "projectname": "lomo-wechat-minigame-cleanroom",
+  "setting": {
+    "es6": true,
+    "minified": false,
+    "urlCheck": false
+  }
+}

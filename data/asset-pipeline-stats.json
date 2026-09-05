@@ -1,0 +1,23 @@
+{
+ "total": 14092,
+ "summary": {
+  "total": 14092,
+  "converted": 1496,
+  "mapped": 1624,
+  "thirdParty": 641,
+  "ignoredIntentionally": 0,
+  "unused": 10331
+ },
+ "pag": {
+  "count": 535,
+  "strategy": "PAG→帧序列/图集（短循环 UI 12-20fps WebP atlas）；人物动作为 packed atlas + animation clip；长演出评估远端视频。转换执行需图形工具链（libpag render/python PIL），逐文件策略见 asset-conversion-report.csv"
+ },
+ "lottie": {
+  "count": 869,
+  "strategy": "<100KB 且纯 UI 的运行时解析；其余烘焙为 sprite atlas"
+ },
+ "audio": {
+  "count": 0,
+  "strategy": "统一转码 mp3(48kbps SFX/96kbps BGM) → InnerAudioContext"
+ }
+}

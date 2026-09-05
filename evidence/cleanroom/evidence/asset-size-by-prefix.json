@@ -1,0 +1,308 @@
+[
+  {
+    "prefix": "assets/pag",
+    "files": 469,
+    "raw_mb": 60.626,
+    "compressed_mb": 56.335
+  },
+  {
+    "prefix": "assets/lottie",
+    "files": 869,
+    "raw_mb": 15.785,
+    "compressed_mb": 12.746
+  },
+  {
+    "prefix": "assets/sound",
+    "files": 56,
+    "raw_mb": 8.113,
+    "compressed_mb": 8.113
+  },
+  {
+    "prefix": "assets/tug",
+    "files": 31,
+    "raw_mb": 8.037,
+    "compressed_mb": 7.931
+  },
+  {
+    "prefix": "assets/voice",
+    "files": 48,
+    "raw_mb": 8.025,
+    "compressed_mb": 8.025
+  },
+  {
+    "prefix": "assets/music",
+    "files": 34,
+    "raw_mb": 6.86,
+    "compressed_mb": 6.86
+  },
+  {
+    "prefix": "assets/png",
+    "files": 1592,
+    "raw_mb": 5.912,
+    "compressed_mb": 5.912
+  },
+  {
+    "prefix": "assets/1694131332",
+    "files": 1,
+    "raw_mb": 4.399,
+    "compressed_mb": 4.322
+  },
+  {
+    "prefix": "assets/blockBattleRoyal",
+    "files": 25,
+    "raw_mb": 2.996,
+    "compressed_mb": 2.898
+  },
+  {
+    "prefix": "assets/toyger.quality.dat",
+    "files": 1,
+    "raw_mb": 1.857,
+    "compressed_mb": 1.857
+  },
+  {
+    "prefix": "assets/gdt_plugin",
+    "files": 1,
+    "raw_mb": 1.628,
+    "compressed_mb": 1.622
+  },
+  {
+    "prefix": "assets/libjiagu_a64.so",
+    "files": 1,
+    "raw_mb": 1.173,
+    "compressed_mb": 0.896
+  },
+  {
+    "prefix": "assets/unicorn_emoji",
+    "files": 166,
+    "raw_mb": 1.092,
+    "compressed_mb": 1.082
+  },
+  {
+    "prefix": "assets/libjiagu.so",
+    "files": 1,
+    "raw_mb": 0.867,
+    "compressed_mb": 0.695
+  },
+  {
+    "prefix": "assets/libjiagu_x64.so",
+    "files": 1,
+    "raw_mb": 0.861,
+    "compressed_mb": 0.731
+  },
+  {
+    "prefix": "assets/detect.ms",
+    "files": 1,
+    "raw_mb": 0.834,
+    "compressed_mb": 0.678
+  },
+  {
+    "prefix": "assets/luckyBag",
+    "files": 3,
+    "raw_mb": 0.832,
+    "compressed_mb": 0.832
+  },
+  {
+    "prefix": "assets/libjiagu_x86.so",
+    "files": 1,
+    "raw_mb": 0.771,
+    "compressed_mb": 0.639
+  },
+  {
+    "prefix": "assets/seq",
+    "files": 132,
+    "raw_mb": 0.703,
+    "compressed_mb": 0.703
+  },
+  {
+    "prefix": "assets/toyger.face.dat",
+    "files": 1,
+    "raw_mb": 0.639,
+    "compressed_mb": 0.639
+  },
+  {
+    "prefix": "assets/res",
+    "files": 4,
+    "raw_mb": 0.378,
+    "compressed_mb": 0.338
+  },
+  {
+    "prefix": "assets/dagger",
+    "files": 12,
+    "raw_mb": 0.22,
+    "compressed_mb": 0.104
+  },
+  {
+    "prefix": "assets/beast",
+    "files": 6,
+    "raw_mb": 0.187,
+    "compressed_mb": 0.186
+  },
+  {
+    "prefix": "assets/address",
+    "files": 1,
+    "raw_mb": 0.131,
+    "compressed_mb": 0.028
+  },
+  {
+    "prefix": "assets/moonaddress",
+    "files": 1,
+    "raw_mb": 0.131,
+    "compressed_mb": 0.028
+  },
+  {
+    "prefix": "assets/angle.ms",
+    "files": 1,
+    "raw_mb": 0.111,
+    "compressed_mb": 0.097
+  },
+  {
+    "prefix": "assets/countdown",
+    "files": 22,
+    "raw_mb": 0.091,
+    "compressed_mb": 0.091
+  },
+  {
+    "prefix": "assets/robbery",
+    "files": 3,
+    "raw_mb": 0.073,
+    "compressed_mb": 0.064
+  },
+  {
+    "prefix": "assets/dtf",
+    "files": 10,
+    "raw_mb": 0.062,
+    "compressed_mb": 0.062
+  },
+  {
+    "prefix": "assets/fonts",
+    "files": 3,
+    "raw_mb": 0.06,
+    "compressed_mb": 0.033
+  },
+  {
+    "prefix": "assets/font",
+    "files": 1,
+    "raw_mb": 0.055,
+    "compressed_mb": 0.033
+  },
+  {
+    "prefix": "assets/hmsrootcas.bks",
+    "files": 1,
+    "raw_mb": 0.033,
+    "compressed_mb": 0.024
+  },
+  {
+    "prefix": "assets/anchors.bin",
+    "files": 1,
+    "raw_mb": 0.031,
+    "compressed_mb": 0.006
+  },
+  {
+    "prefix": "assets/mushroom_map.json",
+    "files": 1,
+    "raw_mb": 0.005,
+    "compressed_mb": 0.001
+  },
+  {
+    "prefix": "assets/nd",
+    "files": 1,
+    "raw_mb": 0.005,
+    "compressed_mb": 0.002
+  },
+  {
+    "prefix": "assets/anim",
+    "files": 1,
+    "raw_mb": 0.004,
+    "compressed_mb": 0.001
+  },
+  {
+    "prefix": "assets/saio_res",
+    "files": 2,
+    "raw_mb": 0.004,
+    "compressed_mb": 0.004
+  },
+  {
+    "prefix": "assets/hmsincas.bks",
+    "files": 1,
+    "raw_mb": 0.003,
+    "compressed_mb": 0.003
+  },
+  {
+    "prefix": "assets/ksad_common_encrypt_image.png",
+    "files": 1,
+    "raw_mb": 0.003,
+    "compressed_mb": 0.003
+  },
+  {
+    "prefix": "assets/dtf_code_config.json",
+    "files": 1,
+    "raw_mb": 0.002,
+    "compressed_mb": 0.001
+  },
+  {
+    "prefix": "assets/jpush_close.png",
+    "files": 1,
+    "raw_mb": 0.002,
+    "compressed_mb": 0.002
+  },
+  {
+    "prefix": "assets/na.czl",
+    "files": 1,
+    "raw_mb": 0.002,
+    "compressed_mb": 0.002
+  },
+  {
+    "prefix": "assets/face_js.html",
+    "files": 1,
+    "raw_mb": 0.001,
+    "compressed_mb": 0.0
+  },
+  {
+    "prefix": "assets/grs_sp.bks",
+    "files": 1,
+    "raw_mb": 0.001,
+    "compressed_mb": 0.001
+  },
+  {
+    "prefix": "assets/nim",
+    "files": 6,
+    "raw_mb": 0.001,
+    "compressed_mb": 0.001
+  },
+  {
+    "prefix": "assets/.jgapp",
+    "files": 1,
+    "raw_mb": 0.0,
+    "compressed_mb": 0.0
+  },
+  {
+    "prefix": "assets/bid-log-key-public.key",
+    "files": 1,
+    "raw_mb": 0.0,
+    "compressed_mb": 0.0
+  },
+  {
+    "prefix": "assets/grs_sdk_server_config.json",
+    "files": 1,
+    "raw_mb": 0.0,
+    "compressed_mb": 0.0
+  },
+  {
+    "prefix": "assets/keystore_unicorn",
+    "files": 1,
+    "raw_mb": 0.0,
+    "compressed_mb": 0.0
+  },
+  {
+    "prefix": "assets/keystore_unicorn2",
+    "files": 1,
+    "raw_mb": 0.0,
+    "compressed_mb": 0.0
+  },
+  {
+    "prefix": "assets/supplierconfig.json",
+    "files": 1,
+    "raw_mb": 0.0,
+    "compressed_mb": 0.0
+  }
+]

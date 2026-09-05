@@ -1,0 +1,16 @@
+{
+  "profile": "full-clone",
+  "purpose": "FULL CLONE / DEV FULL: 完整复刻 APK 4.3.7 已证明存在的全部玩法/系统/页面/经济关系。真钱相关模块以 UI+状态机+沙盒资产+mock API 实现，不接通任何真实资金闭环。",
+  "warning": "仅供开发与工程验证。不可作为微信小游戏发布配置。",
+  "allowCashWallet": true,
+  "allowWithdrawal": true,
+  "allowBetting": true,
+  "allowPaidRandomLoot": true,
+  "allowP2PTrade": true,
+  "allowDigitalAuction": true,
+  "allowAgentDistribution": true,
+  "allowPhysicalPrizeFulfillment": true,
+  "allowCashRedPacket": true,
+  "sandboxOnly": true,
+  "sandboxSettlementNotice": "所有提现/下注/现金红包界面绑定 SandboxSettlementBridge，资产为不可兑换 TEST_CREDIT。"
+}

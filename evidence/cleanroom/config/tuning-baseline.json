@@ -1,0 +1,10 @@
+{
+  "status": "INFERRED_NOT_ORIGINAL",
+  "explanation": "Values below are deterministic clean-room defaults used to make the migration baseline executable. They are NOT asserted to equal APK production values. Exact parity requires runtime traffic/server configuration or source data.",
+  "progression": {"levelXpBase":100,"levelXpStep":40,"levelUpEnergy":5},
+  "energy": {"initial":30,"battleCost":3,"mineCost":2,"exploreCost":4,"minigameCost":1},
+  "economy": {"initialCoin":500,"initialTicket":5,"mineCoinRange":[3,8],"battleWinCoin":25,"refineOreCost":10,"refineCoin":35},
+  "loot_free_only": {"coinWeight":70,"gemWeight":20,"cardWeight":10,"keyEarnEnergyCost":4},
+  "synthesis": {"duplicateCount":3},
+  "chicken": {"feedCoin":10,"eggSeconds":30,"collectCoin":25}
+}

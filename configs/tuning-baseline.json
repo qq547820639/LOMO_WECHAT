@@ -1,0 +1,41 @@
+{
+  "status": "INFERRED_NOT_ORIGINAL",
+  "explanation": "APK 使用 360 加固（com.stub.StubApp + libjiagu*），业务 DEX 运行时解密。以下全部数值为 clean-room 可运行默认值，绝不声称等于原正式服数值。原值必须来自真实后端/抓包/运营配置，接入后仅需替换本文件与 RemoteConfig 下发。",
+  "progression": { "levelXpBase": 100, "levelXpStep": 40, "levelUpEnergy": 5 },
+  "energy": { "initial": 30, "max": 120, "regenMinutes": 6, "battleCost": 3, "mineCost": 2, "exploreCost": 4, "minigameCost": 1 },
+  "economy": { "initialCoin": 500, "initialTicket": 5, "mineCoinRange": [3, 8], "refineOreCost": 10, "refineCoin": 35 },
+  "battleRoyal": {
+    "roomCount": 6, "baseDoorHp": 100, "killerDamage": 18, "repairAmount": 12,
+    "feeRate": 0.05, "daggerLossRatio": 0.2, "entryCostCoin": 50,
+    "killerTickSeconds": 8, "maxRounds": 24
+  },
+  "undertown": {
+    "bricksPerFloor": 24, "grandPrizeBrickWeightNum": 1, "entryTicketCost": 1,
+    "brickCostCoin": 20, "floorPrizeCoin": [30, 120], "grandPrizeGem": [2, 5],
+    "nextFloorUnlock": true, "maxFloorVisible": 100, "probDisplayVersion": 1
+  },
+  "arena": { "powerBase": 5, "enemyBase": 8, "winCoin": 25, "winTicketChance": 0.5, "revengeWindowMinutes": 120 },
+  "boss": { "hpPerPlayerLevel": 60, "attackCooldownSeconds": 300, "bossRewardCoin": 80, "bossRewardGem": 1 },
+  "monkeyFight": { "rounds": 3, "hitChanceBase": 0.5, "winCoin": 30 },
+  "escapeTiger": { "stepsPerRun": 12, "tigerSpeed": 1.15, "buffChance": 0.18, "obstacleChance": 0.3, "finishCoin": 60 },
+  "chicken": { "feedCoin": 10, "eggSeconds": 30, "collectCoin": 25, "thiefIntervalSeconds": 90, "guardCostCoin": 8 },
+  "marbles": { "shotsPerRound": 5, "targetScore": 150, "scoreCoinFactor": 0.2 },
+  "sports": { "tapWindowMs": 220, "rounds": 4, "winCoin": 30 },
+  "tug": { "pullEnergy": 2, "rhythmWindowMs": 180, "winCoin": 20 },
+  "monkeyKing": { "bombCost": { "one": 10, "ten": 90, "hundred": 800 }, "poolContributionRate": 0.6, "seasonScorePerBomb": 1 },
+  "multiplePit": { "players": 5, "durationMinutes": 30, "yieldPerPlayer": [20, 60], "grandPrizeWeightNum": 1 },
+  "goldMine": { "minerStamina": 100, "orePerCycle": [4, 9], "cycleSeconds": 45, "refineGoldOreCost": 20, "refineGoldOut": [1, 3] },
+  "apeMine": { "pitCount": 4, "pitDurationMinutes": 60, "pitYieldGemRange": [2, 6], "friendMineBonus": 0.1, "unlockPitCostGem": [0, 20, 60, 150] },
+  "universe": { "exploreEnergy": 4, "exploreRewardCoin": [8, 20], "shipUpgradeBase": 80, "shipUpgradeStep": 40, "contractRewardStardust": 1 },
+  "warcraft": { "extractCostApeStone": 30, "extractReward": [1, 4], "exchangeRateOreToApeStone": 10 },
+  "cards": { "synthDuplicateCount": 3, "splitDustRate": 0.34, "dustSynthCost": 30 },
+  "box": { "freeKeyWeights": { "coin": 70, "gem": 20, "card": 10 }, "keyEarnEnergyCost": 4 },
+  "gachaRabbit": { "eggCostCoin": 100, "partSlots": ["ears", "head", "body", "hands", "feet", "pants"], "powerPerRarity": { "N": 5, "R": 12, "SR": 25, "SSR": 50 } },
+  "daily": { "checkinCoinBase": 10, "checkinStreakStep": 2, "checkinStreakMax": 20, "dailyTaskCount": 5 },
+  "market": { "feeRate": 0.05, "auctionMinIncrement": 0.05, "consignmentMaxDays": 7 },
+  "robbery": { "energyCost": 3, "successBase": 0.45, "pveScoreWin": 100, "pveScoreLose": 20 },
+  "dagger": { "assassinateEnergy": 2, "upgradeCostDagger": 5, "nailPerLevel": 3 },
+  "tasks": { "dailyMineTaskCoin": 15, "dailyGameTaskCoin": 25, "inviteTaskCoin": 50 },
+  "rank": { "seasonLengthDays": 7 },
+  "antiAddiction": { "minorDailyMinutes": 40, "minorNightCurfew": "22:00-08:00" }
+}

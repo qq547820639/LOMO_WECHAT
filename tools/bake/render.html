@@ -1,0 +1,287 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PAG bake worker</title>
+<style>body { margin: 0; background: #111; } canvas { display: block; }</style>
+</head>
+<body>
+<!-- 2d canvas: makeSnapshot(ImageBitmap) → drawImage → PNG/WebP 编码（尺寸逐文件重设） -->
+<canvas id="bake-2d" width="8" height="8"></canvas>
+<script type="module">
+import { PAGInit, types } from '/lib/libpag.esm.js';
+import { Sheet, selectFrames, classifyVideoBucket } from '/lib/maxrects.mjs';
+
+let PAG = null, c2d = null, ctx2d = null;
+window.__pagReady = false;
+
+try {
+  PAG = await PAGInit({ locateFile: () => '/libpag.wasm' });
+  c2d = document.getElementById('bake-2d');
+  ctx2d = c2d.getContext('2d', { willReadFrequently: true });
+  window.__pagReady = true;
+} catch (e) {
+  window.__bootError = String(e && e.message || e);
+}
+
+function approxBytes(dataUrl) { return Math.max(0, Math.floor((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4)); }
+
+async function upload(url, blob) {
+  await fetch(url, { method: 'POST', body: blob });
+}
+
+async function uploadDataUrl(url, dataUrl) {
+  const blob = await (await fetch(dataUrl)).blob();
+  await upload(url, blob);
+}
+
+/**
+ * 逐文件烘焙（PAGView 路径，官方 demo 同款导出链路）。
+ * 实测踩坑记录（均在 tools/bake/probe_*.mjs 钉死）：
+ *  1. PAGPlayer 必须 PAGPlayer.create()，直接 new 得到 wasmIns=undefined 空壳；
+ *  2. PAGSurface.fromCanvas(动态 canvas) 创建后即 destroyed / 0×0（updateSize 无效），flush=false、readPixels=null；
+ *  3. PAGView.init(file, canvasElement) + setProgress/flush/makeSnapshot 是稳定路径。
+ */
+window.__bakeOne = async function (a) {
+  const t0 = performance.now();
+  let view = null, glCanvas = null;
+  try {
+    const resp = await fetch('/pag/' + a.slug);
+    if (!resp.ok) return { ok: false, error: 'fetch http ' + resp.status };
+    const buf = await resp.arrayBuffer();
+    const t1 = performance.now();
+    const file = await PAG.PAGFile.load(buf);
+    const w = file.width(), h = file.height();
+    if (!(w > 0) || !(h > 0) || w * h > 4096 * 4096) return { ok: false, error: 'bad size ' + w + 'x' + h };
+    const fps = file.frameRate(), durUs = file.duration();
+    const natural = Math.max(1, Math.round((durUs / 1e6) * fps));
+    const n = Math.max(1, Math.min(a.capFrames, natural));
+
+    glCanvas = document.createElement('canvas');
+    glCanvas.width = w; glCanvas.height = h;
+    document.body.appendChild(glCanvas);
+    view = await PAG.PAGView.init(file, glCanvas, { firstFrame: false });
+    if (!view) return { ok: false, error: 'PAGView.init returned undefined' };
+    if (c2d.width !== w || c2d.height !== h) { c2d.width = w; c2d.height = h; }
+    const t2 = performance.now();
+    let pngBytes = 0, webpBytes = 0, rendered = 0, blank = 0, flushFail = 0, wrote = 0;
+    for (let i = 0; i < n; i++) {
+      view.setProgress(i / n);
+      const flushed = await view.flush();
+      if (!flushed) { flushFail++; continue; }
+      const bitmap = await view.makeSnapshot();
+      if (!bitmap) { blank++; continue; }
+      rendered++;
+      ctx2d.drawImage(bitmap, 0, 0);
+      bitmap.close && bitmap.close();
+      if (a.wantPng) {
+        const u = c2d.toDataURL('image/png');
+        pngBytes += approxBytes(u);
+        if (a.keep) { await uploadDataUrl('/frame?f=' + a.slug + '&i=' + i + '&fmt=png', u); wrote++; }
+      }
+      if (a.wantWebp) {
+        const uw = c2d.toDataURL('image/webp', a.quality);
+        webpBytes += approxBytes(uw);
+        if (a.keep) { await uploadDataUrl('/frame?f=' + a.slug + '&i=' + i + '&fmt=webp', uw); }
+      }
+    }
+    const t3 = performance.now();
+    view.destroy();
+    glCanvas.remove();
+    view = null; glCanvas = null;
+    file.destroy && file.destroy();
+    return {
+      ok: rendered > 0, w: w, h: h, fps: fps, durUs: durUs, natural: natural,
+      frames: n, rendered: rendered, blank: blank, flushFail: flushFail,
+      pngBytes: pngBytes, webpBytes: webpBytes, wrote: wrote,
+      fetchMs: Math.round(t1 - t0), decodeMs: Math.round(t2 - t1), renderMs: Math.round(t3 - t2),
+      totalMs: Math.round(performance.now() - t0),
+    };
+  } catch (e) {
+    try { if (view) view.destroy(); } catch (_) { /* noop */ }
+    try { if (glCanvas) glCanvas.remove(); } catch (_) { /* noop */ }
+    return { ok: false, error: String(e && e.message || e) };
+  }
+};
+
+// ==================== P0-3：流式图集打包（跨文件共享 sheet，按特征组） ====================
+
+// group → { sheets: [{canvas, packer, frames:[]}], sheetBytes: [], sheetCount: 0 }
+window.__atlas = { groups: new Map(), seq: 0 };
+
+function groupState(group) {
+  let g = window.__atlas.groups.get(group);
+  if (!g) {
+    g = { sheets: [], sheetBytes: [], group };
+    window.__atlas.groups.set(group, g);
+  }
+  return g;
+}
+
+async function closeSheet(g, idx, a) {
+  const s = g.sheets[idx];
+  if (!s) return 0;
+  if (!s.packer.placed.length) { s.canvas.width = 0; s.canvas.height = 0; return 0; }
+  const dataUrl = s.canvas.toDataURL('image/webp', a.quality);
+  const bytes = approxBytes(dataUrl);
+  g.sheetBytes.push(bytes);
+  const file = 'sheet_' + String(window.__atlas.seq++).padStart(3, '0') + '.webp';
+  if (a.keepWebp) await uploadDataUrl('/atlas?g=' + encodeURIComponent(g.group) + '&f=' + file, dataUrl);
+  for (const fr of s.frames) fr.file = file;
+  // 释放
+  s.canvas.width = 0; s.canvas.height = 0;
+  return bytes;
+}
+
+/**
+ * 烘焙 + 在线打包（P0-3 核心）：
+ *   fetch .pag → 降帧选帧（selectFrames）→ 逐帧 makeSnapshot → MaxRects 在线放置 →
+ *   画入当前 sheet canvas → 满页即导出 WebP（keepWebp 才落盘）→ 元数据累计在 groupState。
+ * 可选 verify：对前 verifyFrames 帧，从 atlas 回抠像素与直渲 ImageData 求 meanAbsDiff（往返像素比对）。
+ */
+window.__bakeAtlas = async function (a) {
+  const t0 = performance.now();
+  let view = null, glCanvas = null;
+  try {
+    const resp = await fetch('/pag/' + a.slug);
+    if (!resp.ok) return { ok: false, error: 'fetch http ' + resp.status };
+    const buf = await resp.arrayBuffer();
+    const file = await PAG.PAGFile.load(buf);
+    const w = file.width(), h = file.height();
+    if (!(w > 0) || !(h > 0) || w * h > 4096 * 4096) return { ok: false, error: 'bad size ' + w + 'x' + h };
+    const fps = file.frameRate(), durUs = file.duration();
+    const natural = Math.max(1, Math.round((durUs / 1e6) * fps));
+    const selected = selectFrames(natural, fps, a.targetFps, a.capFrames);
+    const base = a.base; // 图集帧名前缀 = pag 文件 basename（clip 约定 `${clip}:`）
+    if (classifyVideoBucket(w, h, selected.length, a.sheetSize)) {
+      file.destroy && file.destroy();
+      return { ok: true, videoBucket: true, w, h, fps, natural, selected: selected.length };
+    }
+    const g = groupState(a.group);
+    if (c2d.width !== w || c2d.height !== h) { c2d.width = w; c2d.height = h; }
+    glCanvas = document.createElement('canvas');
+    glCanvas.width = w; glCanvas.height = h;
+    document.body.appendChild(glCanvas);
+    view = await PAG.PAGView.init(file, glCanvas, { firstFrame: false });
+    if (!view) return { ok: false, error: 'PAGView.init returned undefined' };
+
+    // verify 参考：前 N 帧直渲 ImageData（仅小文件启用，内存可控）
+    const refs = new Map();
+    const durMs = Math.round(1000 / a.targetFps);
+    let placed = 0, flushFail = 0, blank = 0;
+    const diffs = [];
+    for (let k = 0; k < selected.length; k++) {
+      const idx = selected[k];
+      view.setProgress(idx / natural);
+      const flushed = await view.flush();
+      if (!flushed) { flushFail++; continue; }
+      const bitmap = await view.makeSnapshot();
+      if (!bitmap) { blank++; continue; }
+      // 参考 ImageData（verify 时先存，供打包后回抠比对）
+      let ref = null;
+      if (a.verify && refs.size < (a.verifyFrames || 2)) {
+        ctx2d.drawImage(bitmap, 0, 0);
+        ref = ctx2d.getImageData(0, 0, w, h);
+        refs.set(idx, ref);
+      }
+      // 在线 MaxRects 放置
+      let cur = g.sheets[g.sheets.length - 1];
+      if (!cur) {
+        const canvas = document.createElement('canvas');
+        canvas.width = a.sheetSize; canvas.height = a.sheetSize;
+        cur = { canvas, packer: new Sheet(a.sheetSize, a.sheetSize), frames: [] };
+        g.sheets.push(cur);
+      }
+      let pos = cur.packer.insert(w, h);
+      if (!pos) {
+        await closeSheet(g, g.sheets.length - 1, a);
+        const canvas = document.createElement('canvas');
+        canvas.width = a.sheetSize; canvas.height = a.sheetSize;
+        cur = { canvas, packer: new Sheet(a.sheetSize, a.sheetSize), frames: [] };
+        g.sheets.push(cur);
+        pos = cur.packer.insert(w, h);
+        if (!pos) { bitmap.close && bitmap.close(); continue; } // 单帧超 sheet（已被 videoBucket 规则拦截，理论不可达）
+      }
+      const sctx = cur.canvas.getContext('2d');
+      sctx.drawImage(bitmap, pos.x, pos.y, w, h);
+      const frameName = base + ':' + String(idx).padStart(4, '0');
+      cur.frames.push({ name: frameName, x: pos.x, y: pos.y, w: w, h: h, dur: durMs, slug: a.slug, idx });
+      placed++;
+      // 往返像素比对 = 真实消费链路损失度量：直渲帧 → WebP(q=quality) 编码 → 解码 → 比对。
+      // （图集内 drawImage 搬运为 canvas 同源拷贝零损失；MaxRects 放置正确性由 unit_pack 单测保证）
+      if (a.verify && refs.has(idx)) {
+        const ref = refs.get(idx);
+        const dataUrl = c2d.toDataURL('image/webp', a.quality);
+        const img = new Image();
+        await new Promise((res) => { img.onload = () => res(null); img.onerror = () => res(null); img.src = dataUrl; });
+        if (img.width === w && img.height === h) {
+          const tctx = c2d.getContext('2d');
+          tctx.clearRect(0, 0, w, h);
+          tctx.drawImage(img, 0, 0);
+          const back = tctx.getImageData(0, 0, w, h);
+          let sum = 0;
+          const n1 = ref.data.length;
+          for (let p = 0; p < n1; p += 4) {
+            sum += Math.abs(back.data[p] - ref.data[p]) + Math.abs(back.data[p + 1] - ref.data[p + 1]) + Math.abs(back.data[p + 2] - ref.data[p + 2]);
+          }
+          diffs.push({ idx, meanAbsDiff: Number((sum / ((n1 / 4) * 3) / 255).toFixed(6)) });
+        }
+        refs.delete(idx);
+      }
+      bitmap.close && bitmap.close();
+    }
+    view.destroy();
+    glCanvas.remove();
+    view = null; glCanvas = null;
+    file.destroy && file.destroy();
+    return { ok: placed > 0, videoBucket: false, w, h, fps, natural, selected: selected.length, placed, flushFail, blank, diffs, totalMs: Math.round(performance.now() - t0) };
+  } catch (e) {
+    try { if (view) view.destroy(); } catch (_) { /* noop */ }
+    try { if (glCanvas) glCanvas.remove(); } catch (_) { /* noop */ }
+    return { ok: false, error: String(e && e.message || e) };
+  }
+};
+
+/** 组收尾：导出未满 sheet → 返回组元数据（形态 A）+ sheet 字节统计 */
+window.__atlasFlush = async function (a) {
+  const g = groupState(a.group);
+  for (let i = 0; i < g.sheets.length; i++) await closeSheet(g, i, a);
+  const frames = g.sheets.flatMap((s) => s.frames);
+  const out = {
+    group: g.group,
+    sheets: g.sheetBytes.length,
+    sheetBytes: g.sheetBytes,
+    frames: frames.map(({ slug, idx, ...rest }) => rest),
+    framesWithPlace: frames.map(({ name, x, y, w, h, dur, file }) => ({ name, x, y, w, h, dur, file })),
+  };
+  window.__atlas.groups.delete(a.group);
+  return out;
+};
+
+/** 无头满帧基准（验收第 2 条的 headless 代理；真机数据另测） */
+window.__benchAtlas = async function (a) {
+  const sheets = [];
+  for (let i = 0; i < a.sheets; i++) {
+    const cv = document.createElement('canvas');
+    cv.width = 2048; cv.height = 2048;
+    const c = cv.getContext('2d');
+    c.fillStyle = 'hsl(' + (i * 60) + ',60%,50%)';
+    c.fillRect(0, 0, 2048, 2048);
+    sheets.push(cv);
+  }
+  const frames = a.draws;
+  const t0 = performance.now();
+  for (let i = 0; i < frames; i++) {
+    const cv = sheets[i % sheets.length];
+    const c = cv.getContext('2d');
+    const sx = (i * 131) % 1536, sy = (i * 197) % 1536;
+    c.clearRect(0, 0, 256, 256);
+    c.drawImage(cv, sx, sy, 256, 256, (i * 7) % 1024, (i * 13) % 1024, 256, 256);
+  }
+  const ms = performance.now() - t0;
+  for (const cv of sheets) { cv.width = 0; cv.height = 0; }
+  return { sheets: a.sheets, draws: frames, msPerFrame: Number((ms / frames).toFixed(3)), totalMs: Math.round(ms) };
+};
+</script>
+</body>
+</html>

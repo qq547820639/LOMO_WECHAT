@@ -1,0 +1,194 @@
+[
+  {
+    "module": "third_party",
+    "display": "第三方SDK",
+    "activityCount": 113,
+    "business": false
+  },
+  {
+    "module": "com.caike.lomo.modules.ape",
+    "display": "猿宇宙",
+    "activityCount": 94,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.home",
+    "display": "主城/潮玩主页",
+    "activityCount": 91,
+    "business": true
+  },
+  {
+    "module": "com.caike.ticket.modules.mine",
+    "display": "我的/钱包",
+    "activityCount": 54,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.digtal",
+    "display": "数字潮玩",
+    "activityCount": 35,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.mall",
+    "display": "商城/卡牌",
+    "activityCount": 28,
+    "business": true
+  },
+  {
+    "module": "com.caike.ticket.modules.moon",
+    "display": "月饼/兑换",
+    "activityCount": 24,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.universe",
+    "display": "宇宙探索",
+    "activityCount": 23,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.blocks",
+    "display": "方块兽",
+    "activityCount": 23,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.nx",
+    "display": "NX竞技",
+    "activityCount": 21,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.undertown",
+    "display": "地下城",
+    "activityCount": 19,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.agent",
+    "display": "店长/代理",
+    "activityCount": 19,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.gold",
+    "display": "黄金矿场",
+    "activityCount": 17,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.box",
+    "display": "盲盒",
+    "activityCount": 16,
+    "business": true
+  },
+  {
+    "module": "com.caike.ticket.modules.main",
+    "display": "账号/登录",
+    "activityCount": 15,
+    "business": true
+  },
+  {
+    "module": "com.caike.ticket.modules.friend",
+    "display": "邀请裂变",
+    "activityCount": 11,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.applet",
+    "display": "小游戏集合",
+    "activityCount": 11,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.treasure",
+    "display": "宝藏盲盒",
+    "activityCount": 9,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.design",
+    "display": "设计师",
+    "activityCount": 8,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.common",
+    "display": "公共/飞船",
+    "activityCount": 7,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.hundred",
+    "display": "百人/IP内容",
+    "activityCount": 6,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.superlink",
+    "display": "超级链接",
+    "activityCount": 6,
+    "business": true
+  },
+  {
+    "module": "com.caike.ticket.modules.rocks",
+    "display": "方块兽/动物玩法",
+    "activityCount": 5,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.mine",
+    "display": "消息/未成年人",
+    "activityCount": 5,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.battle",
+    "display": "猿兔战斗",
+    "activityCount": 4,
+    "business": true
+  },
+  {
+    "module": "com.caike.ticket.modules.rocksTug",
+    "display": "拔河",
+    "activityCount": 3,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.rob",
+    "display": "抢夺",
+    "activityCount": 3,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.reboom",
+    "display": "炸猴王",
+    "activityCount": 3,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.multiple",
+    "display": "多人矿坑",
+    "activityCount": 3,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.modules.warcraft",
+    "display": "猿石魔兽",
+    "activityCount": 2,
+    "business": true
+  },
+  {
+    "module": "wechat",
+    "display": "微信适配",
+    "activityCount": 1,
+    "business": true
+  },
+  {
+    "module": "com.caike.lomo.slapi",
+    "display": "系统入口",
+    "activityCount": 1,
+    "business": true
+  }
+]

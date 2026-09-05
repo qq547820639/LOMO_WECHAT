@@ -1,0 +1,13 @@
+{
+  "profile": "full-baseline",
+  "purpose": "Engineering parity map. Includes all discovered feature families, including modules that must not ship unchanged.",
+  "allowCashWallet": true,
+  "allowWithdrawal": true,
+  "allowBetting": true,
+  "allowPaidRandomLoot": true,
+  "allowP2PTrade": true,
+  "allowDigitalAuction": true,
+  "allowAgentDistribution": true,
+  "allowPhysicalPrizeFulfillment": true,
+  "warning": "This profile is documentation/simulation only and is not a publishable WeChat Mini Game configuration."
+}

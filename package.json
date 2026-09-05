@@ -1,0 +1,29 @@
+{
+  "name": "lomo-wechat-formal-migration",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LOMO 4.3.7 (com.caike.lomo) → WeChat Mini Game formal engineering migration. FULL CLONE + WECHAT RELEASE dual-profile client, server-authoritative reference backend, asset pipeline, 680-route parity tooling.",
+  "scripts": {
+    "clean": "rm -rf dist build coverage",
+    "build": "tsc -p tsconfig.json",
+    "build:release": "node dist/tools/src/build_wechat.js --profile wechat-release",
+    "build:full": "node dist/tools/src/build_wechat.js --profile full-clone",
+    "build:wechat": "node dist/tools/src/build_wechat.js --profile full-clone && node dist/tools/src/build_wechat.js --profile wechat-release",
+    "gen:data": "node dist/tools/src/gen_data.js",
+    "gen:assets": "node dist/tools/src/asset_pipeline.js",
+    "test": "npm run build && node --test dist/tests/*.js",
+    "verify": "node dist/tools/src/verify.js",
+    "server": "node dist/server/src/index.js",
+    "parity": "node dist/tools/src/route_parity.js",
+    "bake:pag": "node dist/tools/src/bake_pag.js",
+    "bake:atlas": "npm run build && node dist/tools/src/bake_pag.js --atlas",
+    "bake": "npm run build && node dist/tools/src/bake_pag.js",
+    "video:pag": "node dist/tools/src/bake_pag.js --video-only"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "libpag": "^4.5.85",
+    "puppeteer-core": "^25.10.0",
+    "typescript": "^5.7.0"
+  }
+}
