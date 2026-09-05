@@ -289,7 +289,7 @@ class DuelArenaScreen extends ApiScreen {
     ui.text('已选: ' + (this.moveSeq.map(moveLabel).join('→') || '（自动）'), 16, y + 12, { size: 11, color: THEME.gold });
     y += 20;
     ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `挑战 ${this.opponents[this.selIdx]?.nick ?? '对手'}！`, () => {
-      if (this.featureId === 'monkeyFight') this.app.playOverlay('monkeyfighting__monkey_fight_idle', 1200);
+      if (this.featureId === 'monkeyFight') this.app.playOverlay(this.app.assets.resolveSlotId('monkeyfighting__'), 1200);
       void this.app.api.action('arena', 'fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then((r: any) => {
         this.app.playOverlay(r.ok && r.message.includes('胜') ? 'arena__result_success' : 'pag__pag_levelup_fail', 1500);
         this.moveSeq = [];
@@ -317,7 +317,7 @@ export class BossScreen extends ApiScreen {
 
   onEnter(): Promise<void> {
     if (!this.bossClip && this.app.assets) {
-      try { this.bossClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'challenge_boss__boss_circle_blue', 'launch', { loop: true, fitHeight: 84 }); this.bossClip.play(); } catch { this.bossClip = null; }
+      try { this.bossClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('challenge_boss__boss_circle'), 'launch', { loop: true, fitHeight: 84 }); this.bossClip.play(); } catch { this.bossClip = null; }
     }
     return super.onEnter();
   }

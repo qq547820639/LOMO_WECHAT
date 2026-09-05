@@ -192,6 +192,13 @@ export class AssetManager {
     return n;
   }
 
+  /** 槽位前缀解析：返回 manifest 中首个匹配前缀的图集 id（找不到返回原值） */
+  resolveSlotId(prefix: string): string {
+    if (!this.manifest) return prefix;
+    const hit = this.manifest.atlases.find((a) => a.id === prefix || a.id.startsWith(prefix));
+    return hit ? hit.id : prefix;
+  }
+
   /** 手动释放（屏幕 onExit / 预算压力） */
   release(id: string): void {
     const a = this.cache.get(id);

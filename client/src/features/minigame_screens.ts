@@ -17,7 +17,7 @@ export class EscapeTigerScreen extends ApiScreen {
   private tigerClip: any = null;
 
   private runnerFor(animal: string): any {
-    try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, `escape_animal__${animal}`, 'launch', { loop: true, fitHeight: 52 }); } catch { return null; }
+    try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId(`escape_animal__${animal}`), 'launch', { loop: true, fitHeight: 52 }); } catch { return null; }
   }
 
   constructor() { super('escapeTiger', '虎口逃生'); }
@@ -70,7 +70,7 @@ export class EscapeTigerScreen extends ApiScreen {
       }
       // 虎（追击者，距离越近越靠右）
       const dist = Math.max(0, data.tigerDist ?? 6);
-      if (!this.tigerClip) { try { this.tigerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'escape_animal__tiger', 'launch', { loop: true, fitHeight: 54 }); this.tigerClip.play(); } catch { this.tigerClip = null; } }
+      if (!this.tigerClip) { try { this.tigerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('escape_animal__tiger'), 'launch', { loop: true, fitHeight: 54 }); this.tigerClip.play(); } catch { this.tigerClip = null; } }
       const tigerX = 20 + (dist / 6) * (ui.w - 110);
       this.tigerClip?.draw(ui, tigerX, trackTop + trackH * 0.32, this.app.frameDt);
       ui.text('虎', tigerX, trackTop + trackH * 0.62, { size: 11, color: THEME.red });
@@ -130,7 +130,7 @@ export class ChickenScreen extends ApiScreen {
     ui.panel({ x: 12, y, w: ui.w - 24, h: 96 }, THEME.panel);
     const eggReady = st.eggReady;
     const eggPending = (st.eggReadyAt ?? 0) > 0 && !eggReady;
-    if (!this.chickenClip) { try { this.chickenClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'chicken__chicken_idle', 'launch', { loop: true, fitHeight: 40 }); this.chickenClip.play(); } catch { this.chickenClip = null; } }
+    if (!this.chickenClip) { try { this.chickenClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('chicken__'), 'launch', { loop: true, fitHeight: 40 }); this.chickenClip.play(); } catch { this.chickenClip = null; } }
     this.chickenClip?.draw(ui, ui.w - 52, y + 30, this.app.frameDt);
     ui.textCenter(eggReady ? '🥚 蛋已成熟！' : eggPending ? '🥚 孵化中…' : '🐔 鸡窝空空', ui.w / 2, y + 30, { size: 15, bold: true, color: eggReady ? THEME.gold : THEME.text });
     if (eggPending) {
@@ -208,8 +208,15 @@ export class MarblesScreen extends ApiScreen {
       this.app.ui.ctx.fillRect(ox - 4, oy - 4, 8, 8);
       // 摆锤（服务端下发）
       for (const peg of d.pegs ?? []) {
-        this.app.ui.ctx.fillStyle = THEME.purple;
-        this.app.ui.ctx.fillRect(ox + (peg.x ?? 0) * 0.85 - (peg.r ?? 10) / 2, oy - (peg.y ?? 0) * 0.3 - (peg.r ?? 10) / 2, (peg.r ?? 10), (peg.r ?? 10));
+        const pc = this.app.ui.ctx;
+        pc.fillStyle = THEME.purple;
+        pc.beginPath();
+        pc.arc(ox + (peg.x ?? 0) * 0.85, oy - (peg.y ?? 0) * 0.3, (peg.r ?? 10) / 1.6, 0, Math.PI * 2);
+        pc.fill();
+        pc.fillStyle = THEME.accent;
+        pc.beginPath();
+        pc.arc(ox + (peg.x ?? 0) * 0.85 - 2, oy - (peg.y ?? 0) * 0.3 - 2, (peg.r ?? 10) / 5, 0, Math.PI * 2);
+        pc.fill();
       }
       // 发射特效（自制美术）：待机静帧，发射时播放一遍；图集加载失败自动降级程序化
       if (this.launchClip && 'state' in this.launchClip && (this.launchClip.state as any).failed) {
@@ -313,7 +320,7 @@ export class SportsScreen extends ApiScreen {
       const nextGun = gunTimes[round];
       if (nextGun != null) ui.text(`发令: +${(nextGun / 1000).toFixed(1)}s`, ui.w - 90, y + 76, { size: 11, color: THEME.textDim });
       y += 120;
-      if (!this.runnerClip) { try { this.runnerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'sport__runner', 'launch', { loop: true, fitHeight: 46 }); this.runnerClip.play(); } catch { this.runnerClip = null; } }
+      if (!this.runnerClip) { try { this.runnerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('sport__'), 'launch', { loop: true, fitHeight: 46 }); this.runnerClip.play(); } catch { this.runnerClip = null; } }
       this.runnerClip?.draw(ui, ui.w / 2, y + 34, this.app.frameDt);
       ui.button({ x: 12, y, w: ui.w - 24, h: 70 }, 'GO！（点击反应）', () => {
         const reaction = Date.now() - this.roundStartAt - (gunTimes[round] ?? 0);
@@ -374,7 +381,7 @@ export class TugScreen extends ApiScreen {
       this.app.ui.ctx.fillRect(20, y + 40, ui.w - 40, 5);
       this.app.ui.ctx.fillStyle = THEME.accent;
       this.app.ui.ctx.fillRect(pos - 6, y + 32, 12, 20);
-      if (!this.tugClip) { try { this.tugClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'tug__team_pull', 'launch', { loop: true, fitHeight: 44 }); this.tugClip.play(); } catch { this.tugClip = null; } }
+      if (!this.tugClip) { try { this.tugClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('tug__'), 'launch', { loop: true, fitHeight: 44 }); this.tugClip.play(); } catch { this.tugClip = null; } }
       this.tugClip?.draw(ui, ui.w / 2, y + 66, this.app.frameDt);
       ui.text(`节拍 ${d.beatIdx ?? 0}/10`, 24, y + 76, { size: 11, color: THEME.textDim });
       y += 100;
