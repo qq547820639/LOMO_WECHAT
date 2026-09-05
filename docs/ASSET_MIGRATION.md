@@ -30,6 +30,11 @@
 
 烘焙执行（PAG 解码渲染→PNG 序列→图集打包）需要图形工具链（libpag 渲染端/PIL/TexturePacker），属像素产能问题而非架构问题；客户端渲染侧已实测就绪（2026-09-05，P0-1 落地；**2026-09-06 勘误：包内图集/帧曾为原版派生，已按 SANITIZATION_ASSESSMENT P0 全量替换为自绘 PNG 帧与程序化特效，下述「真实 APK 矿工帧」表述为历史记录**）：Draw.drawImage（client/src/ui/widgets.ts:18）+ FrameClip（client/src/ui/frame_clip.ts:24，支持 packed atlas 子矩形与逐帧文件两形态）+ AssetManager（client/src/core/assets.ts:54，manifest/版本/LRU/占位兜底）；真实 APK 矿工帧序列（game-assets/miner/ 8 帧）经构建管线打入包内并在主城/矿场屏实际渲染（verify bundle-smoke drawImage>0 断言）。烘焙产物按 manifest 形态 A（packed atlas）接入即播。
 
+## 视频资产处置（2026-09-06 脱敏补充）
+
+209 个原版 PAG 烘焙 mp4（tools/bake/out/video/，44MB）与 2 个样例（evidence/video_samples/）法律性质 = **原版派生美术**（同图集字节，P0 级）。
+处置：**私有研究档案**——git/ZIP/构建产物零暴露（已核查），目录内附 PRIVATE_ARCHIVE_NOTICE；原「长演出转 mp4 上 CDN」计划作废，产品若需长演出动画须以自制内容重制或完成权利清理。data/video-report.json（转换元数据）属 P1-6 逆向清单口径：研究 ZIP 内保留、外发受限。
+
 ## 图集打包实测（P0-3，2026-09-06，docs/ATLAS_REPORT.md）
 
 99 样本烘包一体：15fps 降帧 + MaxRects-BSSF 跨文件共享 sheet → 72 文件 / 1265 帧 / 78 张 2048² WebP（12.3MB，样本 PNG 863MB 的 1.5%）；WebP 往返像素损失 ≤1.03%；27 个超大件（>1024px 无法 2×2 平铺或面积超限）入 mp4 视频桶。客户端 marbles/launch_click 图集已按形态 A 入包实渲染（verify bundle-smoke + integration 断言）。

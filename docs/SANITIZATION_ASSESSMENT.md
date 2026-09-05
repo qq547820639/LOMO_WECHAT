@@ -106,6 +106,12 @@
 - **P2-4 ✅**：project.config description 去「research build」自我披露；full-clone 包 README 加「禁止对外分发或提审」。
 - **P3 ✅**：机制词/自有文案维持；.gitignore 去重。
 
+### 视频资产专项（2026-09-06 追加处置）
+
+- **定性**：`tools/bake/out/video/` 209 个 mp4（44MB）与 `evidence/video_samples/` 2 个样例 = 原版 PAG 烘焙渲染物，**原版派生美术，P0 级法律性质**（此前误列为可上 CDN 的产出，特此更正并作废该计划）。
+- **处置**：私有研究档案化——两目录附 `PRIVATE_ARCHIVE_NOTICE.txt`；git（0 跟踪）/ZIP（0 文件）/构建产物（0 引用）三面核查归零；`data/video-report.json`（转换元数据）归入 P1-6 逆向清单口径：研究 ZIP 保留、外发受限。
+- **产品影响**：当前客户端无任何视频播放路径（代码 0 引用）✓；未来长演出槽位如需视频，须自制重制或完成权利清理。
+
 ### 复扫结果（执行后）
 
 - 源码（shared/client/server/tools）grep `潮玩宇宙|无聊猿|扭蛋兔|Activity 类名`：0（BRAND_AUDIT/RUNTIME_EVIDENCE 等 L2 文档除外）
