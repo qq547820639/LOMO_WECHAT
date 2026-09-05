@@ -31,6 +31,7 @@ export class MiniGameClientApp {
   antiAddiction: any = null;
   toast: { text: string; until: number } | null = null;
   overlay: { clip: any; until: number } | null = null;
+  ambience: any = null;
   private lastLevel = 0;
   modal: { title: string; lines: string[]; actions: { label: string; onTap: () => void; color?: string }[] } | null = null;
   booted = false;
@@ -249,6 +250,10 @@ export class MiniGameClientApp {
     // Tab 栏（先画，屏幕可覆盖注册自己的命中）
     this.renderTabBar(bottom);
     this.syncBgm();
+    // 氛围窗：当前玩法家族的自制动画轮播（右下角，Tab 栏上方）
+    if (!this.ambience) this.ambience = new (require('../ui/ambience').AmbienceWindow)();
+    this.ambience.setFamily(this.router.current?.route ?? '/home');
+    this.ambience.draw(this, this.ui, this.ui.w - 78, bottom - 76, 72, this.frameDt);
     // 屏幕渲染（内部自行避开 top/bottom）
     try { screen.render(); } catch (e: any) {
       this.ui.textCenter('页面异常: ' + String(e?.message || e).slice(0, 30), this.ui.w / 2, this.ui.h / 2, { size: 12, color: THEME.red });
