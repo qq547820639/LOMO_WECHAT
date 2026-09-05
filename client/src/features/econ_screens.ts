@@ -265,6 +265,9 @@ export class CardsScreen extends ApiScreen {
       if (owned && this.cardsAtlas?.frameImages?.get(c.templateId)) {
         const img = this.cardsAtlas.frameImages.get(c.templateId);
         ui.image(img, cx + 2, cy + 2, cw - 4, 56);
+        const cc = ui.ctx as any;
+        cc.fillStyle = 'rgba(10,12,24,0.72)';
+        cc.fillRect(cx + 2, cy + 12, cw - 4, 46);
       }
       const rarityColor = ({ N: THEME.textDim, R: THEME.accent2, SR: THEME.purple, SSR: THEME.gold } as Record<string, string>)[c.rarity] ?? THEME.text;
       ui.textCenter(owned ? c.name : '???', cx + cw / 2, cy + 18, { size: 10, bold: true, color: owned ? rarityColor : THEME.disabled });

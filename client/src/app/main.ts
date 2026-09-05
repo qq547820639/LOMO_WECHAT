@@ -250,10 +250,6 @@ export class MiniGameClientApp {
     // Tab 栏（先画，屏幕可覆盖注册自己的命中）
     this.renderTabBar(bottom);
     this.syncBgm();
-    // 氛围窗：当前玩法家族的自制动画轮播（右下角，Tab 栏上方）
-    if (!this.ambience) this.ambience = new (require('../ui/ambience').AmbienceWindow)();
-    this.ambience.setFamily(this.router.current?.route ?? '/home');
-    this.ambience.draw(this, this.ui, this.ui.w - 78, bottom - 76, 72, this.frameDt);
     // 屏幕渲染（内部自行避开 top/bottom）
     try { screen.render(); } catch (e: any) {
       this.ui.textCenter('页面异常: ' + String(e?.message || e).slice(0, 30), this.ui.w / 2, this.ui.h / 2, { size: 12, color: THEME.red });
@@ -269,6 +265,10 @@ export class MiniGameClientApp {
       const actions = this.modal.actions.length ? this.modal.actions : [{ label: '知道了', onTap: () => { this.modal = null; } }];
       this.ui.modal(this.modal.title, this.modal.lines, () => { this.modal = null; }, actions.map((a) => ({ ...a, onTap: () => { this.modal = null; a.onTap(); } })));
     }
+    // 氛围窗：当前玩法家族的自制动画轮播（屏幕层之上、半透明，不挡命中）
+    if (!this.ambience) this.ambience = new (require('../ui/ambience').AmbienceWindow)();
+    this.ambience.setFamily(this.router.current?.route ?? '/home');
+    this.ambience.draw(this, this.ui, this.ui.w - 70, bottom - 66, 62, this.frameDt, 0.62);
     if (this.overlay) {
       const c2 = this.ui.ctx;
       c2.fillStyle = 'rgba(6,8,16,0.72)';

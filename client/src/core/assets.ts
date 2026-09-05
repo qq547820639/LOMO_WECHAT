@@ -204,6 +204,22 @@ export class AssetManager {
     return hit ? String(hit.id) : prefix;
   }
 
+  /** 独立加载（绕过 LRU）：AmbienceWindow 等长驻轮播专用，避免驱逐屏内正在使用的图集 */
+  async loadStandalone(id: string): Promise<{ frames: Array<{ name: string; w: number; h: number }>; frameImages: Map<string, any> } | null> {
+    if (!this.manifest) await this.loadManifest();
+    const entry = this.manifest?.atlases.find((a) => a.id === id);
+    if (!entry) return null;
+    const frameImages = new Map<string, any>();
+    for (const f of entry.frames) {
+      if (!f.file) continue;
+      try {
+        const img = await this.loadImage(this.url(entry as any, f.file), f.w, f.h);
+        frameImages.set(f.name, img);
+      } catch { /* 单帧失败跳过 */ }
+    }
+    return frameImages.size ? { frames: entry.frames as any, frameImages } : null;
+  }
+
   /** 手动释放（屏幕 onExit / 预算压力） */
   release(id: string): void {
     const a = this.cache.get(id);
