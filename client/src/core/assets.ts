@@ -192,11 +192,16 @@ export class AssetManager {
     return n;
   }
 
-  /** 槽位前缀解析：返回 manifest 中首个匹配前缀的图集 id（找不到返回原值） */
+  /**
+   * 槽位解析（v3）：大小写不敏感的包含语义。
+   * 兼容三类命名空间：视频桶（anims/pag__*）、图集桶（*）、目录相对（anims/*）。
+   * 找不到时返回原值（调用方已有占位降级）。
+   */
   resolveSlotId(prefix: string): string {
     if (!this.manifest) return prefix;
-    const hit = this.manifest.atlases.find((a) => a.id === prefix || a.id.startsWith(prefix));
-    return hit ? hit.id : prefix;
+    const p = prefix.toLowerCase();
+    const hit = this.manifest.atlases.find((a) => String(a.id).toLowerCase().includes(p));
+    return hit ? String(hit.id) : prefix;
   }
 
   /** 手动释放（屏幕 onExit / 预算压力） */

@@ -384,7 +384,7 @@ export class RobberyScreen extends ApiScreen {
     ui.text(`体力消耗 ${st.energyCost} · 基础成功率 ${(st.successBase * 100).toFixed(0)}%（战力加成）`, 24, y + 40, { size: 10, color: THEME.textDim });
     ui.text('原玩家间资产抢夺已改为 PvE 积分制（RELEASE 合规改造）', 24, y + 56, { size: 9, color: THEME.gold });
     y += 78;
-    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '发起争夺', () => { void this.act('raid').then(() => this.app.playOverlay('rob__rob_effect', 1100)); }, { color: THEME.accent });
+    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '发起争夺', () => { void this.act('raid').then(() => this.app.playOverlay(this.app.assets.resolveSlotId('rob__du'), 1100)); }, { color: THEME.accent });
     y += 56;
     if (st.rank?.length) {
       ui.panel({ x: 12, y, w: ui.w - 24, h: 24 + st.rank.length * 17 }, THEME.panel);

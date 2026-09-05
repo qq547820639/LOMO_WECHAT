@@ -17,6 +17,7 @@ async function main(): Promise<void> {
     { name: 'unit-core', fn: () => require('../../tests/unit_core').run() },
     { name: 'unit-assets+compliance', fn: () => require('../../tests/unit_assets').run() },
     { name: 'unit-pack', fn: () => require('../../tests/unit_pack').run() },
+    { name: 'slot-ref-integrity', fn: () => require('./check_slot_refs').run() },
     { name: 'gameplay-server', fn: () => require('../../tests/gameplay_server').run() },
     { name: 'release-safety', fn: () => require('../../tests/release_safety').run() },
     {
