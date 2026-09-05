@@ -363,17 +363,19 @@ function drawGlyph(c: Canvas, glyph: string, cx: number, cy: number, s: number, 
 const FRAMES_N = 8;
 const M_SKIN = 6, M_HELM = 3, M_WOOD = 5, M_GOLD = 3, M_ACC = 1, M_ACC2 = 2, M_BLUE = 4, M_DUST = 5, M_BOOT = 9, M_GLOVE = 10, M_DARK = 11;
 
-function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, group?: string): Buffer[] {
+function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, group?: string, perf = false): Buffer[] {
   const { arch, ramp, glyph, seed } = classify(rel, group);
   const mats = [ramp, rampOf(hsl((seed % 97) + 8, 0.6, 0.55)), rampOf(hsl((seed % 53) + 180, 0.55, 0.6)), rampOf(hsl(45, 0.85, 0.6)), rampOf(hsl(212, 0.62, 0.46)), rampOf(hsl(210, 0.1, 0.7)), rampOf(hsl(28, 0.6, 0.68)), rampOf(hsl(45, 0.75, 0.5)), rampOf(hsl(150, 0.5, 0.5)), rampOf(hsl(28, 0.5, 0.35)), rampOf(hsl(28, 0.45, 0.42)), rampOf(hsl(258, 0.45, 0.2))]; // +6 皮肤 +7 盔/杀手深
   const M_BODY = 0, M_ACC = 1, M_ACC2 = 2, M_GOLD = 3, M_BLUE = 4, M_DUST = 5;
   const aspect = wOrig / hOrig;
-  const lw = aspect > 1.3 ? 84 : aspect < 0.77 ? 42 : 64;
-  const lh = aspect > 1.3 ? 42 : aspect < 0.77 ? 84 : 64;
+  const szMul = perf ? 1.3 : 1;
+  const lw = Math.round((aspect > 1.3 ? 84 : aspect < 0.77 ? 42 : 64) * szMul);
+  const lh = Math.round((aspect > 1.3 ? 42 : aspect < 0.77 ? 84 : 64) * szMul);
+  const FR = perf ? 16 : FRAMES_N;
   const out: Buffer[] = [];
   let prevMat: Int8Array | null = null;
   const GHOST: RGB = [74, 84, 124];
-  for (let f = 0; f < FRAMES_N; f++) {
+  for (let f = 0; f < FR; f++) {
     const t = f / FRAMES_N;
     const wave = Math.sin(t * Math.PI * 2);
     const c = new Canvas(lw, lh, mats);
@@ -639,6 +641,27 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, g
         void rot;
       }
     }
+    if (perf) {
+      // 演出级增强：旋转神光 + 彩带屑 + 余焰核
+      const rays = 10, rayLen = Math.min(lw, lh) * 0.62;
+      for (let rr = 0; rr < rays; rr++) {
+        const a = (rr / rays) * Math.PI * 2 + t * Math.PI * 0.5;
+        const col: RGB = rr % 2 ? [255, 224, 120] : [140, 190, 255];
+        for (let st = 3; st < Math.floor(rayLen / 2); st += 2) {
+          c.writeRGB(Math.round(cx + Math.cos(a) * st * 2), Math.round(cy + Math.sin(a) * st * 2), col);
+        }
+      }
+      for (let cf = 0; cf < 12; cf++) {
+        const cfx = ((seed >> cf) % lw + cf * 7 + f * 5) % lw;
+        const cfy = (f * 11 + cf * 29) % Math.floor(lh * 0.8);
+        const cc: RGB = cf % 3 === 0 ? [255, 120, 160] : cf % 3 === 1 ? [120, 220, 160] : [255, 214, 96];
+        c.writeDisc(cfx, cfy, 1.6, cc);
+      }
+      if (arch === 'burst' || arch === 'rise') {
+        const after = Math.max(0, t - 0.55) / 0.45;
+        if (after > 0) c.writeDisc(cx, cy, S * 0.5 * (1 - after) + 2, [255, 255, 230]);
+      }
+    }
     prevMat = Int8Array.from(c.mat);
     out.push(c.render(2));
   }
@@ -648,14 +671,14 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, g
 // ================= 主流程 =================
 export function generate(): void {
   const report = JSON.parse(fs.readFileSync(rootPath('data', 'video-report.json'), 'utf8'));
-  const slots: Array<{ rel: string; w: number; h: number; group?: string }> = (report.rows || []).map((r: any) => ({ rel: r.rel, w: r.w, h: r.h }));
+  const slots: Array<{ rel: string; w: number; h: number; group?: string; perf?: boolean }> = (report.rows || []).map((r: any) => ({ rel: r.rel, w: r.w, h: r.h, perf: true }));
   // SANITIZATION 批 1：图集桶（326 文件）补产——bake 全量行减去 video 桶行
   try {
     const bake = JSON.parse(fs.readFileSync(rootPath('data', 'bake-report.json'), 'utf8'));
     const videoRels = new Set(slots.map((s2) => s2.rel));
     for (const row of bake.rows || []) {
       if (!row.ok || videoRels.has(row.rel)) continue;
-      slots.push({ rel: row.rel, w: row.w, h: row.h, group: row.group });
+      slots.push({ rel: row.rel, w: row.w, h: row.h, group: row.group, perf: false });
     }
   } catch { /* bake 报告缺失时仅产视频桶 */ }
   if (!slots.length) { console.error('no slots'); process.exit(1); }
@@ -667,14 +690,14 @@ export function generate(): void {
   const previews: string[] = [];
   for (const s of slots) {
     const slotId = s.rel.replace(/\.pag$/i, '').replace(/\//g, '__');
-    const frames = renderSlot(slotId, s.rel, s.w, s.h, s.group);
+    const frames = renderSlot(slotId, s.rel, s.w, s.h, s.group, s.perf === true);
     const dir = path.join(outRoot, slotId);
     fs.mkdirSync(dir, { recursive: true });
     frames.forEach((buf, i) => fs.writeFileSync(path.join(dir, `f0${i}.png`), buf));
     written += frames.length;
     const { arch } = classify(s.rel, s.group);
     archCount[arch] = (archCount[arch] ?? 0) + 1;
-    if (previews.length < 48) previews.push(path.join(dir, 'f03.png'));
+    if (previews.length < 48) previews.push(path.join(dir, s.perf === false ? 'f03.png' : 'f08.png'));
   }
   // 预览拼板（抽 48 槽的 f03）
   const cols = 8, cell = 104, rows = Math.ceil(previews.length / cols);
