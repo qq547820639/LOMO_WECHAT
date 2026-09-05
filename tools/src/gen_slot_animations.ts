@@ -80,7 +80,7 @@ export class Canvas {
   mat: Int8Array;
   mats: Ramp[];
   constructor(public W: number, public H: number, mats: Ramp[]) {
-    this.px = new Uint8Array(W * H * 4);
+    this.px = new Uint8Array(W * 2 * H * 2 * 4);
     this.mat = new Int8Array(W * H).fill(-1);
     this.mats = mats;
   }
@@ -117,8 +117,18 @@ export class Canvas {
     }
   }
   /** 上缘提亮/下缘压暗 + 轮廓描边 → 放大输出 */
+  clear(): void {
+    this.px.fill(0);
+    this.mat.fill(-1);
+  }
+  /** 前一帧残影：以暗蓝色印记（在被当前帧覆盖前调用） */
+  stampGhost(prev: Int8Array, ghostRGB: RGB): void {
+    for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
+      if (prev[y * this.W + x] >= 0 && this.mat[y * this.W + x] < 0) this.writeRGB(x, y, ghostRGB);
+    }
+  }
   render(scale: number): Buffer {
-    const px = new Uint8Array(this.W * scale * this.H * scale * 4);
+    // v2 合成模式：保留原型已绘的 writeRGB 特效层（修复曾被整体重建吞掉的缺陷）
     const shade = new Uint8Array(this.W * this.H);
     for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
       const i = y * this.W + x;
@@ -128,23 +138,32 @@ export class Canvas {
       if ((up || left) && !(down && right)) shade[i] = 1;
       else if (down || right) shade[i] = 2;
     }
+    const mix = (a: RGB, b: RGB, t: number): RGB => [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+    // 1) 材质三阶色阶（不透明，覆盖特效层）
     for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
       const i = y * this.W + x;
       const m = this.mat[i];
-      let rgb: RGB;
-      if (m < 0) {
-        if (!(this.filled(x - 1, y) || this.filled(x + 1, y) || this.filled(x, y - 1) || this.filled(x, y + 1))) continue;
-        rgb = OUTLINE;
-      } else {
-        const r = this.mats[m];
-        rgb = shade[i] === 1 ? r.hi : shade[i] === 2 ? r.lo : r.base;
-      }
+      if (m < 0) continue;
+      const r = this.mats[m];
+      const rgb = shade[i] === 1 ? r.hi : shade[i] === 2 ? r.lo : r.base;
       for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
         const di = ((y * scale + sy) * this.W * scale + (x * scale + sx)) * 4;
-        px[di] = rgb[0]; px[di + 1] = rgb[1]; px[di + 2] = rgb[2]; px[di + 3] = 255;
+        this.px[di] = rgb[0]; this.px[di + 1] = rgb[1]; this.px[di + 2] = rgb[2]; this.px[di + 3] = 255;
       }
     }
-    return encodePNG(this.W * scale, this.H * scale, px);
+    // 2) 描边（空像素且邻接实体；受光侧轮廓混入材质高光）
+    for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
+      const di0 = (y * this.W + x) * 4;
+      if (this.px[di0 + 3] !== 0) continue;
+      if (!(this.filled(x - 1, y) || this.filled(x + 1, y) || this.filled(x, y - 1) || this.filled(x, y + 1))) continue;
+      const belowM = this.filled(x, y + 1) ? this.mat[(y + 1) * this.W + x] : -1;
+      const rgb = belowM >= 0 ? mix(OUTLINE, this.mats[belowM].hi, 0.5) : OUTLINE;
+      for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
+        const di = ((y * scale + sy) * this.W * scale + (x * scale + sx)) * 4;
+        this.px[di] = rgb[0]; this.px[di + 1] = rgb[1]; this.px[di + 2] = rgb[2]; this.px[di + 3] = 255;
+      }
+    }
+    return encodePNG(this.W * scale, this.H * scale, this.px);
   }
   /** 直接写 RGB 覆盖（光效用，绕过材质） */
   writeRGB(x: number, y: number, rgb: RGB): void {
@@ -335,23 +354,39 @@ function drawGlyph(c: Canvas, glyph: string, cx: number, cy: number, s: number, 
 
 // ================= 12 种运动原型 =================
 const FRAMES_N = 8;
-const M_SKIN = 6, M_HELM = 3, M_WOOD = 5, M_GOLD = 3, M_ACC = 1, M_ACC2 = 2, M_BLUE = 4, M_DUST = 5;
+const M_SKIN = 6, M_HELM = 3, M_WOOD = 5, M_GOLD = 3, M_ACC = 1, M_ACC2 = 2, M_BLUE = 4, M_DUST = 5, M_BOOT = 9, M_GLOVE = 10, M_DARK = 11;
 
 function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, group?: string): Buffer[] {
   const { arch, ramp, glyph, seed } = classify(rel, group);
-  const mats = [ramp, rampOf(hsl((seed % 97) + 8, 0.6, 0.55)), rampOf(hsl((seed % 53) + 180, 0.55, 0.6)), rampOf(hsl(45, 0.85, 0.6)), rampOf(hsl(205, 0.5, 0.62)), rampOf(hsl(210, 0.1, 0.7)), rampOf(hsl(28, 0.55, 0.6)), rampOf(hsl(210, 0.25, 0.5))]; // +6 皮肤 +7 盔/杀手深
+  const mats = [ramp, rampOf(hsl((seed % 97) + 8, 0.6, 0.55)), rampOf(hsl((seed % 53) + 180, 0.55, 0.6)), rampOf(hsl(45, 0.85, 0.6)), rampOf(hsl(212, 0.62, 0.46)), rampOf(hsl(210, 0.1, 0.7)), rampOf(hsl(28, 0.6, 0.68)), rampOf(hsl(45, 0.75, 0.5)), rampOf(hsl(150, 0.5, 0.5)), rampOf(hsl(28, 0.5, 0.35)), rampOf(hsl(28, 0.45, 0.42)), rampOf(hsl(258, 0.45, 0.2))]; // +6 皮肤 +7 盔/杀手深
   const M_BODY = 0, M_ACC = 1, M_ACC2 = 2, M_GOLD = 3, M_BLUE = 4, M_DUST = 5;
   const aspect = wOrig / hOrig;
-  const lw = aspect > 1.3 ? 64 : aspect < 0.77 ? 32 : 48;
-  const lh = aspect > 1.3 ? 32 : aspect < 0.77 ? 64 : 48;
+  const lw = aspect > 1.3 ? 84 : aspect < 0.77 ? 42 : 64;
+  const lh = aspect > 1.3 ? 42 : aspect < 0.77 ? 84 : 64;
   const out: Buffer[] = [];
+  let prevMat: Int8Array | null = null;
+  const GHOST: RGB = [74, 84, 124];
   for (let f = 0; f < FRAMES_N; f++) {
     const t = f / FRAMES_N;
     const wave = Math.sin(t * Math.PI * 2);
     const c = new Canvas(lw, lh, mats);
     const slotIdForTone = slotId;
     const cx = lw / 2, cy = lh / 2;
-    const S = Math.min(lw, lh) * 0.16;
+    // v2 场景背景层：夜空渐变 + 地平线 + 确定性星点
+    const toneA = hsl((seed % 97) + 205, 0.5, 0.12), toneB = hsl((seed % 97) + 215, 0.45, 0.19);
+    for (let y = 0; y < lh; y++) {
+      const tt = y / lh;
+      const row: RGB = [Math.round(toneA[0] + (toneB[0] - toneA[0]) * tt), Math.round(toneA[1] + (toneB[1] - toneA[1]) * tt), Math.round(toneA[2] + (toneB[2] - toneA[2]) * tt)];
+      for (let x = 0; x < lw; x++) c.writeRGB(x, y, row);
+    }
+    const groundY = Math.floor(lh * 0.87);
+    for (let x = 0; x < lw; x++) { c.writeRGB(x, groundY, hsl((seed % 89) + 120, 0.25, 0.15)); c.writeRGB(x, groundY + 1, hsl((seed % 89) + 120, 0.25, 0.11)); }
+    for (let st = 0; st < 7; st++) {
+      const sx2 = (seed >> st) % lw, sy2 = (seed >> (st + 3)) % Math.floor(lh * 0.5);
+      c.writeRGB(sx2, sy2, st % 2 ? [206, 216, 255] : [255, 255, 244]);
+    }
+    if (prevMat) c.stampGhost(prevMat, GHOST);
+    const S = Math.min(lw, lh) * 0.24;
     switch (arch) {
       case 'rise': {
         const rise = (1 - t) * S * 2.2;
@@ -469,21 +504,46 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, g
         break;
       }
       case 'humanoid': {
-        // 人形角色：idle 呼吸 / walk 步行；杀手=暗色+红眼；铜/金/银=工装色变体
+        // v2 人形：肘/膝两段肢体 + 面部（眨眼/嘴）+ 杀手围巾；杀手=暗色+红眼；铜/金/银=工装变体
         const n = slotIdForTone.toLowerCase();
         const killer = n.includes('killer');
-        const suitM = killer ? 1 : n.includes('gold') ? 3 : n.includes('copper') ? 10 : n.includes('silver') ? 4 : 3;
+        const suitM = killer ? M_DARK : n.includes('gold') ? M_GOLD : n.includes('copper') ? M_BOOT : n.includes('silver') ? 7 : M_BLUE;
         const walk = n.includes('walk');
         const bob = walk ? Math.abs(Math.sin(t * Math.PI * 4)) * 2 : Math.sin(t * Math.PI * 2) * 1;
-        const cx2 = cx, headY = cy - S * 0.9 - bob, bodyY = cy - S * 0.2 - bob;
-        c.limb(cx2 - S * 0.25, bodyY + S * 0.5, cx2 - S * (0.3 + (walk ? Math.sin(t * Math.PI * 4) * 0.18 : 0)), bodyY + S * 1.05, S * 0.24, S * 0.16, killer ? M_ACC2 : M_BLUE);
-        c.limb(cx2 + S * 0.25, bodyY + S * 0.5, cx2 + S * (0.3 + (walk ? -Math.sin(t * Math.PI * 4) * 0.18 : 0)), bodyY + S * 1.05, S * 0.24, S * 0.16, killer ? M_ACC2 : M_BLUE);
-        c.rect(Math.floor(cx2 - S * 0.38), Math.floor(bodyY - S * 0.1), Math.floor(S * 0.76), Math.floor(S * 0.72), suitM);
-        c.limb(cx2 - S * 0.32, bodyY - S * 0.02, cx2 - S * 0.5 + (walk ? -Math.sin(t * Math.PI * 4) * S * 0.16 : Math.sin(t * Math.PI * 2) * S * 0.06), bodyY + S * 0.36, S * 0.2, S * 0.14, suitM);
-        c.limb(cx2 + S * 0.32, bodyY - S * 0.02, cx2 + S * 0.5 + (walk ? Math.sin(t * Math.PI * 4) * S * 0.16 : -Math.sin(t * Math.PI * 2) * S * 0.06), bodyY + S * 0.36, S * 0.2, S * 0.14, suitM);
+        const cx2 = cx, headY = cy - S * 0.95 - bob, bodyY = cy - S * 0.2 - bob;
+        const swing = walk ? Math.sin(t * Math.PI * 4) : 0;
+        for (const side of [-1, 1]) {
+          const hx = cx2 + side * S * 0.22;
+          const ph = swing * side;
+          const kx = hx + ph * S * 0.18, ky = bodyY + S * 0.62;
+          const ax = kx + ph * S * 0.22, ay = bodyY + S * 1.08;
+          c.limb(hx, bodyY + S * 0.52, kx, ky, S * 0.22, S * 0.16, killer ? M_DARK : M_BLUE);
+          c.limb(kx, ky, ax, ay, S * 0.15, S * 0.1, killer ? M_DARK : M_BLUE);
+          c.rect(Math.floor(ax - S * 0.16), Math.floor(ay - 1), Math.floor(S * 0.36), 3, M_BOOT);
+        }
+        c.rect(Math.floor(cx2 - S * 0.36), Math.floor(bodyY - S * 0.14), Math.floor(S * 0.72), Math.floor(S * 0.72), suitM);
+        c.rect(Math.floor(cx2 - S * 0.36), Math.floor(bodyY + S * 0.38), Math.floor(S * 0.72), 2, M_GLOVE);
+        for (const side of [-1, 1]) {
+          const sx3 = cx2 + side * S * 0.34;
+          const sw2 = walk ? Math.sin(t * Math.PI * 4 + (side > 0 ? Math.PI : 0)) : Math.sin(t * Math.PI * 2) * 0.4;
+          const ex2 = sx3 + sw2 * S * 0.2, ey2 = bodyY + S * 0.28;
+          const hx2 = ex2 + sw2 * S * 0.22, hy2 = ey2 + S * 0.3;
+          c.limb(sx3, bodyY - S * 0.05, ex2, ey2, S * 0.18, S * 0.13, suitM);
+          c.limb(ex2, ey2, hx2, hy2, S * 0.13, S * 0.1, suitM);
+          c.disc(hx2, hy2, S * 0.1, M_GLOVE);
+        }
         c.disc(cx2, headY, S * 0.3, killer ? M_ACC : M_SKIN);
-        c.disc(cx2, headY - S * 0.18, S * 0.32, killer ? M_ACC2 : M_HELM);
-        if (killer) { c.put(Math.round(cx2 - S * 0.12), Math.round(headY), -3); c.put(Math.round(cx2 + S * 0.12), Math.round(headY), -3); }
+        const blink = f === 1 || f === 5;
+        const eyeY2 = headY + S * 0.02;
+        if (blink) { c.put(Math.round(cx2 + S * 0.1), Math.round(eyeY2), -2); c.put(Math.round(cx2 + S * 0.24), Math.round(eyeY2), -2); }
+        else { c.put(Math.round(cx2 + S * 0.1), Math.round(eyeY2), -2); c.put(Math.round(cx2 + S * 0.24), Math.round(eyeY2), -2); c.put(Math.round(cx2 + S * 0.1), Math.round(eyeY2 - 1), M_GLOVE); c.put(Math.round(cx2 + S * 0.24), Math.round(eyeY2 - 1), M_GLOVE); }
+        c.put(Math.round(cx2 + S * 0.18), Math.round(headY + S * 0.12), -2);
+        c.disc(cx2, headY - S * 0.2, S * 0.33, killer ? M_DARK : M_GOLD);
+        c.rect(Math.floor(cx2 - S * 0.36), Math.floor(headY - S * 0.22), Math.floor(S * 0.74), 2, killer ? M_DARK : M_GOLD);
+        if (killer) {
+          const fl = Math.sin(t * Math.PI * 4) * S * 0.12;
+          c.limb(cx2 - S * 0.3, headY + S * 0.12, cx2 - S * 0.75, headY + S * 0.3 + fl, S * 0.16, S * 0.06, M_ACC);
+        }
         break;
       }
       case 'chicken': {
@@ -572,6 +632,7 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, g
         void rot;
       }
     }
+    prevMat = Int8Array.from(c.mat);
     out.push(c.render(2));
   }
   return out;

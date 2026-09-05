@@ -146,9 +146,11 @@ export class UndertownScreen extends ApiScreen {
       const bx = 12 + ((i - 1) % cols) * (bw + 5);
       const by = y + Math.floor((i - 1) / cols) * 50;
       const idx = i;
-      ui.button({ x: bx, y: by, w: bw, h: 44 }, `${i}`, () => this.act('openBrick', { brickIndex: idx }), {
-        color: THEME.panel2, size: 13,
-      });
+      ui.button({ x: bx, y: by, w: bw, h: 44 }, `${i}`, () => {
+        void this.act('openBrick', { brickIndex: idx }).then((r: any) => {
+          if (r.ok && (r.message.includes('解锁') || r.message.includes('保底'))) this.app.playOverlay('pag__ready_go__ready_go', 1300);
+        });
+      }, { color: THEME.panel2, size: 13 });
     }
     y += Math.ceil(st.bricks / cols) * 50 + 6;
     const bw2 = (ui.w - 24 - 8) / 2;
@@ -224,6 +226,7 @@ class DuelArenaScreen extends ApiScreen {
     ui.text('已选: ' + (this.moveSeq.map(moveLabel).join('→') || '（自动）'), 16, y + 12, { size: 11, color: THEME.gold });
     y += 20;
     ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `挑战 ${this.opponents[this.selIdx]?.nick ?? '对手'}！`, () => {
+      if (this.featureId === 'monkeyFight') this.app.playOverlay('monkeyfighting__monkey_fight_idle', 1200);
       void this.app.api.action('arena', 'fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then((r: any) => {
         this.app.playOverlay(r.ok && r.message.includes('胜') ? 'arena__result_success' : 'pag__pag_levelup_fail', 1500);
         this.moveSeq = [];
@@ -318,7 +321,7 @@ export class RobberyScreen extends ApiScreen {
     ui.text(`体力消耗 ${st.energyCost} · 基础成功率 ${(st.successBase * 100).toFixed(0)}%（战力加成）`, 24, y + 40, { size: 10, color: THEME.textDim });
     ui.text('原玩家间资产抢夺已改为 PvE 积分制（RELEASE 合规改造）', 24, y + 56, { size: 9, color: THEME.gold });
     y += 78;
-    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '发起争夺', () => this.act('raid'), { color: THEME.accent });
+    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '发起争夺', () => { void this.act('raid').then(() => this.app.playOverlay('rob__rob_effect', 1100)); }, { color: THEME.accent });
     y += 56;
     if (st.rank?.length) {
       ui.panel({ x: 12, y, w: ui.w - 24, h: 24 + st.rank.length * 17 }, THEME.panel);

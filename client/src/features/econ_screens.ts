@@ -274,7 +274,7 @@ export class CardsScreen extends ApiScreen {
         ui.hits.push({ x: cx, y: cy, w: cw, h: 60, onTap: () => {
           this.app.showModal(c.name, [`稀有度 ${c.rarity} · 战力 ${c.power}`, `类型 ${c.cardType} · 持有 ${c.owned} 张`], [
             { label: `合成${c.owned >= st.synthNeed ? '' : '(不足)'}`, onTap: () => this.act('synth', { templateId: c.templateId }) },
-            { label: '拆分', onTap: () => this.act('split', { templateId: c.templateId }) },
+            { label: '拆分', onTap: () => { void this.act('split', { templateId: c.templateId }).then(() => this.app.playOverlay('pag__card_split', 1200)); } },
           ]);
         }, id: 'card' + i });
       }
@@ -300,7 +300,7 @@ export class BoxScreen extends ApiScreen {
     ui.text('付费随机获利链路已切断；RELEASE 下此玩法为任务钥匙制', 24, y + 56, { size: 9, color: THEME.green });
     y += 76;
     const bw = (ui.w - 24 - 8) / 2;
-    ui.button({ x: 12, y, w: bw, h: 48 }, '开箱（1 钥匙）', () => this.act('openFree'), { color: THEME.gold, disabled: st.keys < 1 });
+    ui.button({ x: 12, y, w: bw, h: 48 }, '开箱（1 钥匙）', () => { void this.act('openFree').then(() => this.app.playOverlay('pag__luckybag', 1300)); }, { color: THEME.gold, disabled: st.keys < 1 });
     ui.button({ x: 12 + bw + 8, y, w: bw, h: 48 }, '做任务得钥匙(-4体)', () => this.act('earnKey'), { color: THEME.accent2 });
     y += 58;
     (st.history ?? []).slice(0, 6).forEach((h: any, i: number) => {
@@ -323,7 +323,7 @@ export class DailyScreen extends ApiScreen {
     ui.text(st.checkedToday ? '今日已签到 ✓' : '今日未签到', 24, y + 22, { size: 14, bold: true, color: st.checkedToday ? THEME.green : THEME.gold });
     ui.text(`连续签到 ${st.streak} 天（每 7 天里程碑奖券 +2）`, 24, y + 42, { size: 11, color: THEME.textDim });
     y += 70;
-    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, st.checkedToday ? '已签到' : '签到', () => this.act('checkin'), { color: THEME.accent, disabled: st.checkedToday });
+    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, st.checkedToday ? '已签到' : '签到', () => { void this.act('checkin').then(() => this.app.playOverlay('pag__pag_levelup', 1300)); }, { color: THEME.accent, disabled: st.checkedToday });
     y += 58;
     ui.text('每日任务', 16, y + 12, { size: 13, bold: true });
     y += 20;
