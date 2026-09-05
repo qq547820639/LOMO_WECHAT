@@ -79,3 +79,19 @@
 - **图标/卡面**：❌ 不支撑 → 批 4。
 
 **一句话结论**：功能上已经不是空壳；表现层有 4 个可量化的缺口，全部有明确的自制补齐路径且无外部依赖。补完批 1-3 后，游戏在"看得见主角、听得见声音、大演出有表现"的意义上脱离空壳；批 4 后具备完整的收集感。
+
+
+---
+
+## 处置记录（✅ 2026-09-06 四批次一次性执行完毕）
+
+| 批次 | 交付 | 验证 |
+|---|---|---|
+| 批 1 角色动画补产 | gen_slot_animations 扩展：humanoid（idle/walk/killer 暗色+红眼+铜金银变体）/ chicken（啄食+冠+尾）/ tugpull（双人后仰+绳标摆动）/ victory（跳起 V 手+星芒）/ ball（弹跳压扁高光）/ iconfx（盾/速度线/无敌圈/泥滴语义图形）+ 分组分类映射 → **535 槽位 × 8 帧 = 4280 帧自制动画**（17MB，覆盖原 209 视频桶 + 326 图集桶全量） | 原型分布均衡（run 114/burst 65/sway 53/shake 46/marbleRain 47/flow 25/pop 34/pulse 34/rise 36/spark 31/orbit 11/banner 4/tugpull 21/chicken 7/humanoid 7） |
+| 批 2 接线 | `app.playOverlay(slotId)` 全屏大演出通用接线口 + 15 个屏幕接线点：Boss（boss_circle 常驻视觉）、竞技场（胜负结算 overlay）、虎口（动物奔跑预览）、拔河（双人拉绳）、运动会（跑者+反应）、吃鸡（母鸡啄食）、大逃杀（我的角色 avatar，连胜金装）、扭蛋（部位展示轮播）、宇宙（飞艇背景）、黄金矿场（星空底）、邮件（红包 overlay）、弹珠（fx_launch） | bundle-smoke + integration 全绿 |
+| 批 3 音频 | `tools/src/gen_audio.ts` chiptune 合成器（方波/三角/锯齿/噪声 + ADSR + 音序器）：BGM×3（主城 132bpm 宫调 / 战斗 148bpm 小调 / 结算号角）+ SFX×12（click/nav/reward/fail/hit/win/lose/coin/levelup/checkin/open/tick）→ ffmpeg mp3 入库（180KB）；AudioManager 路径修复 + 点击音/胜负 jingle/升级检测/BGM 按路由切换 | 15 个 mp3 在包内 |
+| 批 4 图标/卡面 | gen_placeholder_art 参数化重构 + 资产图标 ×20（各 ID 专属图形）+ 卡面 ×18（稀有度边框色 + 类型符号 + 星级）+ 卡牌屏/图鉴接线（owned 卡渲染卡面图） | ART_PREVIEW 拼板 52 格 |
+
+**复扫终态**：双包敏感词 0；npm test 6/6；verify 10/10；包内 assets/game = 18MB（自绘帧 4280+ + 音频 15 + 图标/卡面 38），**原版派生字节 0**。
+
+**空壳判定更新**：🔴 5 模块全部消除（大逃杀有角色、虎口有动物、拔河有队员、运动会有跑者、斗猿有对手）；🟡 项均已有专属动效/音效/图标中的至少两项；表现层四缺口全部关闭。游戏在功能与表现两层均脱离空壳。

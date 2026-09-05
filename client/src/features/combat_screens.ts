@@ -13,6 +13,12 @@ export class BattleRoyalScreen extends ApiScreen {
   private roomId = 2;
   private sessionId: string | null = null;
   private feed: string[] = [];
+  private avatarClip: any = null;
+
+  private avatarFor(): any {
+    const tone = ((this.app.player?.counters?.['arena.streak'] ?? 0) >= 3) ? 'gold' : 'normal';
+    try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, `pag__battleRoyal__myself_idle_${tone}`, 'launch', { loop: true, fitHeight: 40 }); } catch { return null; }
+  }
 
   constructor() { super('battleRoyal', '大逃杀'); }
 
@@ -62,6 +68,8 @@ export class BattleRoyalScreen extends ApiScreen {
       }, { color: THEME.accent });
       y += 56;
     } else {
+      if (!this.avatarClip) this.avatarClip = this.avatarFor();
+      this.avatarClip?.draw(ui, 30, y + 26, this.app.frameDt);
       // 局内：房间门耐久 + 事件流 + 行动
       const data = st.active?.data;
       const rooms = data?.rooms ?? [];
@@ -216,7 +224,11 @@ class DuelArenaScreen extends ApiScreen {
     ui.text('已选: ' + (this.moveSeq.map(moveLabel).join('→') || '（自动）'), 16, y + 12, { size: 11, color: THEME.gold });
     y += 20;
     ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `挑战 ${this.opponents[this.selIdx]?.nick ?? '对手'}！`, () => {
-      this.act('fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then(() => { this.moveSeq = []; });
+      void this.app.api.action('arena', 'fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then((r: any) => {
+        this.app.playOverlay(r.ok && r.message.includes('胜') ? 'arena__result_success' : 'pag__pag_levelup_fail', 1500);
+        this.moveSeq = [];
+        this.onEnter();
+      });
     }, { color: THEME.accent });
     y += 56;
     ui.text('记录: ' + (st.history?.[0]?.summary ?? '暂无'), 16, y + 8, { size: 10, color: THEME.textDim });
@@ -234,7 +246,16 @@ class DuelArenaScreen extends ApiScreen {
 
 export class BossScreen extends ApiScreen {
   readonly route = '/boss';
+  private bossClip: any = null;
   constructor() { super('boss', 'Boss 挑战'); }
+
+  onEnter(): Promise<void> {
+    if (!this.bossClip && this.app.assets) {
+      try { this.bossClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'challenge_boss__boss_circle_blue', 'launch', { loop: true, fitHeight: 84 }); this.bossClip.play(); } catch { this.bossClip = null; }
+    }
+    return super.onEnter();
+  }
+  onExit(): void { this.bossClip = null; }
 
   render(): void {
     const ui = this.app.ui as UI;
@@ -243,6 +264,7 @@ export class BossScreen extends ApiScreen {
     const st = this.state;
     let y = top + 10;
     ui.panel({ x: 12, y, w: ui.w - 24, h: 108 }, THEME.panel);
+    if (this.bossClip && !st.dead) this.bossClip.draw(ui, ui.w / 2, y + 46, this.app.frameDt);
     ui.textCenter(st.dead ? 'Boss 已被击败（等待刷新）' : '远古猿王 Boss', ui.w / 2, y + 24, { size: 15, bold: true, color: THEME.red });
     ui.progress(28, y + 40, ui.w - 56, 14, st.maxHp ? st.hp / st.maxHp : 0, st.hp / st.maxHp > 0.5 ? THEME.green : THEME.red);
     ui.textCenter(`${st.hp} / ${st.maxHp}`, ui.w / 2, y + 72, { size: 12, bold: true });

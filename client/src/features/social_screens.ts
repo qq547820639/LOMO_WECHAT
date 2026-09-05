@@ -104,6 +104,7 @@ export class MailScreen extends ApiScreen {
   private async claim(mailId: string): Promise<void> {
     const r = await this.app.api.post('/v1/mail/claim', { mailId });
     this.app.handleGameResponse(r);
+    if (r.ok) this.app.playOverlay('pag__red_package_appear', 1400);
     await this.onEnter();
   }
 }

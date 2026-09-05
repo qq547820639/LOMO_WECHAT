@@ -30,6 +30,8 @@ export class MiniGameClientApp {
   player: any = null;
   antiAddiction: any = null;
   toast: { text: string; until: number } | null = null;
+  overlay: { clip: any; until: number } | null = null;
+  private lastLevel = 0;
   modal: { title: string; lines: string[]; actions: { label: string; onTap: () => void; color?: string }[] } | null = null;
   booted = false;
   assets!: import('../core/assets').AssetManager;
@@ -109,7 +111,7 @@ export class MiniGameClientApp {
       this.lastTouchStart = null;
       this.dragTrack = null;
       if (start && Math.abs(start[1] - ly) > 24) return; // 视为滚动
-      if (this.modal) { /* 弹窗层命中由 modal 按钮注册 */ }
+      this.audioManager.playSfx('click');
       this.ui.onTap(lx, ly);
     });
     this.platform.onHide(() => { this.audioManager.onAppHide(); this.telemetry('app_hide'); });
@@ -164,7 +166,14 @@ export class MiniGameClientApp {
 
   async refreshPlayer(): Promise<void> {
     const res = await this.api.get('/v1/player/state');
-    if (res.ok) this.player = res.player;
+    if (res.ok) {
+      if (this.lastLevel && res.player.level > this.lastLevel) {
+        this.audioManager.playSfx('levelup');
+        this.showToast(`升级到 Lv.${res.player.level}！`);
+      }
+      this.lastLevel = res.player.level;
+      this.player = res.player;
+    }
   }
 
   showToast(text: string): void { this.toast = { text, until: Date.now() + 2600 }; }
@@ -175,6 +184,18 @@ export class MiniGameClientApp {
     this.pendingModalActions = actions;
   }
   private pendingModalActions: { label: string; onTap: () => void }[] = [];
+
+  /** 全屏动画 overlay（大演出槽位通用接线口）：一次性播放后自动关闭 */
+  playOverlay(slotId: string, ms = 1600): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { FrameClip } = require('../ui/frame_clip');
+      const clip = new FrameClip(this.assets, slotId, 'launch', { loop: false, fitHeight: Math.min(260, this.ui.h * 0.42) });
+      clip.play();
+      this.overlay = { clip, until: Date.now() + ms };
+      this.telemetry('anim_overlay', { slot: slotId });
+    } catch { /* 资产缺失静默跳过 */ }
+  }
 
   telemetry(name: string, props?: Record<string, unknown>): void {
     this.telemetryBuf.push({ name, at: Date.now(), props });
@@ -192,8 +213,9 @@ export class MiniGameClientApp {
     if (r.message) this.showToast(r.message);
     const hasReward = (r.rewards?.length ?? 0) > 0;
     if (hasReward) this.audioManager.playSfx('reward');
-    if (r.fx?.includes('win')) this.platform.vibrate(true);
-    if (r.fx?.includes('lose')) this.platform.vibrate(false);
+    if (r.fx?.includes('win')) { this.platform.vibrate(true); this.audioManager.playSfx('win'); }
+    if (r.fx?.includes('lose')) { this.platform.vibrate(false); this.audioManager.playSfx('lose'); }
+    if (r.fx?.includes('levelup')) this.audioManager.playSfx('levelup');
     this.refreshPlayer();
     return true;
   }
@@ -224,6 +246,7 @@ export class MiniGameClientApp {
     this.renderHud();
     // Tab 栏（先画，屏幕可覆盖注册自己的命中）
     this.renderTabBar(bottom);
+    this.syncBgm();
     // 屏幕渲染（内部自行避开 top/bottom）
     try { screen.render(); } catch (e: any) {
       this.ui.textCenter('页面异常: ' + String(e?.message || e).slice(0, 30), this.ui.w / 2, this.ui.h / 2, { size: 12, color: THEME.red });
@@ -239,6 +262,13 @@ export class MiniGameClientApp {
       const actions = this.modal.actions.length ? this.modal.actions : [{ label: '知道了', onTap: () => { this.modal = null; } }];
       this.ui.modal(this.modal.title, this.modal.lines, () => { this.modal = null; }, actions.map((a) => ({ ...a, onTap: () => { this.modal = null; a.onTap(); } })));
     }
+    if (this.overlay) {
+      const c2 = this.ui.ctx;
+      c2.fillStyle = 'rgba(6,8,16,0.72)';
+      c2.fillRect(0, top, this.ui.w, bottom - top);
+      this.overlay.clip.draw(this.ui, this.ui.w / 2, (top + bottom) / 2, this.frameDt);
+      if (now >= this.overlay.until || (this.overlay.clip.state && this.overlay.clip.state.finished)) this.overlay = null;
+    }
     if (this.toast && now < this.toast.until) {
       const lines = wrapText(this.toast.text, 32);
       const th = 20 + lines.length * 16;
@@ -250,6 +280,16 @@ export class MiniGameClientApp {
       lines.forEach((l, i) => this.ui.text(l, r.x + 8, r.y + 18 + i * 16, { size: 12 }));
     } else if (this.toast) this.toast = null;
     if (screen.loading) this.ui.textCenter('加载中…', this.ui.w / 2, top + 24, { size: 11, color: THEME.textDim });
+  }
+
+  private bgmForRoute(): string {
+    const r = this.router.current?.route ?? '/home';
+    return /battleRoyal|arena|boss|monkeyFight|dagger|robbery|nxArena|apeRabbit|beast/.test(r) ? 'battle' : 'home';
+  }
+  private lastBgm = 'home';
+  private syncBgm(): void {
+    const want = this.router.stack.length ? this.bgmForRoute() : 'home';
+    if (this.lastBgm !== want) { this.lastBgm = want; this.audioManager.playBgm(want); }
   }
 
   private renderHud(): void {

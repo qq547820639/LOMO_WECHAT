@@ -13,6 +13,11 @@ export class EscapeTigerScreen extends ApiScreen {
   private sessionId: string | null = null;
   private animal = 'monkey';
   private lastMsg = '';
+  private runnerClip: any = null;
+
+  private runnerFor(animal: string): any {
+    try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, `escape_animal__${animal}`, 'launch', { loop: true, fitHeight: 52 }); } catch { return null; }
+  }
 
   constructor() { super('escapeTiger', '虎口逃生'); }
 
@@ -38,6 +43,8 @@ export class EscapeTigerScreen extends ApiScreen {
         ui.button({ x: 12 + i * (aw + 5), y, w: aw, h: 40 }, { cow: '牛', dog: '狗', fox: '狐', monkey: '猴', pig: '猪', raccoon: '浣' }[a] ?? a, () => { this.animal = a; }, { color: this.animal === a ? THEME.accent : THEME.panel2, size: 14 });
       });
       y += 50;
+      if (!this.runnerClip || this.runnerClip.state?.failed) { this.runnerClip = this.runnerFor(this.animal); }
+      this.runnerClip?.draw(ui, ui.w / 2, y + 24, this.app.frameDt);
       ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '开始逃亡（体力 -1）', async () => {
         const s = await this.app.api.post('/v1/game/session/start', { featureId: 'escapeTiger' });
         if (!s.ok) { this.app.showToast(s.message); return; }
@@ -87,6 +94,7 @@ export class EscapeTigerScreen extends ApiScreen {
 // ---------------- 今晚吃鸡 ----------------
 export class ChickenScreen extends ApiScreen {
   readonly route = '/chicken';
+  private chickenClip: any = null;
   constructor() { super('chicken', '今晚吃鸡'); }
 
   pollMs(): number { return 3000; }
@@ -101,6 +109,8 @@ export class ChickenScreen extends ApiScreen {
     ui.panel({ x: 12, y, w: ui.w - 24, h: 96 }, THEME.panel);
     const eggReady = st.eggReady;
     const eggPending = (st.eggReadyAt ?? 0) > 0 && !eggReady;
+    if (!this.chickenClip) { try { this.chickenClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'chicken__chicken_idle', 'launch', { loop: true, fitHeight: 40 }); this.chickenClip.play(); } catch { this.chickenClip = null; } }
+    this.chickenClip?.draw(ui, ui.w - 52, y + 30, this.app.frameDt);
     ui.textCenter(eggReady ? '🥚 蛋已成熟！' : eggPending ? '🥚 孵化中…' : '🐔 鸡窝空空', ui.w / 2, y + 30, { size: 15, bold: true, color: eggReady ? THEME.gold : THEME.text });
     if (eggPending) {
       const remain = st.eggReadyAt - this.app.lastFrameTime;
@@ -241,6 +251,7 @@ export class SportsScreen extends ApiScreen {
   readonly route = '/sports';
   private sessionId: string | null = null;
   private roundStartAt = 0;
+  private runnerClip: any = null;
 
   constructor() { super('sports', '运动会'); }
 
@@ -281,6 +292,8 @@ export class SportsScreen extends ApiScreen {
       const nextGun = gunTimes[round];
       if (nextGun != null) ui.text(`发令: +${(nextGun / 1000).toFixed(1)}s`, ui.w - 90, y + 76, { size: 11, color: THEME.textDim });
       y += 120;
+      if (!this.runnerClip) { try { this.runnerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'sport__runner', 'launch', { loop: true, fitHeight: 46 }); this.runnerClip.play(); } catch { this.runnerClip = null; } }
+      this.runnerClip?.draw(ui, ui.w / 2, y + 34, this.app.frameDt);
       ui.button({ x: 12, y, w: ui.w - 24, h: 70 }, 'GO！（点击反应）', () => {
         const reaction = Date.now() - this.roundStartAt - (gunTimes[round] ?? 0);
         this.act('react', { reactionMs: Math.max(80, reaction) }, this.sessionId!).then(() => { this.roundStartAt = Date.now(); });
@@ -298,6 +311,7 @@ export class TugScreen extends ApiScreen {
   readonly route = '/tug';
   private sessionId: string | null = null;
   private beatStart = 0;
+  private tugClip: any = null;
 
   constructor() { super('tug', '拔河'); }
 
@@ -339,6 +353,8 @@ export class TugScreen extends ApiScreen {
       this.app.ui.ctx.fillRect(20, y + 40, ui.w - 40, 5);
       this.app.ui.ctx.fillStyle = THEME.accent;
       this.app.ui.ctx.fillRect(pos - 6, y + 32, 12, 20);
+      if (!this.tugClip) { try { this.tugClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'tug__team_pull', 'launch', { loop: true, fitHeight: 44 }); this.tugClip.play(); } catch { this.tugClip = null; } }
+      this.tugClip?.draw(ui, ui.w / 2, y + 66, this.app.frameDt);
       ui.text(`节拍 ${d.beatIdx ?? 0}/10`, 24, y + 76, { size: 11, color: THEME.textDim });
       y += 100;
       ui.button({ x: 12, y, w: ui.w - 24, h: 70 }, '拉！！', () => {

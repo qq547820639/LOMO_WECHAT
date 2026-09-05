@@ -30,7 +30,7 @@ function chunk(type: string, data: Buffer): Buffer {
   crc.writeUInt32BE(crc32(body));
   return Buffer.concat([len, body, crc]);
 }
-function encodePNG(width: number, height: number, rgba: Uint8Array): Buffer {
+export function encodePNG(width: number, height: number, rgba: Uint8Array): Buffer {
   const raw = Buffer.alloc(height * (1 + width * 4));
   for (let y = 0; y < height; y++) {
     raw[y * (1 + width * 4)] = 0;
@@ -52,10 +52,10 @@ function encodePNG(width: number, height: number, rgba: Uint8Array): Buffer {
   ]);
 }
 
-type RGB = [number, number, number];
-interface Ramp { hi: RGB; base: RGB; lo: RGB }
+export type RGB = [number, number, number];
+export interface Ramp { hi: RGB; base: RGB; lo: RGB }
 
-function hsl(h: number, s: number, l: number): RGB {
+export function hsl(h: number, s: number, l: number): RGB {
   h = ((h % 360) + 360) % 360;
   const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
   let r = 0, g = 0, b = 0;
@@ -67,15 +67,15 @@ function hsl(h: number, s: number, l: number): RGB {
   else [r, g, b] = [c, 0, x];
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
-function rampOf(base: RGB): Ramp {
+export function rampOf(base: RGB): Ramp {
   const mix = (a: RGB, b: RGB, t: number): RGB => [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
   const WHITE: RGB = [255, 255, 250], DARK: RGB = [24, 18, 36];
   return { hi: mix(base, WHITE, 0.45), base, lo: mix(base, DARK, 0.42) };
 }
 
-const OUTLINE: RGB = [26, 20, 38];
+export const OUTLINE: RGB = [26, 20, 38];
 
-class Canvas {
+export class Canvas {
   px: Uint8Array;
   mat: Int8Array;
   mats: Ramp[];
@@ -162,7 +162,7 @@ class Canvas {
 }
 
 // ================= 语义解析 =================
-function hashStr(s: string): number {
+export function hashStr(s: string): number {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
   return h >>> 0;
@@ -176,9 +176,9 @@ const COLOR_WORDS: Record<string, RGB> = {
   grey: hsl(210, 0.1, 0.55), gray: hsl(210, 0.1, 0.55), cyan: hsl(186, 0.7, 0.48),
 };
 const ANIMALS = ['cow', 'dog', 'fox', 'monkey', 'pig', 'raccoon', 'tiger', 'lion', 'rabbit', 'head'];
-type Archetype = 'rise' | 'burst' | 'orbit' | 'pulse' | 'run' | 'sway' | 'flow' | 'pop' | 'shake' | 'marbleRain' | 'banner' | 'spark';
+type Archetype = 'rise' | 'burst' | 'orbit' | 'pulse' | 'run' | 'sway' | 'flow' | 'pop' | 'shake' | 'marbleRain' | 'banner' | 'spark' | 'humanoid' | 'chicken' | 'tugpull' | 'victory' | 'ball' | 'iconfx';
 
-function classify(rel: string): { arch: Archetype; ramp: Ramp; glyph: string; seed: number } {
+function classify(rel: string, group?: string): { arch: Archetype; ramp: Ramp; glyph: string; seed: number } {
   const n = rel.toLowerCase();
   let color: RGB | null = null;
   for (const w of Object.keys(COLOR_WORDS)) if (n.includes(w)) { color = COLOR_WORDS[w]; break; }
@@ -211,6 +211,29 @@ function classify(rel: string): { arch: Archetype; ramp: Ramp; glyph: string; se
     else if (n.includes('levelup') || n.includes('upgrade') || n.includes('red_package')) arch = 'rise';
     else if (n.includes('ready_go') || n.includes('nail') || n.includes('puzzle') || n.includes('finger') || n.includes('appear') || n.includes('bmp') || n.includes('play')) arch = 'pop';
     else if (n.includes('seek') || n.includes('updat') || n.includes('index')) arch = 'pulse';
+  }
+  // 第三轮：图集桶分组映射（角色/特效动画——玩法屏最需要的（SANITIZATION 批 1 补产））
+  if (arch === 'spark' && group) {
+    const g = group.toLowerCase();
+    const n = rel.toLowerCase();
+    if (g.includes('battleroyal') || g.includes('battleRoyal')) {
+      arch = n.includes('walk') ? 'humanoid' : n.includes('killer') ? 'humanoid' : 'humanoid';
+      if (n.includes('killer')) { /* 杀手：深色由调色板外理 */ }
+    }
+    else if (g.includes('escape_animal') || g.includes('beast')) arch = n.includes('prop') ? 'iconfx' : 'run';
+    else if (g.includes('tug')) arch = 'tugpull';
+    else if (g.includes('sport')) arch = n.includes('win') ? 'victory' : n.includes('stay') ? 'humanoid' : 'run';
+    else if (g.includes('chicken')) arch = 'chicken';
+    else if (g.includes('monkeyfighting') || g.includes('ap_rabbit')) arch = 'humanoid';
+    else if (g.includes('marbles')) arch = 'ball';
+    else if (g.includes('buff') || g.includes('debuff') || g.includes('prop')) arch = 'iconfx';
+    else if (g.includes('challenge_boss')) arch = 'rise';
+    else if (g.includes('arena')) arch = n.includes('pool') ? 'orbit' : n.includes('btn') ? 'pop' : n.includes('vs') ? 'burst' : n.includes('bg') ? 'flow' : 'shake';
+    else if (g.includes('dagger') || g.includes('rob') || g.includes('robbery')) arch = 'burst';
+    else if (g.includes('idle')) arch = 'humanoid';
+    else if (g.includes('strengthen')) arch = 'sway';
+    else if (g.includes('run')) arch = 'run';
+    else if (g.includes('me')) arch = 'humanoid';
   }
   let glyph = 'diamond';
   if (n.includes('boss')) glyph = 'boss';
@@ -312,9 +335,11 @@ function drawGlyph(c: Canvas, glyph: string, cx: number, cy: number, s: number, 
 
 // ================= 12 种运动原型 =================
 const FRAMES_N = 8;
-function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number): Buffer[] {
-  const { arch, ramp, glyph, seed } = classify(rel);
-  const mats = [ramp, rampOf(hsl((seed % 97) + 8, 0.6, 0.55)), rampOf(hsl((seed % 53) + 180, 0.55, 0.6)), rampOf(hsl(45, 0.85, 0.6)), rampOf(hsl(205, 0.5, 0.62)), rampOf(hsl(210, 0.1, 0.7))];
+const M_SKIN = 6, M_HELM = 3, M_WOOD = 5, M_GOLD = 3, M_ACC = 1, M_ACC2 = 2, M_BLUE = 4, M_DUST = 5;
+
+function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number, group?: string): Buffer[] {
+  const { arch, ramp, glyph, seed } = classify(rel, group);
+  const mats = [ramp, rampOf(hsl((seed % 97) + 8, 0.6, 0.55)), rampOf(hsl((seed % 53) + 180, 0.55, 0.6)), rampOf(hsl(45, 0.85, 0.6)), rampOf(hsl(205, 0.5, 0.62)), rampOf(hsl(210, 0.1, 0.7)), rampOf(hsl(28, 0.55, 0.6)), rampOf(hsl(210, 0.25, 0.5))]; // +6 皮肤 +7 盔/杀手深
   const M_BODY = 0, M_ACC = 1, M_ACC2 = 2, M_GOLD = 3, M_BLUE = 4, M_DUST = 5;
   const aspect = wOrig / hOrig;
   const lw = aspect > 1.3 ? 64 : aspect < 0.77 ? 32 : 48;
@@ -324,6 +349,7 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number): 
     const t = f / FRAMES_N;
     const wave = Math.sin(t * Math.PI * 2);
     const c = new Canvas(lw, lh, mats);
+    const slotIdForTone = slotId;
     const cx = lw / 2, cy = lh / 2;
     const S = Math.min(lw, lh) * 0.16;
     switch (arch) {
@@ -442,6 +468,100 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number): 
         }
         break;
       }
+      case 'humanoid': {
+        // 人形角色：idle 呼吸 / walk 步行；杀手=暗色+红眼；铜/金/银=工装色变体
+        const n = slotIdForTone.toLowerCase();
+        const killer = n.includes('killer');
+        const suitM = killer ? 1 : n.includes('gold') ? 3 : n.includes('copper') ? 10 : n.includes('silver') ? 4 : 3;
+        const walk = n.includes('walk');
+        const bob = walk ? Math.abs(Math.sin(t * Math.PI * 4)) * 2 : Math.sin(t * Math.PI * 2) * 1;
+        const cx2 = cx, headY = cy - S * 0.9 - bob, bodyY = cy - S * 0.2 - bob;
+        c.limb(cx2 - S * 0.25, bodyY + S * 0.5, cx2 - S * (0.3 + (walk ? Math.sin(t * Math.PI * 4) * 0.18 : 0)), bodyY + S * 1.05, S * 0.24, S * 0.16, killer ? M_ACC2 : M_BLUE);
+        c.limb(cx2 + S * 0.25, bodyY + S * 0.5, cx2 + S * (0.3 + (walk ? -Math.sin(t * Math.PI * 4) * 0.18 : 0)), bodyY + S * 1.05, S * 0.24, S * 0.16, killer ? M_ACC2 : M_BLUE);
+        c.rect(Math.floor(cx2 - S * 0.38), Math.floor(bodyY - S * 0.1), Math.floor(S * 0.76), Math.floor(S * 0.72), suitM);
+        c.limb(cx2 - S * 0.32, bodyY - S * 0.02, cx2 - S * 0.5 + (walk ? -Math.sin(t * Math.PI * 4) * S * 0.16 : Math.sin(t * Math.PI * 2) * S * 0.06), bodyY + S * 0.36, S * 0.2, S * 0.14, suitM);
+        c.limb(cx2 + S * 0.32, bodyY - S * 0.02, cx2 + S * 0.5 + (walk ? Math.sin(t * Math.PI * 4) * S * 0.16 : -Math.sin(t * Math.PI * 2) * S * 0.06), bodyY + S * 0.36, S * 0.2, S * 0.14, suitM);
+        c.disc(cx2, headY, S * 0.3, killer ? M_ACC : M_SKIN);
+        c.disc(cx2, headY - S * 0.18, S * 0.32, killer ? M_ACC2 : M_HELM);
+        if (killer) { c.put(Math.round(cx2 - S * 0.12), Math.round(headY), -3); c.put(Math.round(cx2 + S * 0.12), Math.round(headY), -3); }
+        break;
+      }
+      case 'chicken': {
+        // 母鸡：身体/头/冠/喙，啄食步 cycle
+        const peck = Math.sin(t * Math.PI * 2) > 0.4 ? 2 : 0;
+        const bx = cx + Math.sin(t * Math.PI * 2) * 1.5;
+        c.disc(bx, cy + S * 0.1, S * 0.42, M_BODY);
+        c.disc(bx + S * 0.38, cy - S * 0.25 + peck, S * 0.26, M_BODY);
+        c.put(Math.round(bx + S * 0.44), Math.round(cy - S * 0.22 + peck), M_GOLD);
+        c.put(Math.round(bx + S * 0.32), Math.round(cy - S * 0.52 + peck), M_ACC);
+        c.put(Math.round(bx + S * 0.3), Math.round(cy - S * 0.32 + peck), -2);
+        for (let l = 0; l < 2; l++) {
+          const ph = Math.sin(t * Math.PI * 4 + l * Math.PI) * 1.2;
+          c.limb(bx - S * 0.15 + l * S * 0.3, cy + S * 0.42, bx - S * 0.15 + l * S * 0.3 + ph, cy + S * 0.75, 1, 0.6, M_GOLD);
+        }
+        c.limb(bx - S * 0.35, cy + S * 0.05, bx - S * 0.6, cy - S * 0.15 + Math.sin(t * Math.PI * 2) * S * 0.12, 1, 0.5, M_ACC);
+        break;
+      }
+      case 'tugpull': {
+        // 拔河：双人后仰拉绳（绳中红标随 t 摆动）
+        const lean = Math.sin(t * Math.PI * 2) * 2;
+        for (const side of [-1, 1]) {
+          const px2 = cx + side * S * 1.5;
+          c.limb(px2, cy - S * 0.3, px2 - side * S * 0.5 - lean * side, cy + S * 0.4, S * 0.3, S * 0.22, side < 0 ? M_BODY : M_ACC);
+          c.disc(px2 - side * S * 0.55 - lean * side, cy - S * 0.55, S * 0.24, side < 0 ? M_SKIN : M_ACC);
+          c.limb(px2 - side * S * 0.2, cy - S * 0.2, px2 - side * S * 0.9, cy - S * 0.35 + lean, S * 0.18, S * 0.12, side < 0 ? M_BODY : M_ACC);
+        }
+        const ropeY = cy - S * 0.32 + lean * 0.5;
+        c.limb(cx - S * 1.9, ropeY, cx + S * 1.9, ropeY, 1, 0.6, M_WOOD);
+        c.writeDisc(cx + Math.sin(t * Math.PI * 4) * S * 0.8, ropeY, 1.6, [255, 80, 80]);
+        break;
+      }
+      case 'victory': {
+        // 胜利：双臂高举 V + 跳跃 + 星芒
+        const jump = Math.abs(Math.sin(t * Math.PI * 2)) * S * 0.4;
+        const jy = cy - jump;
+        c.rect(Math.floor(cx - S * 0.35), Math.floor(jy), Math.floor(S * 0.7), Math.floor(S * 0.7), M_BODY);
+        c.disc(cx, jy - S * 0.35, S * 0.26, M_SKIN);
+        c.limb(cx - S * 0.3, jy + S * 0.05, cx - S * 0.75, jy - S * 0.55, S * 0.2, S * 0.12, M_BODY);
+        c.limb(cx + S * 0.3, jy + S * 0.05, cx + S * 0.75, jy - S * 0.55, S * 0.2, S * 0.12, M_BODY);
+        for (let i = 0; i < 4; i++) {
+          const a = t * Math.PI * 2 + i * Math.PI / 2;
+          c.writeDisc(cx + Math.cos(a) * S * 1.15, jy - S * 0.2 + Math.sin(a) * S * 0.7, 1.5, i % 2 ? [255, 224, 120] : [255, 255, 244]);
+        }
+        break;
+      }
+      case 'ball': {
+        // 彩色弹珠：弹跳 + 压扁 + 高光
+        const bt = t;
+        const by = cy + S * 0.5 - Math.abs(Math.sin(bt * Math.PI)) * S * 0.9;
+        const squash = by > cy + S * 0.3 ? 1.25 : 1;
+        c.writeDisc(cx, by, S * 0.42 * squash, [255, 255, 244]);
+        const ballColor = (seed % 2 === 0) ? [120, 200, 255] : [235, 120, 160];
+        c.writeDisc(cx, by, S * 0.34 * squash, ballColor as RGB);
+        c.writeDisc(cx - S * 0.12, by - S * 0.14, S * 0.1, [255, 255, 255]);
+        break;
+      }
+      case 'iconfx': {
+        // Buff/道具图标：盾/闪电/星/光圈/泥滴 语义图形 + 脉动
+        const pl = 0.8 + 0.2 * Math.sin(t * Math.PI * 4);
+        const n = slotIdForTone.toLowerCase();
+        if (n.includes('shield') || n.includes('buff')) {
+          c.rect(Math.floor(cx - S * 0.5), Math.floor(cy - S * 0.55), Math.floor(S), Math.floor(S * 0.8), M_BODY);
+          c.tri(cx - S * 0.5, cy + S * 0.25, cx + S * 0.5, cy + S * 0.25, cx, cy + S * 0.85, M_BODY);
+          c.rect(Math.floor(cx - S * 0.28), Math.floor(cy - S * 0.3), Math.floor(S * 0.56), Math.floor(S * 0.16), M_ACC);
+        } else if (n.includes('speed')) {
+          for (let l = 0; l < 3; l++) c.limb(cx - S * 0.7 + l * S * 0.3, cy - S * 0.4 + l * S * 0.4, cx + S * 0.5 + l * S * 0.2, cy - S * 0.4 + l * S * 0.4, S * 0.14 * pl, S * 0.06, M_BODY);
+        } else if (n.includes('invincible')) {
+          c.disc(cx, cy, S * 0.55 * pl, M_ACC);
+          c.disc(cx, cy, S * 0.3, M_GOLD);
+        } else if (n.includes('mud') || n.includes('debuff')) {
+          c.disc(cx, cy - S * 0.2, S * 0.3 * pl, M_BODY);
+          c.tri(cx - S * 0.25, cy, cx + S * 0.25, cy, cx, cy + S * 0.5, M_BODY);
+        } else {
+          drawGlyph(c, 'star', cx, cy, S * 0.6 * pl, M_GOLD, M_ACC, t);
+        }
+        break;
+      }
       default: { // spark：菱形旋转 + 双轨道点
         const rot = t * Math.PI / 2;
         drawGlyph(c, 'diamond', cx, cy, S * (1.1 + 0.15 * wave), M_BODY, M_ACC, t);
@@ -460,8 +580,17 @@ function renderSlot(slotId: string, rel: string, wOrig: number, hOrig: number): 
 // ================= 主流程 =================
 export function generate(): void {
   const report = JSON.parse(fs.readFileSync(rootPath('data', 'video-report.json'), 'utf8'));
-  const slots: Array<{ rel: string; w: number; h: number }> = report.rows || [];
-  if (!slots.length) { console.error('no slots in video-report.json'); process.exit(1); }
+  const slots: Array<{ rel: string; w: number; h: number; group?: string }> = (report.rows || []).map((r: any) => ({ rel: r.rel, w: r.w, h: r.h }));
+  // SANITIZATION 批 1：图集桶（326 文件）补产——bake 全量行减去 video 桶行
+  try {
+    const bake = JSON.parse(fs.readFileSync(rootPath('data', 'bake-report.json'), 'utf8'));
+    const videoRels = new Set(slots.map((s2) => s2.rel));
+    for (const row of bake.rows || []) {
+      if (!row.ok || videoRels.has(row.rel)) continue;
+      slots.push({ rel: row.rel, w: row.w, h: row.h, group: row.group });
+    }
+  } catch { /* bake 报告缺失时仅产视频桶 */ }
+  if (!slots.length) { console.error('no slots'); process.exit(1); }
   const outRoot = rootPath('game-assets', 'anims');
   fs.rmSync(outRoot, { recursive: true, force: true });
   fs.mkdirSync(outRoot, { recursive: true });
@@ -470,12 +599,12 @@ export function generate(): void {
   const previews: string[] = [];
   for (const s of slots) {
     const slotId = s.rel.replace(/\.pag$/i, '').replace(/\//g, '__');
-    const frames = renderSlot(slotId, s.rel, s.w, s.h);
+    const frames = renderSlot(slotId, s.rel, s.w, s.h, s.group);
     const dir = path.join(outRoot, slotId);
     fs.mkdirSync(dir, { recursive: true });
     frames.forEach((buf, i) => fs.writeFileSync(path.join(dir, `f0${i}.png`), buf));
     written += frames.length;
-    const { arch } = classify(s.rel);
+    const { arch } = classify(s.rel, s.group);
     archCount[arch] = (archCount[arch] ?? 0) + 1;
     if (previews.length < 48) previews.push(path.join(dir, 'f03.png'));
   }

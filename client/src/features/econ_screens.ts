@@ -50,10 +50,14 @@ export class ApeMineScreen extends ApiScreen {
 export class GoldMineScreen extends ApiScreen {
   readonly route = '/goldMine';
   private minerClip: import('../ui/frame_clip').FrameClip | null = null;
+  private bgClip: any = null;
 
   constructor() { super('goldMine', '黄金矿场'); }
 
   onEnter(): Promise<void> {
+    if (!this.bgClip && this.app.assets) {
+      try { this.bgClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__bg_starship', 'launch', { loop: true, fitHeight: 60 }); this.bgClip.play(); } catch { this.bgClip = null; }
+    }
     // P0-1 demo：真实 APK 矿工帧序列（game-assets/miner，构建期入包 assets/game/）
     if (!this.minerClip && this.app.assets) {
       const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'miner', 'idle', { fitHeight: 64, placeholderColor: THEME.gold });
@@ -117,7 +121,16 @@ export class MultiplePitScreen extends ApiScreen {
 
 // ---------------- 宇宙探索 ----------------
 export class UniverseScreen extends ApiScreen {
+  private bgClip: any = null;
   constructor(featureId = 'universe', title = '宇宙探索') { super(featureId, title); }
+
+  onEnter(): Promise<void> {
+    if (!this.bgClip && this.app.assets) {
+      try { this.bgClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__airship', 'launch', { loop: true, fitHeight: 60 }); this.bgClip.play(); } catch { this.bgClip = null; }
+    }
+    return super.onEnter();
+  }
+  onExit(): void { this.bgClip = null; }
 
   render(): void {
     const ui = this.app.ui as UI;
@@ -126,6 +139,7 @@ export class UniverseScreen extends ApiScreen {
     const st = this.state;
     let y = top + 6;
     ui.panel({ x: 12, y, w: ui.w - 24, h: 80 }, THEME.panel);
+    this.bgClip?.draw(ui, ui.w - 52, y + 34, this.app.frameDt);
     ui.text(`飞船 Lv.${st.shipLevel} · 已探索 ${st.planetsVisited} 星球 · 星尘 ${fmtNum(st.stardust)}`, 24, y + 20, { size: 13, bold: true, color: THEME.purple });
     ui.text(`飞船每级探索收益 +10% · 升级需 ${st.upgradeCost} 金币`, 24, y + 40, { size: 10, color: THEME.textDim });
     ui.text(`神殿契约: ${st.contractAvailable ? '今日可领' : '今日已完成'}`, 24, y + 60, { size: 11, color: st.contractAvailable ? THEME.green : THEME.textDim });
@@ -166,7 +180,23 @@ export class WarcraftScreen extends ApiScreen {
 // ---------------- 萌宠扭蛋 ----------------
 export class GachaScreen extends ApiScreen {
   readonly route = '/gacha';
+  private partClips: any[] = [];
   constructor() { super('gacha', '萌宠扭蛋'); }
+
+  onEnter(): Promise<void> {
+    if (!this.partClips.length && this.app.assets) {
+      const slots = ['strengthen__ear_left', 'strengthen__ear_right', 'strengthen__eye_nose', 'strengthen__hand_left'];
+      this.partClips = slots.map((sid, i) => {
+        try {
+          const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, sid, 'launch', { loop: true, fitHeight: 44 });
+          clip.play();
+          return { clip, x: 40 + i * 80 };
+        } catch { return null; }
+      }).filter(Boolean);
+    }
+    return super.onEnter();
+  }
+  onExit(): void { this.partClips = []; }
 
   render(): void {
     const ui = this.app.ui as UI;
@@ -175,6 +205,7 @@ export class GachaScreen extends ApiScreen {
     const st = this.state;
     let y = top + 6;
     ui.panel({ x: 12, y, w: ui.w - 24, h: 66 }, THEME.panel);
+    this.partClips.forEach((pc: any) => pc.clip.draw(ui, pc.x, y + 36, this.app.frameDt));
     ui.text(`总战力 ${st.power} · 已开蛋 ${st.eggsOpened} · 单蛋 ${st.eggCostCoin} 金币`, 24, y + 20, { size: 13, bold: true, color: THEME.accent });
     ui.text(`部位战力: ${Object.entries(st.equipped ?? {}).filter(([, v]) => v).map(([k]) => k).join('/') || '未穿戴'}`, 24, y + 40, { size: 10, color: THEME.textDim });
     y += 76;
@@ -200,7 +231,13 @@ export class GachaScreen extends ApiScreen {
 
 // ---------------- 卡牌 ----------------
 export class CardsScreen extends ApiScreen {
+  private cardsAtlas: any = null;
   constructor(featureId = 'cards', title = '卡牌收集与合成') { super(featureId, title); }
+
+  onEnter(): Promise<void> {
+    if (!this.cardsAtlas && this.app.assets) { void this.app.assets.getAtlas('cards').then((a: any) => { this.cardsAtlas = a; }); }
+    return super.onEnter();
+  }
 
   render(): void {
     const ui = this.app.ui as UI;
@@ -225,6 +262,10 @@ export class CardsScreen extends ApiScreen {
       const cy = y + Math.floor(i / cols) * 66;
       const owned = c.owned > 0;
       ui.panel({ x: cx, y: cy, w: cw, h: 60 }, owned ? THEME.panel : THEME.bg2);
+      if (owned && this.cardsAtlas?.frameImages?.get(c.templateId)) {
+        const img = this.cardsAtlas.frameImages.get(c.templateId);
+        ui.image(img, cx + 2, cy + 2, cw - 4, 56);
+      }
       const rarityColor = ({ N: THEME.textDim, R: THEME.accent2, SR: THEME.purple, SSR: THEME.gold } as Record<string, string>)[c.rarity] ?? THEME.text;
       ui.textCenter(owned ? c.name : '???', cx + cw / 2, cy + 18, { size: 10, bold: true, color: owned ? rarityColor : THEME.disabled });
       ui.textCenter(`${c.rarity}·战力${c.power}`, cx + cw / 2, cy + 32, { size: 9, color: THEME.textDim });

@@ -73,23 +73,51 @@ const R = {
   glove: { hi: [170, 122, 74], base: [136, 94, 56], lo: [100, 68, 40] } as Ramp,
 };
 const OUTLINE: RGB = [28, 22, 40];
+export function hsl(h: number, sat: number, l: number): RGB {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+function rampOf(base: RGB): Ramp {
+  const mix = (a: RGB, b: RGB, t: number): RGB => [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+  const WHITE: RGB = [255, 255, 250], DARK: RGB = [24, 18, 36];
+  return { hi: mix(base, WHITE, 0.45), base, lo: mix(base, DARK, 0.42) };
+}
 const SPARK: RGB = [255, 255, 255];
 const SPARK2: RGB = [255, 214, 96];
 
 // ================= 画布 + 材质缓冲 =================
 const W = 48, H = 48;
 class Canvas {
-  px = new Uint8Array(W * H * 4);
-  mat = new Int8Array(W * H).fill(-1); // 材质 id，用于着色/描边
-  constructor(public mats: Ramp[]) {}
+  px: Uint8Array;
+  mat: Int8Array;
+  constructor(public W: number, public H: number, public mats: Ramp[]) {
+    this.px = new Uint8Array(W * H * 4);
+    this.mat = new Int8Array(W * H).fill(-1);
+  }
   put(x: number, y: number, matId: number): void {
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
-    const i = y * W + x;
-    this.mat[i] = matId;
+    if (x < 0 || y < 0 || x >= this.W || y >= this.H) return;
+    this.mat[y * this.W + x] = matId;
   }
   filled(x: number, y: number): boolean {
-    if (x < 0 || y < 0 || x >= W || y >= H) return false;
-    return this.mat[y * W + x] >= 0;
+    return x >= 0 && y >= 0 && x < this.W && y < this.H && this.mat[y * this.W + x] >= 0;
+  }
+  tri(x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, matId: number): void {
+    const minX = Math.min(x0, x1, x2), maxX = Math.max(x0, x1, x2);
+    const minY = Math.min(y0, y1, y2), maxY = Math.max(y0, y1, y2);
+    const sign = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => (ax - cx) * (by - cy) - (bx - cx) * (ay - cy);
+    for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+      const d1 = sign(x, y, x0, y0, x1, y1), d2 = sign(x, y, x1, y1, x2, y2), d3 = sign(x, y, x2, y2, x0, y0);
+      const neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0;
+      if (!(neg && pos)) this.put(x, y, matId);
+    }
   }
   rect(x0: number, y0: number, w: number, h: number, matId: number): void {
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) this.put(x, y, matId);
@@ -112,24 +140,24 @@ class Canvas {
   }
   /** 后处理：上缘提亮 / 下缘压暗 / 轮廓描边，再上色（scale 放大输出） */
   render(scale: number): Buffer {
-    const px = new Uint8Array(W * scale * H * scale * 4);
+    const px = new Uint8Array(this.W * scale * this.H * scale * 4);
     const shade = new Uint8Array(W * H); // 0 base 1 hi 2 lo
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = y * W + x;
+    for (let y = 0; y < this.H; y++) {
+      for (let x = 0; x < this.W; x++) {
+        const i = y * this.W + x;
         if (this.mat[i] < 0) continue;
         // 左上方向来光：上方/左方为空 → 高光；下方/右方为空 → 暗部
-        const upEmpty = y === 0 || this.mat[i - W] < 0;
+        const upEmpty = y === 0 || this.mat[i - this.W] < 0;
         const leftEmpty = x === 0 || this.mat[i - 1] < 0;
-        const downEmpty = y === H - 1 || this.mat[i + W] < 0;
-        const rightEmpty = x === W - 1 || this.mat[i + 1] < 0;
+        const downEmpty = y === this.H - 1 || this.mat[i + this.W] < 0;
+        const rightEmpty = x === this.W - 1 || this.mat[i + 1] < 0;
         if ((upEmpty || leftEmpty) && !(downEmpty && rightEmpty)) shade[i] = 1;
         else if (downEmpty || rightEmpty) shade[i] = 2;
       }
     }
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = y * W + x;
+    for (let y = 0; y < this.H; y++) {
+      for (let x = 0; x < this.W; x++) {
+        const i = y * this.W + x;
         const m = this.mat[i];
         let rgb: RGB;
         if (m < 0) {
@@ -143,13 +171,13 @@ class Canvas {
         }
         for (let sy = 0; sy < scale; sy++) {
           for (let sx = 0; sx < scale; sx++) {
-            const di = ((y * scale + sy) * W * scale + (x * scale + sx)) * 4;
+            const di = ((y * scale + sy) * this.W * scale + (x * scale + sx)) * 4;
             px[di] = rgb[0]; px[di + 1] = rgb[1]; px[di + 2] = rgb[2]; px[di + 3] = 255;
           }
         }
       }
     }
-    return encodePNG(W * scale, H * scale, px);
+    return encodePNG(this.W * scale, this.H * scale, px);
   }
 }
 
@@ -186,7 +214,7 @@ const FRAMES: MinerPose[] = [
 
 function drawMiner(phase: number): Buffer {
   const P = FRAMES[phase];
-  const c = new Canvas(MATS);
+  const c = new Canvas(W, H, MATS);
   const cx = 20 + P.lean; // 身体中轴
   const hipY = 34 + P.crouch;
   const shoulderY = 20 + P.crouch;
@@ -393,7 +421,82 @@ function contactSheet(files: string[], out: string, cell: number): void {
   fs.writeFileSync(out, encodePNG(cols * cell, rows * cell, sheet));
 }
 
+
+// ================= 资产图标 ×20 + 卡面 ×18（批 4） =================
+function generateIcons(): string[] {
+  const c2 = (w: number, h: number, mats: Ramp[]) => new Canvas(w, h, mats);
+  const out: string[] = [];
+  const dir = rootPath('game-assets', 'icons');
+  fs.mkdirSync(dir, { recursive: true });
+  const IM = { GOLD: 0, BLUE: 1, CYAN: 2, GREEN: 3, RED: 4, PURPLE: 5, STEEL: 6, WHITE: 7 };
+  const iconMats = [rampOf(hsl(45, 0.9, 0.52)), rampOf(hsl(212, 0.7, 0.5)), rampOf(hsl(186, 0.7, 0.48)), rampOf(hsl(150, 0.6, 0.45)), rampOf(hsl(354, 0.75, 0.5)), rampOf(hsl(268, 0.6, 0.55)), rampOf(hsl(210, 0.15, 0.6)), rampOf(hsl(210, 0.1, 0.75))];
+  const draw = (id: string, fn: (c: Canvas) => void): void => {
+    const c = c2(32, 32, iconMats);
+    fn(c);
+    const f = path.join(dir, id.toLowerCase() + '.png');
+    fs.writeFileSync(f, c.render(2));
+    out.push(f);
+  };
+  draw('COIN', c => { c.disc(16, 16, 11, M_GOLD_I); c.disc(16, 16, 7, M_ACC_I); c.put(14, 12, -3); c.put(15, 11, -3); });
+  draw('ENERGY', c => { c.tri(18, 4, 8, 18, 15, 18, M_GOLD_I); c.tri(14, 28, 24, 14, 17, 14, M_GOLD_I); });
+  draw('GEMSTONE', c => { c.tri(16, 4, 27, 16, 16, 28, M_CYAN_I); c.tri(16, 4, 5, 16, 16, 28, M_BLUE_I); c.put(13, 12, -3); });
+  draw('TICKET', c => { c.rect(5, 10, 22, 12, M_GOLD_I); c.rect(14, 10, 2, 12, M_BLUE_I); c.put(8, 13, -3); c.put(9, 13, -3); });
+  draw('ORE', c => { c.disc(13, 18, 7, M_STEEL_I); c.disc(21, 20, 5, M_STEEL_I); c.put(11, 15, -3); c.put(20, 18, M_CYAN_I); });
+  draw('GOLD', c => { c.rect(6, 18, 9, 6, M_GOLD_I); c.rect(17, 18, 9, 6, M_GOLD_I); c.rect(11, 11, 9, 6, M_ACC_I); });
+  draw('SAND', c => { c.tri(4, 26, 28, 26, 16, 10, M_GOLD_I); c.put(14, 16, -3); c.put(18, 20, M_ACC_I); });
+  draw('APE_STONE', c => { c.disc(16, 18, 10, M_STEEL_I); c.disc(12, 14, 3, M_ACC_I); c.put(20, 20, M_BLUE_I); });
+  draw('DAGGER', c => { c.tri(22, 6, 26, 10, 12, 22, M_STEEL_I); c.rect(9, 21, 6, 3, M_GOLD_I); c.limb(10, 24, 6, 28, 2, 1.4, M_BLUE_I); });
+  draw('INTEGRAL', c => { c.rect(6, 20, 5, 6, M_BLUE_I); c.rect(13, 14, 5, 12, M_ACC_I); c.rect(20, 8, 5, 18, M_GOLD_I); });
+  draw('SEASON_SCORE', c => { c.rect(9, 6, 14, 10, M_GOLD_I); c.rect(7, 6, 18, 3, M_ACC_I); c.rect(14, 16, 4, 5, M_GOLD_I); c.rect(10, 21, 12, 3, M_ACC_I); });
+  draw('BADGE', c => { c.disc(16, 12, 8, M_GOLD_I); c.put(14, 10, -3); c.tri(11, 19, 21, 19, 16, 29, M_RED_I); c.tri(11, 19, 16, 29, 12, 27, M_BLUE_I); });
+  draw('RED_PACKET_PROGRESS', c => { c.rect(8, 5, 16, 22, M_RED_I); c.rect(8, 5, 16, 7, M_ACC_I); c.disc(16, 13, 3, M_GOLD_I); });
+  draw('TEST_CREDIT', c => { c.disc(16, 16, 11, M_PURPLE_I); c.disc(16, 16, 7, M_ACC_I); c.rect(14, 11, 3, 10, M_WHITE_I); c.rect(12, 13, 7, 3, M_WHITE_I); });
+  draw('APE_CARD', c => { c.rect(7, 4, 18, 24, M_BLUE_I); c.rect(9, 6, 14, 20, M_ACC_I); c.disc(16, 14, 4, M_GOLD_I); c.rect(12, 20, 8, 3, M_GOLD_I); });
+  draw('PLANET_CARD', c => { c.rect(7, 4, 18, 24, M_PURPLE_I); c.disc(16, 15, 6, M_ACC_I); c.rect(8, 17, 16, 2, M_CYAN_I); });
+  draw('FLASH_CARD', c => { c.rect(7, 4, 18, 24, M_CYAN_I); c.tri(18, 8, 12, 17, 16, 17, M_GOLD_I); c.tri(14, 24, 20, 15, 16, 15, M_GOLD_I); });
+  draw('WORLD_COIN', c => { c.disc(16, 16, 11, M_BLUE_I); c.rect(10, 15, 12, 2, M_ACC_I); c.rect(15, 6, 2, 20, M_ACC_I); c.disc(13, 10, 2, M_ACC_I); });
+  draw('MEDAL', c => { c.disc(16, 12, 9, M_GOLD_I); c.disc(16, 12, 5, M_ACC_I); c.rect(11, 20, 3, 8, M_BLUE_I); c.rect(18, 20, 3, 8, M_RED_I); });
+  draw('DUST', c => { c.disc(11, 20, 4, M_WHITE_I); c.disc(19, 17, 5, M_WHITE_I); c.disc(24, 22, 3, M_WHITE_I); c.put(17, 14, -3); });
+  return out;
+}
+// 图标材质别名（独立于矿工材质表）
+const M_GOLD_I = 0, M_BLUE_I = 1, M_CYAN_I = 2, M_GREEN_I = 3, M_RED_I = 4, M_PURPLE_I = 5, M_STEEL_I = 6, M_WHITE_I = 7, M_ACC_I = 7;
+
+function generateCards(): string[] {
+  const out: string[] = [];
+  const dir = rootPath('game-assets', 'cards');
+  fs.mkdirSync(dir, { recursive: true });
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { CARD_TEMPLATES } = require('../../../server/src/games/card_data');
+  const rarityBase: Record<string, RGB> = {
+    N: hsl(210, 0.12, 0.5), R: hsl(212, 0.7, 0.5), SR: hsl(268, 0.6, 0.55), SSR: hsl(42, 0.9, 0.5),
+  };
+  const typeM: Record<string, number> = { APE_CARD: 0, PLANET_CARD: 1, FLASH_CARD: 2 };
+  const typeRamp: Ramp[] = [rampOf(hsl(28, 0.6, 0.5)), rampOf(hsl(258, 0.55, 0.55)), rampOf(hsl(196, 0.65, 0.5))];
+  for (const t of CARD_TEMPLATES as Array<{ templateId: string; cardType: string; rarity: string; name: string }>) {
+    const c = new Canvas(48, 64, [rampOf(rarityBase[t.rarity] ?? rarityBase.N), typeRamp[typeM[t.cardType] ?? 0], rampOf(hsl(45, 0.9, 0.55)), rampOf(hsl(210, 0.1, 0.78))]);
+    // 边框（稀有度色）+ 内板（类型色）+ 中心符号（星/环/电）
+    c.rect(2, 2, 44, 60, 0);
+    c.rect(5, 5, 38, 54, 1);
+    const cx = 24, cy = 26;
+    if (t.cardType === 'PLANET_CARD') { c.disc(cx, cy, 9, 2); c.rect(10, cy + 2, 28, 3, 3); c.disc(cx - 3, cy - 3, 2, 3); }
+    else if (t.cardType === 'FLASH_CARD') { c.tri(cx + 4, cy - 12, cx - 8, cy + 2, cx - 1, cy + 2, 2); c.tri(cx - 4, cy + 12, cx + 8, cy - 2, cx, cy - 2, 2); }
+    else { for (let i = 0; i < 10; i++) { const ang = -Math.PI / 2 + i * Math.PI / 5; const r = i % 2 === 0 ? 10 : 4; const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r; i === 0 ? c.put(Math.round(x), Math.round(y), 2) : c.limb(cx + Math.cos(ang - Math.PI / 5) * (i % 2 === 0 ? 4 : 10), cy + Math.sin(ang - Math.PI / 5) * (i % 2 === 0 ? 4 : 10), x, y, 1.2, 1.2, 2); } }
+    // 稀有度星（SSR3/SR2/R1）
+    const pips = t.rarity === 'SSR' ? 3 : t.rarity === 'SR' ? 2 : 1;
+    for (let p = 0; p < pips; p++) c.disc(24 - (pips - 1) * 4 + p * 8, 52, 2.4, 2);
+    // 名称条（抽象短线，实际名称由 UI 文本渲染）
+    c.rect(9, 42, 30, 4, 3);
+    const f = path.join(dir, t.templateId.toLowerCase() + '.png');
+    fs.writeFileSync(f, c.render(2));
+    out.push(f);
+  }
+  return out;
+}
+
 export function generate(): void {
+  const artFiles = [...generateIcons(), ...generateCards()];
+  void artFiles;
   const minerDir = rootPath('game-assets', 'miner');
   const fxDir = rootPath('game-assets', 'fx_launch');
   fs.mkdirSync(minerDir, { recursive: true });
@@ -410,8 +513,8 @@ export function generate(): void {
     fs.writeFileSync(f, drawFx(i));
     fxFiles.push(f);
   }
-  contactSheet([...minerFiles, ...fxFiles], rootPath('docs', 'ART_PREVIEW.png'), 104);
-  console.log('[gen_placeholder_art] miner 8 帧（96×96 三阶色阶+描边）+ fx_launch 6 帧 + docs/ART_PREVIEW.png 预览拼板');
+  contactSheet([...minerFiles, ...fxFiles, ...generateIcons(), ...generateCards()], rootPath('docs', 'ART_PREVIEW.png'), 104);
+  console.log('[gen_placeholder_art] miner 8 帧 + fx_launch 6 帧 + 图标×20 + 卡面×18 + docs/ART_PREVIEW.png');
 }
 
 if (require.main === module) generate();

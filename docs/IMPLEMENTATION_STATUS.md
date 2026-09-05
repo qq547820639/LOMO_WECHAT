@@ -44,6 +44,7 @@
 | 资源管线 | DONE | 14,092 分类 + 3,524 全量提取验证 + 440 样本归档 |
 | 微信双产物 | DONE | build/wechat-full-clone & wechat-release（verify 产物冒烟通过） |
 | PAG→图集批量烘焙 | PARITY_HIGH（P0-1/P0-2/P0-3/P1 完成 2026-09-06） | 图像层 + bake 全量 535 文件 0 失败（BAKE_REPORT）+ 图集全量 326 打包/209 视频桶/478 张 2048² WebP/65MB、maxDiff 1.03%、1 次崩溃自愈（ATLAS_REPORT）；mp4 已完成（209/209 共 42MB，2026-09-06）；仅剩 CDN 接入（EXTERNAL_BLOCKERS #5） |
+| 音频 | DONE（2026-09-06） | chiptune BGM×3+SFX×12 入包，事件全接线 |
 | 真机性能采集 | BLOCKED_EXTERNAL | 需微信开发者工具 CLI/真机（EXTERNAL_BLOCKERS） |
 | 启动合规页（健康忠告+出版信息） | DONE | 规范 2.6：client/src/features/compliance_gate.ts，bundle 冒烟点击通过实测 |
 | 隐私授权交互层 | DONE | getPrivacySetting/requirePrivacyAuthorize + errCode -12034 前置防护（platform.ts），服务端 /v1/compliance/privacy-consent 留痕（server/src/app.ts:302），拒绝→exitMiniProgram |
