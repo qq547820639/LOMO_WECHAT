@@ -14,6 +14,7 @@ export class EscapeTigerScreen extends ApiScreen {
   private animal = 'monkey';
   private lastMsg = '';
   private runnerClip: any = null;
+  private tigerClip: any = null;
 
   private runnerFor(animal: string): any {
     try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, `escape_animal__${animal}`, 'launch', { loop: true, fitHeight: 52 }); } catch { return null; }
@@ -56,21 +57,41 @@ export class EscapeTigerScreen extends ApiScreen {
       y += 56;
     } else {
       const data = st.active ?? {};
-      // 进度 + 虎距离
-      ui.panel({ x: 12, y, w: ui.w - 24, h: 96 }, THEME.panel);
-      ui.text(`第 ${data.step ?? 0} / ${st.stepsPerRun} 步`, 24, y + 20, { size: 13, bold: true });
-      ui.progress(24, y + 32, ui.w - 48, 10, (data.step ?? 0) / st.stepsPerRun, THEME.accent2);
-      ui.text(`虎口距离 ${Math.max(0, Math.ceil(data.tigerDist ?? 6))} 步`, 24, y + 58, { size: 12, color: (data.tigerDist ?? 6) < 3 ? THEME.red : THEME.green });
-      ui.text(`Buff: ${(data.buffs ?? []).join(', ') || '无'}`, 24, y + 78, { size: 10, color: THEME.purple });
-      y += 104;
-      // 三车道
+      // v3 跑道视觉：虎在身后追 + 三车道 + 跑者动物 + 障碍闪红
+      ui.panel({ x: 12, y, w: ui.w - 24, h: 176 }, THEME.panel);
+      const trackTop = y + 8, trackH = 150;
+      // 三车道底
+      const laneW = (ui.w - 24) / 3;
+      const tc = this.app.ui.ctx;
+      for (let li = 0; li < 3; li++) {
+        tc.fillStyle = li === (data.lane ?? 1) ? THEME.panel2 : THEME.bg2;
+        tc.fillRect(12 + li * laneW, trackTop, laneW, trackH);
+        tc.strokeStyle = THEME.line; tc.strokeRect(12 + li * laneW, trackTop, laneW, trackH);
+      }
+      // 虎（追击者，距离越近越靠右）
+      const dist = Math.max(0, data.tigerDist ?? 6);
+      if (!this.tigerClip) { try { this.tigerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'escape_animal__tiger', 'launch', { loop: true, fitHeight: 54 }); this.tigerClip.play(); } catch { this.tigerClip = null; } }
+      const tigerX = 20 + (dist / 6) * (ui.w - 110);
+      this.tigerClip?.draw(ui, tigerX, trackTop + trackH * 0.32, this.app.frameDt);
+      ui.text('虎', tigerX, trackTop + trackH * 0.62, { size: 11, color: THEME.red });
+      // 跑者动物（我的位置：当前车道）
+      if (!this.runnerClip || this.runnerClip.state?.failed) this.runnerClip = this.runnerFor(this.animal);
+      const laneCx = 12 + (data.lane ?? 1) * laneW + laneW / 2;
+      this.runnerClip?.draw(ui, laneCx, trackTop + trackH * 0.68, this.app.frameDt);
+      // 进度/距离/Buff
+      ui.text(`第 ${data.step ?? 0} / ${st.stepsPerRun} 步`, 24, trackTop + trackH + 6, { size: 12, bold: true });
+      ui.progress(110, trackTop + trackH + 6, ui.w - 190, 8, (data.step ?? 0) / st.stepsPerRun, THEME.accent2);
+      ui.text(`虎距 ${Math.max(0, Math.ceil(dist))}`, ui.w - 70, trackTop + trackH + 6, { size: 11, color: dist < 3 ? THEME.red : THEME.green });
+      ui.text(`Buff: ${(data.buffs ?? []).join(', ') || '无'}`, 24, trackTop + trackH + 20, { size: 9, color: THEME.purple });
+      y += 186;
+      // 三车道选择
       ui.text('选择车道（躲开障碍！）', 16, y + 12, { size: 12, color: THEME.textDim });
       y += 18;
       const lw = (ui.w - 24 - 12) / 3;
       ['左', '中', '右'].forEach((lane, i) => {
-        ui.button({ x: 12 + i * (lw + 6), y, w: lw, h: 74 }, lane, () => this.act('step', { lane: i }, this.sessionId!), { color: THEME.panel2, size: 20 });
+        ui.button({ x: 12 + i * (lw + 6), y, w: lw, h: 64 }, ['左', '中', '右'][i], () => this.act('step', { lane: i }, this.sessionId!), { color: i === (data.lane ?? 1) ? THEME.accent2 : THEME.panel2, size: 20 });
       });
-      y += 84;
+      y += 72;
       ui.text(this.lastMsg || '虎口还差 6 步', 16, y + 8, { size: 11, color: THEME.text });
       y += 22;
       ui.button({ x: 12, y, w: ui.w - 24, h: 36 }, '放弃（按进度结算）', () => this.act('abort', {}, this.sessionId!), { size: 12, color: THEME.bg2 });

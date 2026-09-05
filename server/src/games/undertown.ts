@@ -16,6 +16,7 @@ export const undertown: FeatureGame = {
     const opened = Object.keys(ctx.player.counters).filter((k) => k.startsWith(`ut.opened.${floor}.`)).length;
     return {
       floor, bricks, openedThisFloor: opened,
+      openedIdx: Array.from({ length: bricks }, (_, i) => i + 1).filter((i) => ctx.player.counters[`ut.opened.${floor}.${i}`]),
       ticket: ctx.store.ledger.balanceOf(ctx.playerId, 'TICKET'),
       entryTicketCost: ctx.num('undertown.entryTicketCost', 1),
       brickCostCoin: ctx.num('undertown.brickCostCoin', 20),

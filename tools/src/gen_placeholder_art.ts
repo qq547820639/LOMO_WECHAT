@@ -479,9 +479,12 @@ function generateCards(): string[] {
     c.rect(2, 2, 44, 60, 0);
     c.rect(5, 5, 38, 54, 1);
     const cx = 24, cy = 26;
-    if (t.cardType === 'PLANET_CARD') { c.disc(cx, cy, 9, 2); c.rect(10, cy + 2, 28, 3, 3); c.disc(cx - 3, cy - 3, 2, 3); }
-    else if (t.cardType === 'FLASH_CARD') { c.tri(cx + 4, cy - 12, cx - 8, cy + 2, cx - 1, cy + 2, 2); c.tri(cx - 4, cy + 12, cx + 8, cy - 2, cx, cy - 2, 2); }
-    else { for (let i = 0; i < 10; i++) { const ang = -Math.PI / 2 + i * Math.PI / 5; const r = i % 2 === 0 ? 10 : 4; const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r; i === 0 ? c.put(Math.round(x), Math.round(y), 2) : c.limb(cx + Math.cos(ang - Math.PI / 5) * (i % 2 === 0 ? 4 : 10), cy + Math.sin(ang - Math.PI / 5) * (i % 2 === 0 ? 4 : 10), x, y, 1.2, 1.2, 2); } }
+    // v3 双层边框 + 四角钻
+    c.rect(4, 4, 40, 56, 3);
+    for (const [gx2, gy2] of [[5, 5], [41, 5], [5, 57], [41, 57]] as Array<[number, number]>) c.disc(gx2, gy2, 1.6, 2);
+    if (t.cardType === 'PLANET_CARD') { c.disc(cx, cy, 9, 2); c.rect(10, cy + 2, 28, 3, 3); c.disc(cx - 3, cy - 3, 2, 3); c.disc(cx + 5, cy - 4, 1.4, 3); }
+    else if (t.cardType === 'FLASH_CARD') { c.tri(cx + 4, cy - 12, cx - 8, cy + 2, cx - 1, cy + 2, 2); c.tri(cx - 4, cy + 12, cx + 8, cy - 2, cx, cy - 2, 2); c.put(cx - 2, cy - 4, 3); }
+    else { for (let i = 0; i < 10; i++) { const ang = -Math.PI / 2 + i * Math.PI / 5; const r = i % 2 === 0 ? 10 : 4; const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r; i === 0 ? c.put(Math.round(x), Math.round(y), 2) : c.limb(cx + Math.cos(ang - Math.PI / 5) * (i % 2 === 0 ? 4 : 10), cy + Math.sin(ang - Math.PI / 5) * (i % 2 === 0 ? 4 : 10), x, y, 1.2, 1.2, 2); } c.disc(cx, cy, 2, 3); }
     // 稀有度星（SSR3/SR2/R1）
     const pips = t.rarity === 'SSR' ? 3 : t.rarity === 'SR' ? 2 : 1;
     for (let p = 0; p < pips; p++) c.disc(24 - (pips - 1) * 4 + p * 8, 52, 2.4, 2);

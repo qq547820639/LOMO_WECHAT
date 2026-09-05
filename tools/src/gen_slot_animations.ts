@@ -300,13 +300,20 @@ function drawGlyph(c: Canvas, glyph: string, cx: number, cy: number, s: number, 
       }
       break;
     }
-    case 'dress': { // 裙装：衣身 + 随风摆裙摆
+    case 'dress': { // v3 裙装：吊脖领 + 收腰 + 双层裙摆扇贝 + 高光
       const sway = Math.sin(t * Math.PI * 2) * 2;
-      c.rect(Math.floor(cx - 2), Math.floor(cy - s * 0.9), 5, Math.floor(s * 0.6), bodyM);
-      c.tri(cx - 3, cy - s * 0.3, cx + 4, cy - s * 0.3, cx + 6 + sway, cy + s * 0.9, bodyM);
-      c.tri(cx - 3, cy - s * 0.3, cx + 4, cy - s * 0.3, cx - 5 + sway, cy + s * 0.9, bodyM);
-      c.limb(cx - 5 + sway, cy + s * 0.85, cx + 6 + sway, cy + s * 0.85, 1, 1, accM);
-      c.put(Math.round(cx - 1), Math.round(cy - s * 0.75), accM);
+      const hem = cy + s * 0.9;
+      c.rect(Math.floor(cx - 2), Math.floor(cy - s * 0.95), 5, Math.floor(s * 0.35), accM);           // 吊脖带
+      c.rect(Math.floor(cx - 3), Math.floor(cy - s * 0.62), 7, Math.floor(s * 0.34), bodyM);          // 上衣
+      c.put(Math.floor(cx - 1), Math.floor(cy - s * 0.5), accM);                                       // 胸口高光
+      c.rect(Math.floor(cx - 3), Math.floor(cy - s * 0.3), 7, 2, accM);                                // 腰带
+      c.tri(cx - 3, cy - s * 0.28, cx + 4, cy - s * 0.28, cx + 6 + sway, hem, bodyM);                  // 裙右
+      c.tri(cx - 3, cy - s * 0.28, cx + 4, cy - s * 0.28, cx - 5 + sway, hem, bodyM);                  // 裙左
+      for (let k = -2; k <= 2; k++) {                                                                  // 扇贝下摆
+        const hx = cx + sway + k * 2.4;
+        c.disc(hx, hem - 1, 1.2, bodyM);
+      }
+      c.limb(cx - 5 + sway, hem, cx + 6 + sway, hem, 0.8, 0.8, accM);                                  // 下摆描线
       break;
     }
     case 'coin': {

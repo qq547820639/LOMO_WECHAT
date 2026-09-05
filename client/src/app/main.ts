@@ -192,6 +192,7 @@ export class MiniGameClientApp {
       const { FrameClip } = require('../ui/frame_clip');
       const clip = new FrameClip(this.assets, slotId, 'launch', { loop: false, fitHeight: Math.min(260, this.ui.h * 0.42) });
       clip.play();
+      this.audioManager.playSfx('open');
       this.overlay = { clip, until: Date.now() + ms };
       this.telemetry('anim_overlay', { slot: slotId });
     } catch { /* 资产缺失静默跳过 */ }
@@ -212,6 +213,7 @@ export class MiniGameClientApp {
     if (r.ok === false) { this.showToast(r.message || '操作失败'); this.audioManager.playSfx('fail'); return false; }
     if (r.message) this.showToast(r.message);
     const hasReward = (r.rewards?.length ?? 0) > 0;
+    if (hasReward && (r.rewards ?? []).some((x: any) => x.assetId === 'COIN')) this.audioManager.playSfx('coin');
     if (hasReward) this.audioManager.playSfx('reward');
     if (r.fx?.includes('win')) { this.platform.vibrate(true); this.audioManager.playSfx('win'); }
     if (r.fx?.includes('lose')) { this.platform.vibrate(false); this.audioManager.playSfx('lose'); }

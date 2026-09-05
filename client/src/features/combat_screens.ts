@@ -77,14 +77,29 @@ export class BattleRoyalScreen extends ApiScreen {
       ui.text(`第 ${data?.round ?? 0} 轮 · 你的房间 ${data?.playerRoom ?? '-'} · 奖池 ${fmtNum(data?.pool ?? 0)}`, 24, y + 20, { size: 12, bold: true, color: THEME.gold });
       y += 38;
       const bw = (ui.w - 24 - 10) / 3;
+      const bc = this.app.ui.ctx;
       rooms.forEach((room: any, i: number) => {
         const bx = 12 + (i % 3) * (bw + 5);
         const by = y + Math.floor(i / 3) * 58;
         const mine = room.id === data?.playerRoom;
         ui.panel({ x: bx, y: by, w: bw, h: 52 }, room.alive ? THEME.panel : THEME.bg2);
-        ui.textCenter(`${room.id}号${mine ? '(你)' : room.alive ? '' : '✝'}`, bx + bw / 2, by + 16, { size: 11, bold: mine, color: mine ? THEME.gold : room.alive ? THEME.text : THEME.red });
-        ui.progress(bx + 6, by + 26, bw - 12, 6, room.doorHp / (room.maxDoorHp || 100), room.doorHp > 50 ? THEME.green : room.doorHp > 20 ? THEME.gold : THEME.red);
-        ui.textCenter(`耐久 ${Math.max(0, room.doorHp)}`, bx + bw / 2, by + 46, { size: 9, color: THEME.textDim });
+        const doorW = 14, doorH = 34, dx = bx + 8, dy = by + 9;
+        bc.fillStyle = room.alive ? (mine ? '#5a4632' : '#4a3a28') : '#2a2a30';
+        bc.fillRect(dx, dy, doorW, doorH);
+        bc.strokeStyle = mine ? THEME.gold : THEME.line;
+        bc.strokeRect(dx, dy, doorW, doorH);
+        if (room.alive) {
+          const hpR = Math.max(0, Math.min(1, room.doorHp / (room.maxDoorHp || 100)));
+          bc.fillStyle = hpR > 0.5 ? THEME.green : hpR > 0.2 ? THEME.gold : THEME.red;
+          bc.fillRect(dx + doorW + 3, dy + doorH * (1 - hpR), 4, doorH * hpR);
+          bc.fillStyle = THEME.gold;
+          bc.fillRect(dx + doorW - 4, dy + doorH / 2, 2, 2);
+        } else {
+          ui.text('✝', dx + doorW / 2 - 4, dy + doorH / 2 + 4, { size: 12, color: THEME.red });
+        }
+        ui.text(`${room.id}号${mine ? '(你)' : ''}`, bx + doorW + 16, by + 18, { size: 11, bold: mine, color: mine ? THEME.gold : room.alive ? THEME.text : THEME.red });
+        ui.text(`耐久 ${Math.max(0, room.doorHp)}`, bx + doorW + 16, by + 34, { size: 9, color: THEME.textDim });
+        ui.text(`×${(room.players ?? []).length}`, bx + doorW + 16, by + 46, { size: 9, color: THEME.textDim });
       });
       y += Math.ceil(rooms.length / 3) * 58 + 6;
       const bw2 = (ui.w - 24 - 12) / 3;
@@ -142,15 +157,22 @@ export class UndertownScreen extends ApiScreen {
     // 砖块网格
     const cols = 6;
     const bw = (ui.w - 24 - (cols - 1) * 5) / cols;
+    const openedSet = new Set<number>(st.openedIdx ?? []);
     for (let i = 1; i <= st.bricks; i++) {
       const bx = 12 + ((i - 1) % cols) * (bw + 5);
       const by = y + Math.floor((i - 1) / cols) * 50;
       const idx = i;
-      ui.button({ x: bx, y: by, w: bw, h: 44 }, `${i}`, () => {
-        void this.act('openBrick', { brickIndex: idx }).then((r: any) => {
-          if (r.ok && (r.message.includes('解锁') || r.message.includes('保底'))) this.app.playOverlay('pag__ready_go__ready_go', 1300);
-        });
-      }, { color: THEME.panel2, size: 13 });
+      if (openedSet.has(i)) {
+        ui.panel({ x: bx, y: by, w: bw, h: 44 }, THEME.bg2);
+        ui.textCenter('✓', bx + bw / 2, by + 26, { size: 14, color: THEME.textDim });
+      } else {
+        ui.button({ x: bx, y: by, w: bw, h: 44 }, `${i}`, () => {
+          this.app.audioManager.playSfx('tick');
+          void this.act('openBrick', { brickIndex: idx }).then((r: any) => {
+            if (r.ok && (r.message.includes('解锁') || r.message.includes('保底'))) this.app.playOverlay('pag__ready_go__ready_go', 1300);
+          });
+        }, { color: THEME.panel2, size: 13 });
+      }
     }
     y += Math.ceil(st.bricks / cols) * 50 + 6;
     const bw2 = (ui.w - 24 - 8) / 2;
@@ -178,6 +200,46 @@ class DuelArenaScreen extends ApiScreen {
   private opponents: any[] = [];
   private selIdx = 0;
   private moveSeq: string[] = [];
+  private cine: { startAt: number; me: any; foe: any } | null = null;
+
+  /** v3 对战场景：对峙→三回合突进（每次命中音）→ 结果 overlay */
+  private startCinematic(): void {
+    if (this.cine) return;
+    const me = (() => { try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__battleRoyal__myself_idle_normal', 'launch', { loop: true, fitHeight: 56 }); } catch { return null; } })();
+    const foe = (() => { try { return new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__battleRoyal__killer_walk', 'launch', { loop: true, fitHeight: 56 }); } catch { return null; } })();
+    this.cine = { startAt: Date.now(), me, foe };
+  }
+
+  private renderCinematic(ui: UI, top: number): boolean {
+    if (!this.cine) return false;
+    const el = Date.now() - this.cine.startAt;
+    const c = this.app.ui.ctx;
+    c.fillStyle = THEME.bg2; c.fillRect(12, top + 6, ui.w - 24, 120);
+    c.strokeStyle = THEME.line; c.strokeRect(12, top + 6, ui.w - 24, 120);
+    // 突进：每 400ms 一次互冲（共 3 回合），2s 后收
+    const round = Math.min(3, Math.floor(el / 400));
+    const lunge = (el % 400) < 200 ? Math.min(1, (el % 400) / 200) : 0;
+    const myX = 60 + lunge * 70, foeX = ui.w - 60 - lunge * 70;
+    const gy = top + 88;
+    this.cine.me?.draw(ui, myX, gy, this.app.frameDt);
+    this.cine.foe?.draw(ui, foeX, gy, this.app.frameDt);
+    if (lunge > 0.8) {
+      this.app.audioManager.playSfx('hit');
+      c.fillStyle = THEME.gold;
+      c.fillRect(ui.w / 2 - 14, gy - 40, 28, 3);
+    }
+    // 回合 pip（我方连招）
+    for (let i = 0; i < 3; i++) {
+      const played = i < round;
+      const label = this.moveSeq[i] === 'attack' ? '攻' : this.moveSeq[i] === 'defend' ? '防' : this.moveSeq[i] === 'charge' ? '蓄' : '·';
+      c.fillStyle = played ? THEME.gold : THEME.panel2;
+      c.fillRect(16 + i * 20, top + 14, 16, 16);
+      ui.text(played ? label : '·', 19 + i * 20, top + 26, { size: 11, bold: played, color: played ? THEME.bg2 : THEME.textDim });
+    }
+    ui.textCenter('VS', ui.w / 2, top + 30, { size: 16, bold: true, color: THEME.accent });
+    if (el > 2000) { this.cine = null; }
+    return true;
+  }
 
   constructor(featureId: string, title: string) {
     super(featureId, title);
@@ -194,6 +256,7 @@ class DuelArenaScreen extends ApiScreen {
     const ui = this.app.ui as UI;
     const top = 64;
     if (this.renderStatus(ui, top)) return;
+    if (this.renderCinematic(ui, top)) return;
     const st = this.state;
     let y = top + 6;
     ui.panel({ x: 12, y, w: ui.w - 24, h: 48 }, THEME.panel);

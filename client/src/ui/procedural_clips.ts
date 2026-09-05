@@ -49,11 +49,14 @@ export class LaunchPulse {
       c.arc(cx, cy, r, 0, Math.PI * 2);
       c.stroke();
     }
-    // 射出弹丸（沿 45° 方向飞出）
+    // 射出弹丸（菱形，沿 45° 方向飞出）
     const fly = ease * 46;
     c.globalAlpha = 1 - t * 0.4;
     c.fillStyle = THEME.gold;
-    c.fillRect(cx + fly - 3, cy - fly - 3, 6, 6);
+    const px2 = cx + fly, py2 = cy - fly;
+    c.beginPath();
+    c.moveTo(px2, py2 - 5); c.lineTo(px2 + 5, py2); c.lineTo(px2, py2 + 5); c.lineTo(px2 - 5, py2);
+    c.closePath(); c.fill();
     // 拖尾
     c.globalAlpha = (1 - t) * 0.5;
     for (let k = 1; k <= 3; k++) {
