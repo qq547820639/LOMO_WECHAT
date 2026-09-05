@@ -112,6 +112,17 @@
 - **处置**：私有研究档案化——两目录附 `PRIVATE_ARCHIVE_NOTICE.txt`；git（0 跟踪）/ZIP（0 文件）/构建产物（0 引用）三面核查归零；`data/video-report.json`（转换元数据）归入 P1-6 逆向清单口径：研究 ZIP 保留、外发受限。
 - **产品影响**：当前客户端无任何视频播放路径（代码 0 引用）✓；未来长演出槽位如需视频，须自制重制或完成权利清理。
 
+### 视频槽位自制替换（✅ 2026-09-06 二次处置——修正"仅归档"的保守结论）
+
+> 更正：首次处置将 209 视频槽位"归档了事"，等于把游戏内容砍成空壳，违背正式运营目标。正确目标是**全部内容槽位自有化并入库**。
+
+- **交付**：`tools/src/gen_slot_animations.ts` 生成系统（12 种手调运动原型 × 槽位语义派生调色板/主体剪影/节奏）→ **209 槽位 × 8 帧 = 1672 帧自制动画**（`game-assets/anims/<slot>/f00–07.png`，96/128px，6.5MB，全部入库）。
+- **原型分布**：sway 52（裙装/部位展示）/ burst 29 / run 23（动物奔跑）/ shake 22 / rise 16（Boss 升起·结果）/ marbleRain 16 / flow 17（背景星野）/ pop 13 / pulse 7 / orbit 5 / banner 4 / spark 5。
+- **接线**：构建器自动并入 manifest（211 条 = miner + fx_launch + 209），AssetManager/FrameClip 即取即播；弹珠发射特效已接自绘 fx_launch。
+- **复扫**：双包敏感词 0；npm test 6/6；verify 10/10。
+- **诚实口径**：209 槽为"设计系统逐槽参数化产出"（每槽语义对应、视觉互异、风格统一），非 209 件独立手绘；任一槽位可随时以更高规格自制件同名替换（管线槽位制）。
+- 原版 209 mp4 与样本维持**私有档案**（git/ZIP/包零暴露），仅供研究对照。
+
 ### 复扫结果（执行后）
 
 - 源码（shared/client/server/tools）grep `潮玩宇宙|无聊猿|扭蛋兔|Activity 类名`：0（BRAND_AUDIT/RUNTIME_EVIDENCE 等 L2 文档除外）

@@ -38,7 +38,12 @@ APP_SERVER_URL=https://api.your-domain.com npm run build:wechat
 
 微信 mp 后台 → 开发管理 → 服务器域名，将自有域名加入 request/socket 合法域名白名单。
 
-## 4. 资源上自有 CDN
+## 4. 资源策略（全部自有，已入库）
+
+包内美术全部为**自制资产**（`game-assets/`：矿工 8 帧 + fx_launch 6 帧 + 209 槽位动画 1672 帧，均由 `tools/src/gen_placeholder_art.ts` 与 `gen_slot_animations.ts` 生成，已提交仓库）。重建：`npm run gen:art && npm run build:wechat`。
+如单包超微信主包限制，将 `assets/game/` 按组上自有 CDN（manifest.base 切换）；209 槽位动画为自制内容，上 CDN 无权利障碍。
+
+## 5. 资源上自有 CDN
 
 ```bash
 # 478 张 sheet（tools/bake/out/atlas/<group>/sheet_NNN.webp + *.meta.partNN.json）
