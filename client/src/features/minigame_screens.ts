@@ -125,16 +125,15 @@ export class MarblesScreen extends ApiScreen {
   private sessionId: string | null = null;
   private angle = 45;
   private power = 60;
-  private launchClip: import('../ui/procedural_clips').LaunchPulse | null = null;
+  private launchClip: import('../ui/frame_clip').FrameClip | import('../ui/procedural_clips').LaunchPulse | null = null;
   private launchVisible = false;
 
   constructor() { super('marbles', '弹珠'); }
 
   onEnter(): Promise<void> {
-    // P0-3 demo：launch_click 图集（形态 A，烘焙自 APK marbles/launch_click.pag）
+    // SANITIZATION P0-2 处置：发射特效 = 自绘 6 帧图集（fx_launch）；图集缺失时降级程序化绘制
     if (!this.launchClip && this.app.assets) {
-      // 待机静帧展示首帧；点击「发射」时从头播放一遍（loop: false）
-      this.launchClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'marbles', 'launch_click', { loop: false, fitHeight: 56 });
+      this.launchClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'fx_launch', 'launch', { loop: false, fitHeight: 56 });
     }
     return super.onEnter();
   }
@@ -181,7 +180,10 @@ export class MarblesScreen extends ApiScreen {
         this.app.ui.ctx.fillStyle = THEME.purple;
         this.app.ui.ctx.fillRect(ox + (peg.x ?? 0) * 0.85 - (peg.r ?? 10) / 2, oy - (peg.y ?? 0) * 0.3 - (peg.r ?? 10) / 2, (peg.r ?? 10), (peg.r ?? 10));
       }
-      // 发射特效（程序化自制）：待机静帧，发射时播放一遍
+      // 发射特效（自制美术）：待机静帧，发射时播放一遍；图集加载失败自动降级程序化
+      if (this.launchClip && 'state' in this.launchClip && (this.launchClip.state as any).failed) {
+        this.launchClip = new (require('../ui/procedural_clips').LaunchPulse)();
+      }
       if (this.launchClip) {
         this.launchClip.draw(ui, ox + 60, oy - 30, this.launchVisible ? this.app.frameDt : 0);
         if (this.launchClip.state.finished) this.launchVisible = false;

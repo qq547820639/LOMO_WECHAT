@@ -90,7 +90,9 @@ export async function run(): Promise<void> {
   assert.ok(manifest && manifest.atlases.length >= 1, 'game manifest loaded: ' + (manifest?.atlases.length ?? 0));
   // SANITIZATION P0：包内资产已全部为自制（miner 8 帧 64×64 自绘 PNG）；原版派生帧/图集已移除
   const minerEntry = manifest.atlases.find((a: any) => a.id === 'miner');
-  assert.ok(minerEntry && minerEntry.frames.length === 8 && minerEntry.frames[0].w === 64, 'self-made miner atlas present');
+  assert.ok(minerEntry && minerEntry.frames.length === 8 && minerEntry.frames[0].w === 96, 'self-made miner atlas present (96px crafted)');
+  const fxEntry = manifest.atlases.find((a: any) => a.id === 'fx_launch');
+  assert.ok(fxEntry && fxEntry.frames.length === 6, 'self-made fx_launch atlas present');
 
   const goldScreen = reg.SCREEN_ROUTES['goldMine']();
   app.router.push(goldScreen);
