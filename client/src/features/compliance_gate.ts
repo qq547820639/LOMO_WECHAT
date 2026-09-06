@@ -117,6 +117,11 @@ export class ComplianceGateScreen extends Screen {
     this.continuing = false;
     cb();
   }
+
+  resetForRetry(): void {
+    this.acked = false;
+    this.continuing = false;
+  }
 }
 
 function wrap(text: string, maxChars: number): string[] {

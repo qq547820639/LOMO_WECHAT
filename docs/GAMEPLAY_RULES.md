@@ -1,6 +1,6 @@
 # GAMEPLAY_RULES
 
-> 玩法规则复刻说明。凡未标注 MATCHED 的数值均为 INFERRED_NOT_ORIGINAL（tuning-baseline.json 可整体替换）。
+> 玩法规则说明。凡未标注 MATCHED 的数值均采用 `OWNED_LAUNCH_DEFAULTS`（`tuning-baseline.json` 版本化、范围校验并可由签名 RemoteConfig 调优）；原服历史值不可验证，但不构成运行时占位。
 
 ## 大逃杀（battleRoyal）— HIGH_CONFIDENCE_REIMPLEMENTATION
 - **还原**（公开资料+资源）：多房间投注进入 → 倒计时内行动 → 随机杀手逐轮撞击房门 → 门破房间淘汰 → 幸存房按投入比例分池（手续费 5%）→ 败方按 20% 铸匕首 → 历史+排行。
@@ -12,7 +12,7 @@
 - 每层 24 块砖；进场 1 奖券；开砖 20 金币；每层 1 块大奖砖（1/24，2-5 宝石）→ 解锁下一层；普通砖小额金币+15% 奖券；24 块全开保底下一层；ProbDetail 概率公示页 + 每日百强榜。
 - 服务端首次开砖时确定性缓存大奖砖位置（防客户端重放试探）。
 
-## 竞技场/Boss/斗猿/猿兔 — 结构 MATCHED，数值 INFERRED
+## 竞技场/Boss/斗猿/猿兔 — 结构 MATCHED，数值 OWNED_DEFAULTS
 - 三回合行为克制状态机：攻击(1+蓄力层数) / 防御(0.2, 被攻击减半) / 蓄力(+0.5, 强化下次攻击)；敌 AI skill=f(level)；总伤=Σ行为分×战力。**非单随机数判胜负**（Section 26）。
 - Boss：血量=60×等级，攻击冷却 5 分钟，击杀奖励金币+宝石。
 

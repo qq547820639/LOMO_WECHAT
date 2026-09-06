@@ -37,10 +37,10 @@ export const undertown: FeatureGame = {
       const ticketCost = ctx.num('undertown.entryTicketCost', 1);
       if (openedCount === 0) {
         if (ctx.store.ledger.balanceOf(ctx.playerId, 'TICKET') < ticketCost) return fail(`奖券不足（进场需 ${ticketCost}）`);
-        ctx.econ.spend(ctx.playerId, 'TICKET', ticketCost, 'undertown.entry', `floor${floor}`);
       }
       const brickCost = ctx.num('undertown.brickCostCoin', 20);
       if (!ctx.econ.payFrom(ctx.player, { COIN: brickCost }, 'undertown.brick', `floor${floor}`)) return fail(`金币不足（开砖需 ${brickCost}）`);
+      if (openedCount === 0) ctx.econ.spend(ctx.playerId, 'TICKET', ticketCost, 'undertown.entry', `floor${floor}`);
       // 大奖砖位置：每层第一次开砖时确定性生成并缓存
       const grandKey = `ut.grand.${floor}`;
       if (!ctx.player.counters[grandKey]) {
@@ -94,7 +94,7 @@ function probTable(ctx: Parameters<NonNullable<FeatureGame['readState']>>[0], fl
   return {
     floor,
     version: ctx.num('undertown.probDisplayVersion', 1),
-    evidence: 'INFERRED_NOT_ORIGINAL —— 原正式服概率不可从加固 APK 静态恢复，以下为可运行 clean-room 数值，以 RemoteConfig 下发为准',
+    evidence: 'OWNED_LAUNCH_DEFAULTS —— 原正式服概率不可从加固 APK 静态恢复；当前采用已校验自有参数，以签名 RemoteConfig 下发为准',
     bricksPerFloor: bricks,
     grandPrizePerBrick: `${grandWeight}/${bricks}`,
     grandPrizeRate: `${((grandWeight / bricks) * 100).toFixed(2)}%`,

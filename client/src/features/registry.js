@@ -16,7 +16,10 @@ function openFeature(app, featureId) {
     var _a, _b;
     const policy = (_b = (_a = app.api.bootstrap) === null || _a === void 0 ? void 0 : _a.featurePolicies) === null || _b === void 0 ? void 0 : _b[featureId];
     const profile = app.profile;
-    const blockedInRelease = profile === 'wechat-release' && policy && policy !== 'keep' && policy !== 'sandbox' && false;
+    if (profile === 'wechat-release' && policy === 'cut') {
+        app.showModal('功能暂不可用', ['该功能不属于微信正式版能力范围。', '请使用合规替代玩法。']);
+        return;
+    }
     const factory = exports.SCREEN_ROUTES[featureId];
     if (!factory) {
         app.showModal('功能未实装', [`「${titleOf(featureId)}」暂无独立页面，请从对应 Tab 枢纽进入相关玩法。`, `featureId=${featureId}`]);

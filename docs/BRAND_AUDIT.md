@@ -69,4 +69,4 @@
 5. project.config.json/package.json 工程名 → 中性代号（如 `mini-game-app`）。
 6. 执行后重跑 `npm run verify`（bundle-smoke 会再次全文渲染验证）+ 包内 grep 复扫归零。
 
-> 状态：**审计完成，脱敏未执行**——L1 共 7 项待处理，等确认占位品牌名后一轮改完（改动全部集中在 brand.ts + 4 个文件）。
+> 状态：**审计与工程脱敏已完成（2026-09-06）**——默认品牌已集中于 `shared/src/brand.ts` 的 ApeIsland 占位名；构建产物已复扫，正式部署前仅需由发布方替换自有品牌和 `project.config.json` 元数据。

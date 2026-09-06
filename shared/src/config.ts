@@ -32,13 +32,63 @@ export interface ReleaseProfile {
 /** 服务端功能策略：来自 44 族注册表 + 现金敏感性 */
 export type FeaturePolicy = 'keep' | 'defer' | 'cut' | 'sandbox';
 
-/** tuning-baseline.json 同构（INFERRED_NOT_ORIGINAL） */
+/** 可审计、版本化的自有运营默认参数。原服参数未知不影响本配置上线。 */
 export interface TuningConfig {
-  status?: string;
+  schemaVersion?: string;
+  status?: 'OWNED_LAUNCH_DEFAULTS';
+  provenance?: 'CLEAN_ROOM_PRODUCT_DEFAULTS';
+  effectiveFrom?: string;
+  owner?: string;
   progression: { levelXpBase: number; levelXpStep: number; levelUpEnergy: number };
   energy: { initial: number; max: number; regenMinutes: number; battleCost: number; mineCost: number; exploreCost: number; minigameCost: number };
   economy: { initialCoin: number; initialTicket: number; mineCoinRange: [number, number]; refineOreCost: number; refineCoin: number };
   [feature: string]: unknown;
+}
+
+const REQUIRED_TUNING_PATHS = [
+  ['progression', 'levelXpBase'], ['progression', 'levelXpStep'], ['progression', 'levelUpEnergy'],
+  ['energy', 'initial'], ['energy', 'max'], ['energy', 'regenMinutes'],
+  ['economy', 'initialCoin'], ['economy', 'initialTicket'], ['economy', 'refineOreCost'], ['economy', 'refineCoin'],
+] as const;
+
+export class TuningConfigError extends Error {
+  constructor(message: string) { super(`invalid tuning config: ${message}`); this.name = 'TuningConfigError'; }
+}
+
+export function validateTuningConfig(value: unknown): TuningConfig {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new TuningConfigError('root must be an object');
+  const candidate = value as Record<string, unknown>;
+  if (candidate.status !== 'OWNED_LAUNCH_DEFAULTS') throw new TuningConfigError('status must be OWNED_LAUNCH_DEFAULTS');
+  if (candidate.provenance !== 'CLEAN_ROOM_PRODUCT_DEFAULTS') throw new TuningConfigError('provenance must be CLEAN_ROOM_PRODUCT_DEFAULTS');
+  if (typeof candidate.schemaVersion !== 'string' || !candidate.schemaVersion) throw new TuningConfigError('schemaVersion is required');
+  if (typeof candidate.effectiveFrom !== 'string' || Number.isNaN(Date.parse(candidate.effectiveFrom))) throw new TuningConfigError('effectiveFrom must be an ISO date');
+  if (typeof candidate.owner !== 'string' || !candidate.owner.trim()) throw new TuningConfigError('owner is required');
+  for (const path of REQUIRED_TUNING_PATHS) {
+    let node: unknown = candidate;
+    for (const segment of path) node = node && typeof node === 'object' ? (node as Record<string, unknown>)[segment] : undefined;
+    if (typeof node !== 'number' || !Number.isFinite(node) || node < 0) throw new TuningConfigError(`${path.join('.')} must be a finite non-negative number`);
+  }
+  const walk = (node: unknown, path: string): void => {
+    if (typeof node === 'number') {
+      if (!Number.isFinite(node) || node < 0) throw new TuningConfigError(`${path} must be finite and non-negative`);
+      return;
+    }
+    if (Array.isArray(node)) {
+      if (node.length === 2 && node.every((item) => typeof item === 'number')) {
+        const [low, high] = node as number[];
+        if (!Number.isFinite(low) || !Number.isFinite(high) || low < 0 || high < low) throw new TuningConfigError(`${path} must be an ascending non-negative range`);
+      }
+      node.forEach((item, index) => walk(item, `${path}[${index}]`));
+      return;
+    }
+    if (node && typeof node === 'object') for (const [key, child] of Object.entries(node)) walk(child, path ? `${path}.${key}` : key);
+  };
+  walk(candidate, 'tuning');
+  const progression = candidate.progression as TuningConfig['progression'];
+  const energy = candidate.energy as TuningConfig['energy'];
+  if (progression.levelXpBase <= 0 || progression.levelXpStep < 0) throw new TuningConfigError('progression XP values are out of range');
+  if (energy.max < energy.initial) throw new TuningConfigError('energy.max must be >= energy.initial');
+  return candidate as TuningConfig;
 }
 
 export interface RemoteConfig {

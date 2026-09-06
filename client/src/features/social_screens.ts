@@ -47,8 +47,14 @@ export class RankScreen extends Screen {
   private board = 'seasonScore';
   private data: any = null;
 
-  onEnter(): Promise<void> { return this.load(async () => { this.data = await this.app.api.get('/v1/rank/' + this.board); }); }
-  private async load(fn: () => Promise<void>): Promise<void> { try { await fn(); } catch (e: any) { this.error = String(e?.message || e); } }
+  onEnter(): Promise<void> {
+    this.loading = true;
+    this.error = null;
+    return this.app.api.get('/v1/rank/' + this.board)
+      .then((result: any) => { if (result?.ok === false) throw new Error(result.message || '排行榜加载失败'); this.data = result; })
+      .catch((e: any) => { this.error = String(e?.message || e); })
+      .finally(() => { this.loading = false; });
+  }
 
   render(): void {
     const ui = this.app.ui as UI;
@@ -60,7 +66,14 @@ export class RankScreen extends Screen {
       ui.button({ x: 12 + i * (bw + 4), y, w: bw, h: 30 }, label, () => { this.board = id; this.onEnter(); }, { size: 9, color: this.board === id ? THEME.accent : THEME.panel2 });
     });
     y += 40;
-    if (this.error) { ui.textCenter('加载失败', ui.w / 2, y + 20, { size: 12, color: THEME.red }); return; }
+    if (this.loading) { ui.textCenter('加载中…', ui.w / 2, y + 28, { size: 12, color: THEME.textDim }); return; }
+    if (this.error) {
+      ui.panel({ x: 12, y: y + 4, w: ui.w - 24, h: 62 }, THEME.panel);
+      ui.text('加载失败', 24, y + 26, { size: 13, color: THEME.red, bold: true });
+      ui.text(this.error.slice(0, 34), 24, y + 44, { size: 10, color: THEME.textDim });
+      ui.button({ x: ui.w - 100, y: y + 16, w: 80, h: 30 }, '重试', () => { void this.onEnter(); }, { size: 12 });
+      return;
+    }
     const rows = this.data?.rows ?? [];
     rows.slice(0, 15).forEach((r: any, i: number) => {
       const medal = ['🥇', '🥈', '🥉'][i] ?? `${i + 1}.`;

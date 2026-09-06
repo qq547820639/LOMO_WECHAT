@@ -37,7 +37,7 @@
 
 ## 图集打包实测（P0-3，2026-09-06，docs/ATLAS_REPORT.md）
 
-99 样本烘包一体：15fps 降帧 + MaxRects-BSSF 跨文件共享 sheet → 72 文件 / 1265 帧 / 78 张 2048² WebP（12.3MB，样本 PNG 863MB 的 1.5%）；WebP 往返像素损失 ≤1.03%；27 个超大件（>1024px 无法 2×2 平铺或面积超限）入 mp4 视频桶。客户端 marbles/launch_click 图集已按形态 A 入包实渲染（verify bundle-smoke + integration 断言）。
+全量烘包已完成：535 文件 0 失败，326 文件进入 478 张 2048² WebP 图集（65MB），209 个超大件进入视频桶（42MB）；WebP 往返像素损失 ≤1.03%，客户端 marbles/launch_click 图集按形态 A 入包并由 bundle-smoke + integration 断言。早期 99 文件样本统计保留在 `docs/ATLAS_REPORT.md` 作为方法学证据。
 
 ## Lottie 策略（15.8MB / 869 文件）
 

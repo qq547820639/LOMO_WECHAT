@@ -9,7 +9,7 @@ exports.robbery = exports.dagger = exports.monkeyFight = exports.boss = exports.
  *       服务端验证结构。抢夺在 Release 转为 PvE/异步积分争夺。
  */
 const types_1 = require("./types");
-/** 力量值：等级 + 卡牌收集 + 扭蛋兔装备（gacha power 缓存在 counters） */
+/** 力量值：等级 + 卡牌收集 + 萌宠扭蛋装备（gacha power 缓存在 counters） */
 function powerOf(ctx) {
     var _a;
     const base = ctx.player.level * ctx.num('arena.powerBase', 5);
@@ -227,10 +227,12 @@ exports.dagger = {
         assassinate: (ctx) => {
             var _a;
             const cost = ctx.num('dagger.assassinateEnergy', 2);
-            if (!ctx.econ.takeItems(ctx.playerId, 'dagger', 1))
+            if (ctx.econ.itemCount(ctx.playerId, 'dagger') < 1)
                 return (0, types_1.fail)('需要 1 把匕首');
             if (!ctx.econ.payFrom(ctx.player, { ENERGY: cost }, 'dagger.assassinate', 'target'))
                 return (0, types_1.fail)('体力不足');
+            if (!ctx.econ.takeItems(ctx.playerId, 'dagger', 1))
+                return (0, types_1.fail)('需要 1 把匕首');
             const level = (_a = ctx.player.counters['dagger.level']) !== null && _a !== void 0 ? _a : 1;
             const success = ctx.rng.chance(Math.min(0.9, 0.35 + level * 0.06));
             if (success) {

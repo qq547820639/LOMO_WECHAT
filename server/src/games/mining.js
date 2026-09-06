@@ -2,13 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.multiplePit = exports.goldMine = exports.apeMine = void 0;
 /**
- * Wave 3 —— 生产经济：猿宇宙矿场（私矿/好友矿/多矿坑）/ 黄金矿场 / 多人矿坑。
- * 证据: 猿宇宙 94 页（矿坑/私人矿场/好友矿场/拼图矿场）、黄金矿场 17 页（ miner 1591 帧序列）、
- *       MultiplePitActivity/GrandPrizeLogActivity/ParticipateInLogActivity。
+ * Wave 3 —— 生产经济：猿岛矿场（私矿/好友矿/多矿坑）/ 黄金矿场 / 多人矿坑。
+ * 证据: 原版对应页清单见研究归档（ROUTE_PARITY_680，不随包分发）。
  * 经济: 矿坑定时产出 → 领取走 Ledger；黄金矿场挖矿→精炼→（Release: NPC 兑换 / Full: 沙盒交易）。
  */
 const types_1 = require("./types");
-// ---------------- 猿宇宙矿场 ----------------
+// ---------------- 猿岛矿场 ----------------
 exports.apeMine = {
     id: 'apeMine',
     readState: (ctx) => {

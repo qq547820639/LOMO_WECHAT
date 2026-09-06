@@ -178,10 +178,12 @@ export function generate(): void {
   }
   const screens = Array.from(agg.entries()).map(([k, count]) => { const [moduleName, feature] = k.split('|'); return { moduleName, feature, screenCount: count }; });
 
-  // economy.json：资产目录 + 主要兑换/产出关系（工程重建，INFERRED）
+  // economy.json：资产目录 + 主要兑换/产出关系（版本化自有运营默认值）
   const { ASSET_CATALOG } = require('../../shared/src/assets');
   const economy = {
-    status: 'INFERRED_STRUCTURES_NOT_ORIGINAL_VALUES',
+    status: 'OWNED_LAUNCH_DEFAULTS',
+    schemaVersion: '1.0.0',
+    provenance: 'CLEAN_ROOM_PRODUCT_DEFAULTS',
     assets: ASSET_CATALOG,
     flows: [
       { from: 'apeMine', to: 'GEMSTONE+SAND', note: '矿坑定时产出' },

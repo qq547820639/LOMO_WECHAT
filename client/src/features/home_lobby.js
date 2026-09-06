@@ -9,20 +9,33 @@ const theme_1 = require("../core/theme");
 const registry_1 = require("./registry");
 const registry_2 = require("./registry");
 const data_gen_1 = require("../../../shared/src/gen/data.gen");
+const brand_1 = require("../../../shared/src/brand");
 class HomeLobbyScreen extends base_1.ApiScreen {
     constructor() {
-        super('home', '主城 · 潮玩宇宙');
+        super('home', brand_1.BRAND.homeTitle);
         this.route = '/home';
+        this.minerClip = null;
     }
+    onEnter() {
+        // P0-1 图像层常驻展示位：真实 APK 矿工帧序列（缺图时自动占位）
+        if (!this.minerClip && this.app.assets) {
+            const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'miner', 'idle', { fitHeight: 40, placeholderColor: theme_1.THEME.gold });
+            clip.play();
+            this.minerClip = clip;
+        }
+        return super.onEnter();
+    }
+    onExit() { this.minerClip = null; }
     render() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const ui = this.app.ui;
         const top = 64;
         let y = top + 6;
         // 公告
         ui.panel({ x: 12, y, w: ui.w - 24, h: 46 }, theme_1.THEME.panel2);
-        ui.text('📢 680 路由全映射 · 全玩法服务端权威 · 双发布配置', 24, y + 19, { size: 10, color: theme_1.THEME.gold });
-        ui.text('每日: 签到 → 挖矿 → 短局 → 收集 → 赛季回流', 24, y + 34, { size: 9, color: theme_1.THEME.textDim });
+        ui.text('📢 ' + brand_1.BRAND.announcements[0], 24, y + 19, { size: 10, color: theme_1.THEME.gold });
+        ui.text(brand_1.BRAND.announcements[1], 24, y + 34, { size: 9, color: theme_1.THEME.textDim });
+        (_a = this.minerClip) === null || _a === void 0 ? void 0 : _a.draw(ui, ui.w - 44, y + 23, this.app.frameDt);
         y += 54;
         // 核心宫格（两行）
         const core = [
@@ -56,7 +69,7 @@ class HomeLobbyScreen extends base_1.ApiScreen {
         y += Math.ceil(list.length / 4) * 44 + 8;
         const p = this.app.player;
         if (p) {
-            ui.text(`今日循环: 金币 ${(0, theme_1.fmtNum)((_a = p.balances) === null || _a === void 0 ? void 0 : _a.COIN)} · 体力 ${(0, theme_1.fmtNum)((_b = p.balances) === null || _b === void 0 ? void 0 : _b.ENERGY)} · 奖券 ${(0, theme_1.fmtNum)((_c = p.balances) === null || _c === void 0 ? void 0 : _c.TICKET)}`, 16, y, { size: 10, color: theme_1.THEME.textDim });
+            ui.text(`今日循环: 金币 ${(0, theme_1.fmtNum)((_b = p.balances) === null || _b === void 0 ? void 0 : _b.COIN)} · 体力 ${(0, theme_1.fmtNum)((_c = p.balances) === null || _c === void 0 ? void 0 : _c.ENERGY)} · 奖券 ${(0, theme_1.fmtNum)((_d = p.balances) === null || _d === void 0 ? void 0 : _d.TICKET)}`, 16, y, { size: 10, color: theme_1.THEME.textDim });
         }
     }
 }

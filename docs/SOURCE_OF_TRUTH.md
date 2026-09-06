@@ -35,7 +35,7 @@
 
 1. APK 静态可证（Manifest/Activity/资源名/音频/PAG/Lottie）→ **MATCHED**
 2. 公开玩法资料可交叉验证（大逃杀修门/地下城砖块/扭蛋部位）→ **HIGH_CONFIDENCE_REIMPLEMENTATION**
-3. 结构推断（经济关系/成长曲线）→ **INFERRED**
+3. 结构推断（经济关系/成长曲线）→ **OWNED_LAUNCH_DEFAULTS**（自有参数，版本化并可校准）
 4. 原服数值（概率/奖池/签名）→ **SERVER_REQUIRED / RUNTIME_REQUIRED**，全部落 RemoteConfig
 
 APK 加固事实：`com.stub.StubApp` + `assets/libjiagu*.so`；`classes.dex` 仅 4 个壳类。因此本工程**不声称恢复任何原服数值**。

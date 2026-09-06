@@ -16,8 +16,15 @@ class Store {
         this.dirty = false;
         this.ledger = new ledger_1.Ledger(txnIdGen);
         this.persistPath = persistPath !== null && persistPath !== void 0 ? persistPath : null;
-        if (this.persistPath)
+        if (this.persistPath) {
+            try {
+                const fs = require('node:fs');
+                const path = require('node:path');
+                fs.mkdirSync(path.dirname(this.persistPath), { recursive: true, mode: 0o700 });
+            }
+            catch { /* persistence remains best-effort */ }
             this.tryRestore();
+        }
     }
     setCards(cards) { this.cards = cards; }
     // ---- players ----
@@ -48,10 +55,15 @@ class Store {
     }
     session(id) { return this.data.sessions[id]; }
     // ---- ranks ----
-    rankScore(board, playerId) { var _a, _b; return (_b = (_a = this.data.ranks[board]) === null || _a === void 0 ? void 0 : _a[playerId]) !== null && _b !== void 0 ? _b : 0; }
+    rankScore(board, playerId) {
+        const scores = Object.prototype.hasOwnProperty.call(this.data.ranks, board) ? this.data.ranks[board] : undefined;
+        return scores && Object.prototype.hasOwnProperty.call(scores, playerId) ? scores[playerId] : 0;
+    }
     rankAdd(board, playerId, delta) {
         var _a;
-        if (!this.data.ranks[board])
+        if (board === '__proto__' || board === 'constructor' || board === 'prototype')
+            return 0;
+        if (!Object.prototype.hasOwnProperty.call(this.data.ranks, board))
             this.data.ranks[board] = {};
         const cur = (_a = this.data.ranks[board][playerId]) !== null && _a !== void 0 ? _a : 0;
         const next = cur + delta;
@@ -60,7 +72,7 @@ class Store {
         return next;
     }
     rankTop(board, limit) {
-        const m = this.data.ranks[board] || {};
+        const m = Object.prototype.hasOwnProperty.call(this.data.ranks, board) ? this.data.ranks[board] : {};
         return Object.entries(m).map(([playerId, score]) => ({ playerId, score })).sort((a, b) => b.score - a.score).slice(0, limit);
     }
     // ---- history ----
@@ -103,7 +115,9 @@ class Store {
         try {
             const fs = require('node:fs');
             const snapshot = JSON.stringify({ ...this.data, _ledger: this.ledger.dump() });
-            fs.writeFileSync(this.persistPath, snapshot);
+            const tmpPath = `${this.persistPath}.tmp`;
+            fs.writeFileSync(tmpPath, snapshot, { encoding: 'utf8', mode: 0o600 });
+            fs.renameSync(tmpPath, this.persistPath);
             this.dirty = false;
         }
         catch { /* 持久化失败不阻塞游戏 */ }

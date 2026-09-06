@@ -29,3 +29,17 @@ export function hmac(secret: string, data: string): string {
     return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
   }
 }
+
+export function safeEqual(left: string, right: string): boolean {
+  try {
+    const { timingSafeEqual } = require('node:crypto');
+    const a = Buffer.from(left);
+    const b = Buffer.from(right);
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    if (left.length !== right.length) return false;
+    let diff = 0;
+    for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+    return diff === 0;
+  }
+}

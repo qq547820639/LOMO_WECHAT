@@ -10,14 +10,14 @@ import * as path from 'node:path';
 import { rootPath } from '../../shared/src/paths';
 import { BRAND } from '../../shared/src/brand';
 import type { RouteDef, HttpCtx } from './http';
-import { hmac, randomId } from './util';
+import { hmac, randomId, safeEqual } from './util';
 import { attachCommerceRoutes } from './commerce';
 import { Store } from './store';
 import { EconomyOps } from './economy';
 import { FEATURES_GAMES } from './games';
 import { ReadCtx } from './games/types';
 import { Rng } from '../../shared/src/rng';
-import { BuildProfile, CASH_SENSITIVE_FEATURES, FeaturePolicy, RELEASE_LOCKED_FLAGS, RemoteConfig, TuningConfig, featureEnabledInProfile } from '../../shared/src/config';
+import { BuildProfile, CASH_SENSITIVE_FEATURES, FeaturePolicy, RELEASE_LOCKED_FLAGS, RemoteConfig, TuningConfig, featureEnabledInProfile, validateTuningConfig, TuningConfigError } from '../../shared/src/config';
 import { AssetId } from '../../shared/src/assets';
 import { LedgerError } from '../../shared/src/ledger';
 import { AntiAddictionStatus, AuthWechatResponse, ConfigBootstrap, GameActionResponse, InventoryItemDto, PlayerStateDto, RankRow } from '../../shared/src/protocol';
@@ -37,6 +37,8 @@ export interface AppOptions {
 }
 
 export class GameApp {
+  private static readonly TOKEN_TTL_MS = 7 * 86400000;
+  private static readonly INVITE_TTL_MS = 7 * 86400000;
   store: Store;
   profile: BuildProfile;
   secret: string;
@@ -47,7 +49,9 @@ export class GameApp {
   private playerSeedCounter: Map<string, number> = new Map();
 
   constructor(opts: AppOptions = {}) {
-    this.profile = opts.profile ?? (process.env.APP_PROFILE as BuildProfile) ?? 'full-clone';
+    const profile = opts.profile ?? (process.env.APP_PROFILE as BuildProfile) ?? 'full-clone';
+    if (profile !== 'full-clone' && profile !== 'wechat-release') throw new Error(`invalid APP_PROFILE: ${profile}`);
+    this.profile = profile;
     this.secret = opts.secret ?? process.env.APP_SECRET ?? 'dev-only-secret-DO-NOT-USE-IN-PROD';
     this.tokenSecret = this.secret + ':token';
     this.tuning = this.loadTuning();
@@ -58,13 +62,18 @@ export class GameApp {
   }
 
   private loadTuning(): TuningConfig {
+    let raw: string;
     try {
       const fs = require('node:fs');
       const p = rootPath('configs/tuning-baseline.json');
-      return JSON.parse(fs.readFileSync(p, 'utf8'));
-    } catch {
-      return TUNING_FALLBACK;
+      raw = fs.readFileSync(p, 'utf8');
+    } catch (error) {
+      if ((error as { code?: string }).code === 'ENOENT') return TUNING_FALLBACK;
+      throw new TuningConfigError(`config read failed: ${String(error)}`);
     }
+    let parsed: unknown;
+    try { parsed = JSON.parse(raw!); } catch (error) { throw new TuningConfigError(`JSON parse failed: ${String(error)}`); }
+    return validateTuningConfig(parsed);
   }
 
   /** NPC/机器人玩家：让排行榜/矿场好友可交互可测试 */
@@ -128,15 +137,21 @@ export class GameApp {
 
   // ---------- auth ----------
   issueToken(playerId: string): string {
-    return `t1.${playerId}.${hmac(this.tokenSecret, playerId)}`;
+    const expiresAt = Date.now() + GameApp.TOKEN_TTL_MS;
+    const payload = `${playerId}.${expiresAt}`;
+    return `t1.${payload}.${hmac(this.tokenSecret, payload)}`;
   }
 
   verifyToken(token: string | undefined | null): string | null {
     if (!token || !token.startsWith('t1.')) return null;
     const parts = token.split('.');
-    if (parts.length !== 3) return null;
+    if (parts.length !== 4) return null;
     const playerId = parts[1];
-    if (hmac(this.tokenSecret, playerId) !== parts[2]) return null;
+    const expiresAt = Number(parts[2]);
+    if (!playerId || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) return null;
+    const payload = `${playerId}.${expiresAt}`;
+    if (!safeEqual(hmac(this.tokenSecret, payload), parts[3])) return null;
+    if (!this.store.player(playerId)) return null;
     return playerId;
   }
 
@@ -243,7 +258,7 @@ export class GameApp {
 
   routes(): RouteDef[] {
     const app = this;
-    const authed = (ctx: HttpCtx): string | null => app.verifyToken((ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (ctx.body?.token as string));
+    const authed = (ctx: HttpCtx): string | null => app.verifyToken(String(ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (typeof ctx.body?.token === 'string' ? ctx.body.token : undefined));
     const guard = (ctx: HttpCtx): string | null => {
       const playerId = authed(ctx);
       if (!playerId) { ctx.status(401); ctx.json({ ok: false, code: 'AUTH_REQUIRED', message: '缺少有效 token' }); return null; }
@@ -340,6 +355,11 @@ export class GameApp {
           const playerId = guard(ctx);
           if (!playerId) return;
           const { featureId, actionId, sessionId, clientSeq, payload, idempotencyKey } = ctx.body || {};
+          if (typeof featureId !== 'string' || typeof actionId !== 'string' ||
+            (clientSeq !== undefined && (!Number.isSafeInteger(clientSeq) || clientSeq < 0)) ||
+            (payload !== undefined && (payload === null || typeof payload !== 'object' || Array.isArray(payload)))) {
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'featureId/actionId/clientSeq/payload 格式无效' }); return;
+          }
           const game = FEATURES_GAMES[featureId];
           if (!game || typeof game.actions[actionId] !== 'function') { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: `unknown action ${featureId}.${actionId}` }); return; }
           if (!this.featureAllowed(featureId)) { ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: `${featureId} 在 ${this.profile} 配置下不可用`, detail: { policy: this.policyOf(featureId) } }); return; }
@@ -504,8 +524,9 @@ export class GameApp {
           const playerId = guard(ctx);
           if (!playerId) return;
           const token = String(ctx.body?.token || '');
-          const rec = this.store.data.inviteTokens[token];
+          const rec = Object.prototype.hasOwnProperty.call(this.store.data.inviteTokens, token) ? this.store.data.inviteTokens[token] : undefined;
           if (!rec) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '邀请码无效' }); return; }
+          if (Date.now() - rec.createdAt > GameApp.INVITE_TTL_MS) { delete this.store.data.inviteTokens[token]; ctx.status(410); ctx.json({ ok: false, code: 'INVITE_EXPIRED', message: '邀请码已过期' }); return; }
           if (rec.usedBy) { ctx.status(409); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '邀请码已被使用' }); return; }
           if (rec.inviterId === playerId) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '不能接受自己的邀请' }); return; }
           rec.usedBy = playerId;
@@ -530,6 +551,7 @@ export class GameApp {
       {
         method: 'POST', pattern: '/v1/telemetry/events', handler: (ctx) => {
           const playerId = guard(ctx);
+          if (!playerId) return;
           const events = Array.isArray(ctx.body?.events) ? ctx.body.events : [];
           for (const e of events.slice(0, 100)) this.store.telemetry(String(e.name || 'unknown'), { playerId, ...e.props });
           ctx.json({ ok: true, accepted: Math.min(events.length, 100) });
@@ -539,6 +561,9 @@ export class GameApp {
       {
         method: 'POST', pattern: '/v1/admin/reset', handler: (ctx) => {
           if (process.env.APP_ALLOW_ADMIN !== '1') { ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: 'admin disabled' }); return; }
+          const configured = process.env.APP_ADMIN_TOKEN;
+          const supplied = String(ctx.req.headers['x-admin-token'] || ctx.body?.adminToken || '');
+          if (!configured || !safeEqual(supplied, configured)) { ctx.status(401); ctx.json({ ok: false, code: 'ADMIN_AUTH_REQUIRED', message: 'admin token required' }); return; }
           this.store.data = { players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [] };
           this.seedNpcPlayers();
           ctx.json({ ok: true });
@@ -569,4 +594,3 @@ export class GameApp {
     };
   }
 }
-

@@ -12,7 +12,8 @@ exports.attachCommerceRoutes = attachCommerceRoutes;
 const util_1 = require("./util");
 const economy_1 = require("./economy");
 function attachCommerceRoutes(app, routes) {
-    const authed = (ctx) => { var _a; return app.verifyToken((ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || ((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.token)); };
+    const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined;
+    const authed = (ctx) => { var _a; return app.verifyToken(String(ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (typeof ((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.token) === 'string' ? ctx.body.token : undefined)); };
     const guard = (ctx) => {
         const playerId = authed(ctx);
         if (!playerId) {
@@ -40,6 +41,19 @@ function attachCommerceRoutes(app, routes) {
             kind: l.kind, createdAt: l.createdAt, expiresAt: l.expiresAt, topBid: l.topBid, closed: !!l.closed,
         });
     };
+    const expireListing = (l) => {
+        if (l.closed)
+            return;
+        const econ = new economy_1.EconomyOps(app.store, app.profile);
+        if (l.topBidder && l.topBid)
+            econ.grant(l.topBidder, 'TEST_CREDIT', l.topBid, 'auction.expire.refund', l.listingId, `expire-refund:${l.listingId}`);
+        if (l.templateId)
+            econ.addItems(l.sellerId, l.templateId, l.qty);
+        else if (l.assetId)
+            econ.grant(l.sellerId, l.assetId, l.qty, 'market.expire.refund', l.listingId, `expire-asset:${l.listingId}`);
+        l.closed = true;
+        app.store.audit(l.sellerId, 'market.expire', { listingId: l.listingId });
+    };
     routes.push({
         method: 'GET', pattern: '/v1/market/listings', handler: (ctx) => {
             const playerId = guard(ctx);
@@ -49,7 +63,11 @@ function attachCommerceRoutes(app, routes) {
                 return;
             const kind = ctx.query.get('kind');
             const list = Object.values(app.store.data.listings)
-                .filter((l) => !l.closed && (!kind || l.kind === kind))
+                .filter((l) => {
+                if (!l.closed && l.expiresAt <= Date.now())
+                    expireListing(l);
+                return !l.closed && (!kind || l.kind === kind);
+            })
                 .sort((a, b) => b.createdAt - a.createdAt)
                 .slice(0, 80)
                 .map(listingDto);
@@ -65,16 +83,23 @@ function attachCommerceRoutes(app, routes) {
             if (!commerceAllowed(ctx, 'p2pTrade'))
                 return;
             const { assetId, templateId, qty, unitPrice, kind } = ctx.body || {};
-            const q = Math.max(1, Math.floor(Number(qty) || 1));
-            const price = Math.max(1, Math.floor(Number(unitPrice) || 0));
-            if (!price) {
+            const q = qty === undefined ? 1 : Number(qty);
+            const price = Number(unitPrice);
+            if (!Number.isSafeInteger(q) || q < 1 || !Number.isSafeInteger(price) || price < 1) {
                 ctx.status(400);
-                ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'unitPrice required' });
+                ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'qty/unitPrice 必须为正整数' });
+                return;
+            }
+            const k = String(kind || 'market');
+            if (k !== 'market' && k !== 'consignment' && k !== 'auction') {
+                ctx.status(400);
+                ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'kind 必须是 market/consignment/auction' });
                 return;
             }
             const econ = new economy_1.EconomyOps(app.store, app.profile);
             if (templateId) {
-                if (!econ.takeItems(playerId, String(templateId), q)) {
+                const template = String(templateId);
+                if (template === '__proto__' || template === 'constructor' || template === 'prototype' || !econ.takeItems(playerId, template, q)) {
                     ctx.status(409);
                     ctx.json({ ok: false, code: 'INSUFFICIENT', message: '物品数量不足' });
                     return;
@@ -95,7 +120,6 @@ function attachCommerceRoutes(app, routes) {
                 ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'assetId/templateId required' });
                 return;
             }
-            const k = String(kind || 'market');
             const days = (_b = (_a = app.tuning.market) === null || _a === void 0 ? void 0 : _a.consignmentMaxDays) !== null && _b !== void 0 ? _b : 7;
             const l = {
                 listingId: (0, util_1.randomId)(12), sellerId: playerId, assetId, templateId: templateId ? String(templateId) : undefined,
@@ -115,10 +139,16 @@ function attachCommerceRoutes(app, routes) {
             if (!commerceAllowed(ctx, 'p2pTrade'))
                 return;
             const { listingId } = ctx.body || {};
-            const l = app.store.data.listings[String(listingId || '')];
+            const l = own(app.store.data.listings, String(listingId || ''));
             if (!l || l.closed) {
                 ctx.status(404);
                 ctx.json({ ok: false, code: 'NOT_FOUND', message: '挂单不存在或已成交' });
+                return;
+            }
+            if (l.expiresAt <= Date.now()) {
+                expireListing(l);
+                ctx.status(410);
+                ctx.json({ ok: false, code: 'NOT_FOUND', message: '挂单已过期' });
                 return;
             }
             if (l.sellerId === playerId) {
@@ -156,14 +186,29 @@ function attachCommerceRoutes(app, routes) {
             if (!commerceAllowed(ctx, 'digitalTrade'))
                 return;
             const { listingId, bid } = ctx.body || {};
-            const l = app.store.data.listings[String(listingId || '')];
+            const l = own(app.store.data.listings, String(listingId || ''));
             if (!l || l.closed || l.kind !== 'auction') {
                 ctx.status(404);
                 ctx.json({ ok: false, code: 'NOT_FOUND', message: '竞拍单不存在' });
                 return;
             }
+            if (l.expiresAt <= Date.now()) {
+                expireListing(l);
+                ctx.status(410);
+                ctx.json({ ok: false, code: 'NOT_FOUND', message: '竞拍已结束' });
+                return;
+            }
+            if (l.sellerId === playerId) {
+                ctx.status(400);
+                ctx.json({ ok: false, code: 'BAD_REQUEST', message: '卖家不能竞拍自己的挂单' });
+                return;
+            }
             const min = Math.ceil(((_a = l.topBid) !== null && _a !== void 0 ? _a : l.unitPrice) * (1 + ((_c = (_b = app.tuning.market) === null || _b === void 0 ? void 0 : _b.auctionMinIncrement) !== null && _c !== void 0 ? _c : 0.05)));
             const v = Math.floor(Number(bid) || 0);
+            if (l.topBidder === playerId && l.topBid === v) {
+                ctx.json({ ok: true, message: `出价成功（沙盒）：${v}`, topBid: v });
+                return;
+            }
             if (v < min) {
                 ctx.status(400);
                 ctx.json({ ok: false, code: 'BAD_REQUEST', message: `出价需 ≥ ${min}` });
@@ -194,7 +239,7 @@ function attachCommerceRoutes(app, routes) {
             if (!commerceAllowed(ctx, 'digitalTrade'))
                 return;
             const { listingId } = ctx.body || {};
-            const l = app.store.data.listings[String(listingId || '')];
+            const l = own(app.store.data.listings, String(listingId || ''));
             if (!l || l.closed || l.kind !== 'auction') {
                 ctx.status(404);
                 ctx.json({ ok: false, code: 'NOT_FOUND', message: '竞拍单不存在' });
@@ -203,6 +248,11 @@ function attachCommerceRoutes(app, routes) {
             if (l.sellerId !== playerId) {
                 ctx.status(403);
                 ctx.json({ ok: false, code: 'AUTH_REQUIRED', message: '仅卖家可结算' });
+                return;
+            }
+            if (l.expiresAt > Date.now()) {
+                ctx.status(409);
+                ctx.json({ ok: false, code: 'BAD_REQUEST', message: '竞拍尚未结束' });
                 return;
             }
             const econ = new economy_1.EconomyOps(app.store, app.profile);
@@ -228,7 +278,7 @@ function attachCommerceRoutes(app, routes) {
     const GOODS = [
         { goodsId: 'g_ape_card_pack', title: '猿卡补给包', priceCoin: 200, priceIntegral: 0, kind: 'virtual', stock: 999 },
         { goodsId: 'g_gem_bundle', title: '宝石小袋', priceCoin: 150, priceIntegral: 0, kind: 'virtual', stock: 999 },
-        { goodsId: 'g_toy_figure', title: '潮玩手办（实物·沙盒）', priceCoin: 0, priceIntegral: 500, kind: 'physical', stock: 20 },
+        { goodsId: 'g_toy_figure', title: '手办模型（实物·沙盒）', priceCoin: 0, priceIntegral: 500, kind: 'physical', stock: 20 },
         { goodsId: 'g_claim_ticket', title: '提货券（沙盒）', priceCoin: 0, priceIntegral: 300, kind: 'claim', stock: 50 },
     ];
     routes.push({

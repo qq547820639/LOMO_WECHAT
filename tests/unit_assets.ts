@@ -8,6 +8,7 @@ import { FrameClip } from '../client/src/ui/frame_clip';
 import { NodePlatform } from '../client/src/platform/platform';
 import { MiniGameClientApp } from '../client/src/app/main';
 import { GameApp } from '../server/src/app';
+import { eggProgress } from '../client/src/features/minigame_screens';
 
 function fixtureManifest(): GameManifest {
   return {
@@ -98,6 +99,26 @@ export async function run(): Promise<void> {
     loopClip.update(0);
     loopClip.update(950); // > 总长 400 → wrap
     assert.equal(loopClip.state.frame, Math.floor((950 % 400) / 100), 'loop wraps');
+
+    const prefixed: GameManifest = {
+      version: 'clip-durations', base: 'assets/game/',
+      atlases: [{ id: 'clips', fps: 10, frames: [
+        { name: 'idle:0', file: 'clips/i0.png', w: 16, h: 16, dur: 900 },
+        { name: 'burst:0', file: 'clips/b0.png', w: 16, h: 16, dur: 40 },
+        { name: 'burst:1', file: 'clips/b1.png', w: 16, h: 16, dur: 60 },
+      ] }],
+    };
+    const prefixedAssets = new AssetManager(new NodePlatform());
+    (prefixedAssets as any).manifest = prefixed;
+    const burst = new FrameClip(prefixedAssets, 'clips', 'burst', { loop: false });
+    burst.play();
+    for (let i = 0; i < 5 && !burst.state.loaded; i++) await new Promise((r) => setTimeout(r, 5));
+    burst.update(39);
+    assert.equal(burst.state.frame, 0, 'prefixed clip uses first child duration');
+    burst.update(40);
+    assert.equal(burst.state.frame, 1, 'prefixed clip advances by child duration');
+    burst.update(30);
+    assert.ok(burst.state.finished, 'prefixed clip finishes at child total duration');
   }
 
   // ---------- 占位兜底（manifest 缺失/图集缺失不断帧） ----------
@@ -115,7 +136,17 @@ export async function run(): Promise<void> {
 
   // ---------- 合规门：门页渲染 + 隐私同意 + 上报 ----------
   {
+    const now = 1_000_000;
+    assert.equal(eggProgress(now + 15_000, now), 0.5, 'egg progress uses wall clock');
+    assert.equal(eggProgress(now + 15_000, now, 0), 0.5, 'egg progress clamps invalid duration');
+    assert.equal(eggProgress(now - 1, now), 1, 'egg progress reaches ready state');
+    assert.equal(eggProgress(0, now), 0, 'egg progress handles empty timer');
+  }
+
+  // ---------- 合规门：门页渲染 + 隐私同意 + 上报 ----------
+  {
     const app = new GameApp({ profile: 'wechat-release', bootPngSeeds: false });
+    const privacyPlayer = app.store.ensurePlayer('privacy-test-openid', 'privacy-test', Date.now()).player;
     const platform = new NodePlatform();
     platform.privacyNeedAuth = true;
     const client = new MiniGameClientApp(platform, { profile: 'wechat-release', skipComplianceGate: true });
@@ -126,7 +157,7 @@ export async function run(): Promise<void> {
         const routes = (app as any).routes();
         const found = routes.find((r: any) => r.pattern === path && r.method === 'POST');
         assert.ok(found, 'route exists ' + path);
-        const token = app.issueToken('test-player-privacy');
+        const token = app.issueToken(privacyPlayer.playerId);
         const out: any = {};
         const ctx = { req: { headers: { authorization: 'Bearer ' + token } }, res: {}, method: 'POST', path, params: {}, query: new URLSearchParams(), body: body || {}, status() {}, json(d: any) { out.d = d; } };
         await found.handler(ctx);

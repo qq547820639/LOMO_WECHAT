@@ -31,9 +31,9 @@ Rationale：以上全部为服务端权威、无现金语义、tests 全绿；�
 | 维度 | 评级 | 依据 |
 |---|---|---|
 | 技术完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | verify 8/8 绿：构建/包冒烟/测试全通；缺 AppID/CDN |
-| 玩法完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | 22 玩法族服务端权威+客户端可玩；数值 INFERRED 待校准 |
+| 玩法完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | 22 玩法族服务端权威+客户端可玩；数值采用已校验的 OWNED_LAUNCH_DEFAULTS，可按运营数据调优 |
 | 页面覆盖 | **READY**（结构） | 680/680 路由有迁移决策；354 implemented + 其余全部有明确状态 |
-| 资源覆盖 | **PARTIALLY_READY** | 14,092 全分类+3,524 提取验证；PAG 像素烘焙未完成（工具链） |
+| 资源覆盖 | **PARTIALLY_READY** | 14,092 全分类+3,524 提取验证；PAG/动画已完成烘焙与图集/视频桶生成，正式 CDN 接入和权利链仍待外部完成 |
 | 服务端完成度 | **READY**（参考实现） | 权威账本/会话/排行/邮件/合规拦截全链路；生产部署与压测待做 |
 | 微信适配完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | 双产物真包+wx mock 启动验证；真机矩阵待补 |
 | 测试完成度 | **READY** | 单元/玩法/发布安全/无头端到端/包冒烟，verify 一键 |
@@ -43,7 +43,7 @@ Rationale：以上全部为服务端权威、无现金语义、tests 全绿；�
 
 ## 总评级
 
-- **FULL CLONE（沙盒完整复刻）**：`READY_WITH_EXTERNAL_CREDENTIALS` —— 今日即可在微信开发者工具以测试号导入运行。
-- **WECHAT RELEASE（合规发布版）**：`PARTIALLY_READY` —— 工程侧就绪（关闭层+测试断言+替代玩法齐备），上线取决于：版号/主体资质、官方规范终审复核、真机性能矩阵、原服数值校准四项外部输入。
+- **FULL CLONE（沙盒完整复刻）**：`READY_WITH_EXTERNAL_CREDENTIALS` —— Node/包冒烟可运行；微信开发者工具仍需自有 HTTPS 服务端 URL，且仅限研究环境。
+- **WECHAT RELEASE（合规发布版）**：`PARTIALLY_READY` —— 工程侧就绪（关闭层+测试断言+替代玩法齐备），上线取决于：自有 HTTPS 服务端、版号/主体资质、官方规范终审复核、真机性能矩阵、原服数值校准等外部输入。
 
 **1:1 体验 vs 正式上线冲突**：未破坏 FULL CLONE——双配置同为一份代码，release 仅是闸门组合（Section 98 原则）。

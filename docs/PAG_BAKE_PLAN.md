@@ -1,15 +1,17 @@
 # PAG_BAKE_PLAN
 
-> 2026-09-05 选型评估与执行计划。背景：IMPLEMENTATION_STATUS 中"PAG→图集批量烘焙"为 IN_PROGRESS，本轮完成代码核查 + 联网选型评估，给出推荐路线与执行顺序。
+> 2026-09-05 选型评估与执行计划。以下第一节是当日的历史基线；P0-1/P0-2/P0-3/P1 已于 2026-09-06 完成，当前状态以文末执行记录和 `docs/IMPLEMENTATION_STATUS.md` 为准。
 > 规模口径：APK 内 PAG 共 **60.6MB / 535 文件**（逐文件策略表 data/asset-conversion-report.csv，策略行 469 条 "PAG→帧序列/图集或远端视频"）；归档可直接用于工具链开发的样本 **99 个**（evidence/apk_assets_sample/assets/pag/，含 marbles/launch_click.pag 等）。
 
-## 一、代码核查结论（选型前必须澄清的事实）
+## 一、代码核查结论（2026-09-05 历史基线）
 
 | 文档声称 | 实际核查（2026-09-05） | 结论 |
 |---|---|---|
-| "客户端图集帧动画渲染路径（占位纹理→图集替换零代码改动）已交付"（ASSET_MIGRATION.md:31、IMPLEMENTATION_STATUS 平台表） | client/src 全量 grep：`drawImage` **0 处**、`atlas` **0 处**；ui/widgets.ts 的 Draw 接口仅矢量绘制（fillRect/strokeRect/fillText/arc），无任何图像 API | ❌ **未实现**——文档债，需先补客户端图像层 |
-| "AssetManager manifest/hash/LRU 就绪，接入即切"（EXTERNAL_BLOCKERS #5） | shared/server/client/tools/tests 全部 TS 源 `AssetManager` **0 处** | ❌ **未实现**——文档债，EXTERNAL_BLOCKERS #5 已同步修正 |
+| "客户端图集帧动画渲染路径（占位纹理→图集替换零代码改动）已交付"（ASSET_MIGRATION.md:31、IMPLEMENTATION_STATUS 平台表） | 2026-09-05 基线核查：client/src 当时 `drawImage` **0 处**、`atlas` **0 处**；ui/widgets.ts 仅矢量绘制 | ✅ **已解决**——后续已补齐图像层、FrameClip 与 bundle 验收 |
+| "AssetManager manifest/hash/LRU 就绪，接入即切"（EXTERNAL_BLOCKERS #5） | 2026-09-05 基线核查：当时 TS 源 `AssetManager` **0 处** | ✅ **已解决**——后续已补齐 AssetManager、LRU 和 manifest 校验 |
 | "烘焙执行需图形工具链（libpag 渲染端/TexturePacker）"（asset_pipeline.ts:7 自述"不实际解码"） | 属实：tools/asset_pipeline.ts 仅输出策略 CSV 与统计 | ✅ 如实 |
+
+> 当前复查：客户端图像层、`AssetManager`、`FrameClip`、图集构建和视频桶均已实现并通过 verify；上表仅保留选型当日的核查证据。
 
 **影响**：PAG 落地的第一优先级不是烘焙工具本身，而是**客户端图像渲染层 + AssetManager**——当前客户端是纯矢量立即模式 UI，没有画图能力，烘焙产物再多也无渲染入口。
 

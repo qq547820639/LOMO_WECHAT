@@ -87,6 +87,6 @@
 - 磁盘策略：仅 keep 抽样落盘（f070, f279 → evidence/bake_samples/），其余文件渲染后即弃，字节统计在浏览器端累计。
 - 朝向假设：readPixels 按 top-left 原点处理（SkBitmap 语义）；kept 样本可人工核验，若发现上下翻转在 P0-3 打包器统一校正。
 
-## 下一步（P0-3）
+## 后续接入
 
-图集打包：MaxRects + JSON 元数据（形态 A）→ assets/atlas/；fps 按策略表 12-20；长演出转 mp4。
+P0-3 图集打包与视频桶转换已完成；后续仅需将自有内容上传 CDN，并在 release 构建时注入 `APP_SERVER_URL` 与资源 `manifest.base`。

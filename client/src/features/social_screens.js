@@ -8,6 +8,7 @@ exports.registerSocialScreens = registerSocialScreens;
 const base_1 = require("./base");
 const router_1 = require("../core/router");
 const theme_1 = require("../core/theme");
+const brand_1 = require("../../../shared/src/brand");
 const registry_1 = require("./registry");
 // ---------------- 记录中心 ----------------
 class RecordsScreen extends base_1.ApiScreen {
@@ -52,13 +53,15 @@ class RankScreen extends router_1.Screen {
         this.board = 'seasonScore';
         this.data = null;
     }
-    onEnter() { return this.load(async () => { this.data = await this.app.api.get('/v1/rank/' + this.board); }); }
-    async load(fn) { try {
-        await fn();
+    onEnter() {
+        this.loading = true;
+        this.error = null;
+        return this.app.api.get('/v1/rank/' + this.board)
+            .then((result) => { if ((result === null || result === void 0 ? void 0 : result.ok) === false)
+            throw new Error(result.message || '排行榜加载失败'); this.data = result; })
+            .catch((e) => { this.error = String((e === null || e === void 0 ? void 0 : e.message) || e); })
+            .finally(() => { this.loading = false; });
     }
-    catch (e) {
-        this.error = String((e === null || e === void 0 ? void 0 : e.message) || e);
-    } }
     render() {
         var _a, _b;
         const ui = this.app.ui;
@@ -70,8 +73,15 @@ class RankScreen extends router_1.Screen {
             ui.button({ x: 12 + i * (bw + 4), y, w: bw, h: 30 }, label, () => { this.board = id; this.onEnter(); }, { size: 9, color: this.board === id ? theme_1.THEME.accent : theme_1.THEME.panel2 });
         });
         y += 40;
+        if (this.loading) {
+            ui.textCenter('加载中…', ui.w / 2, y + 28, { size: 12, color: theme_1.THEME.textDim });
+            return;
+        }
         if (this.error) {
-            ui.textCenter('加载失败', ui.w / 2, y + 20, { size: 12, color: theme_1.THEME.red });
+            ui.panel({ x: 12, y: y + 4, w: ui.w - 24, h: 62 }, theme_1.THEME.panel);
+            ui.text('加载失败', 24, y + 26, { size: 13, color: theme_1.THEME.red, bold: true });
+            ui.text(this.error.slice(0, 34), 24, y + 44, { size: 10, color: theme_1.THEME.textDim });
+            ui.button({ x: ui.w - 100, y: y + 16, w: 80, h: 30 }, '重试', () => { void this.onEnter(); }, { size: 12 });
             return;
         }
         const rows = (_b = (_a = this.data) === null || _a === void 0 ? void 0 : _a.rows) !== null && _b !== void 0 ? _b : [];
@@ -124,6 +134,8 @@ class MailScreen extends base_1.ApiScreen {
     async claim(mailId) {
         const r = await this.app.api.post('/v1/mail/claim', { mailId });
         this.app.handleGameResponse(r);
+        if (r.ok)
+            this.app.playOverlay('pag__red_package_appear', 1400);
         await this.onEnter();
     }
 }
@@ -161,7 +173,7 @@ class SocialScreen extends base_1.ApiScreen {
             }
         }, { color: theme_1.THEME.gold });
         ui.button({ x: 12 + bw + 8, y, w: bw, h: 42 }, '分享到微信', () => {
-            this.app.platform.share({ title: '一起来玩 LOMO 小游戏！', query: this.inviteToken ? `invite=${this.inviteToken}` : '' });
+            this.app.platform.share({ title: brand_1.BRAND.shareTitle, query: this.inviteToken ? `invite=${this.inviteToken}` : '' });
         }, { color: theme_1.THEME.accent2 });
         y += 52;
         ui.text('好友列表（NPC 同服玩家）', 16, y + 12, { size: 12, color: theme_1.THEME.textDim });
@@ -214,7 +226,7 @@ class ProfileScreen extends router_1.Screen {
                 this.app.audioManager.playBgm('home');
         }, { size: 12 });
         ui.button({ x: 12 + (ui.w - 30) / 2 + 6, y, w: (ui.w - 30) / 2, h: 40 }, '清空本地缓存', () => {
-            this.app.platform.storageSet('lomo.client.cache', null);
+            this.app.platform.storageSet('app.client.cache', null);
             this.app.showToast('本地缓存已清（服务端数据不受影响）');
         }, { size: 12 });
     }

@@ -1,35 +1,49 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LomoClientApp = void 0;
+exports.MiniGameClientApp = void 0;
 exports.wrapText = wrapText;
 const api_1 = require("../net/api");
 const widgets_1 = require("../ui/widgets");
 const router_1 = require("../core/router");
 const theme_1 = require("../core/theme");
 const audio_1 = require("../audio/audio");
+const brand_1 = require("../../../shared/src/brand");
 const TABS = [
-    { id: 'chaowan', label: '潮玩', color: theme_1.THEME.accent },
-    { id: 'ape', label: '猿宇宙', color: theme_1.THEME.purple },
+    { id: 'chaowan', label: '藏品', color: theme_1.THEME.accent },
+    { id: 'ape', label: '猿岛', color: theme_1.THEME.purple },
     { id: 'games', label: '游戏', color: theme_1.THEME.accent2 },
     { id: 'trade', label: '交易', color: theme_1.THEME.gold },
     { id: 'mine', label: '我的', color: theme_1.THEME.green },
 ];
-class LomoClientApp {
+class MiniGameClientApp {
     constructor(platform, opts) {
+        var _a;
         this.player = null;
         this.antiAddiction = null;
         this.toast = null;
+        this.overlay = null;
+        this.ambience = null;
+        this.lastLevel = 0;
         this.modal = null;
         this.booted = false;
+        this.frameDt = 16.7;
+        this.lastFrameAt = Date.now();
         this.fps = 0;
         this.fpsCount = 0;
         this.fpsAt = Date.now();
         this.lastTouchStart = null;
         this.telemetryBuf = [];
         this.dragTrack = null;
+        this.skipGate = false;
         this.pendingModalActions = [];
+        this.lastBgm = 'home';
+        this.skipGate = !!opts.skipComplianceGate;
         this.platform = platform;
         this.profile = opts.profile;
+        const standalone = (_a = opts.standalone) !== null && _a !== void 0 ? _a : platform.kind === 'node';
+        if (!opts.serverUrl && platform.kind === 'wx' && !standalone) {
+            throw new Error('APP_SERVER_URL is required for WeChat runtime; standalone is Node/test only');
+        }
         const transport = opts.serverUrl ? new api_1.HttpTransport(platform, opts.serverUrl) : new api_1.InProcessTransport(opts.profile);
         this.api = new api_1.ApiClient(transport);
         this.audioManager = new audio_1.AudioManager(platform);
@@ -51,6 +65,24 @@ class LomoClientApp {
                 if (prop === 'fillText') {
                     return (t, x, y) => target.fillText.call(target, t, x * dscale, y * dscale);
                 }
+                if (prop === 'drawImage') {
+                    // 目标坐标缩放；源矩形（前 4 参）保持图像像素原值
+                    return (img, ...rest) => {
+                        if (rest.length === 8) {
+                            const [sx, sy, sw, sh, dx, dy, dw, dh] = rest;
+                            return target.drawImage.call(target, img, sx, sy, sw, sh, dx * dscale, dy * dscale, dw * dscale, dh * dscale);
+                        }
+                        if (rest.length === 4) {
+                            const [dx, dy, dw, dh] = rest;
+                            return target.drawImage.call(target, img, dx * dscale, dy * dscale, dw * dscale, dh * dscale);
+                        }
+                        if (rest.length === 2) {
+                            const [dx, dy] = rest;
+                            return target.drawImage.call(target, img, dx * dscale, dy * dscale);
+                        }
+                        return target.drawImage.call(target, img, ...rest);
+                    };
+                }
                 if (prop === 'measureText')
                     return (t) => target.measureText.call(target, t);
                 const v = target[prop];
@@ -63,54 +95,116 @@ class LomoClientApp {
         this.router = new router_1.Router(this);
         (0, registry_1.registerAllScreens)(this);
         this.router.switchTab('games');
-        const { SCREEN_ROUTES } = require('../features/registry');
-        if (SCREEN_ROUTES['home'])
-            this.router.push(SCREEN_ROUTES['home']());
-        this.platform.onTouchStart((x, y) => { this.lastTouchStart = [x / dscale, y / dscale]; });
+        const inputScale = size.w / 375;
+        this.platform.onTouchStart((x, y) => {
+            var _a, _b;
+            const logicalY = y / inputScale;
+            this.lastTouchStart = [x / inputScale, logicalY];
+            const currentRoute = (_b = (_a = this.router.current) === null || _a === void 0 ? void 0 : _a.route) !== null && _b !== void 0 ? _b : '';
+            this.dragTrack = currentRoute.startsWith('/') && !this.router.stack.length
+                ? { id: 'hub-' + currentRoute.slice(1), startY: logicalY }
+                : null;
+        });
         this.platform.onTouchMove((x, y) => {
             if (this.lastTouchStart && this.dragTrack)
-                this.ui.handleDrag(this.dragTrack.id, this.dragTrack.startY, y / dscale);
+                this.ui.handleDrag(this.dragTrack.id, this.dragTrack.startY, y / inputScale);
         });
         this.platform.onTouchEnd((x, y) => {
-            const lx = x / dscale, ly = y / dscale;
+            const lx = x / inputScale, ly = y / inputScale;
             const start = this.lastTouchStart;
             this.lastTouchStart = null;
             this.dragTrack = null;
             if (start && Math.abs(start[1] - ly) > 24)
                 return; // 视为滚动
-            if (this.modal) { /* 弹窗层命中由 modal 按钮注册 */ }
+            this.audioManager.playSfx('click');
             this.ui.onTap(lx, ly);
         });
         this.platform.onHide(() => { this.audioManager.onAppHide(); this.telemetry('app_hide'); });
         this.platform.onShow(() => { this.audioManager.onAppShow(); this.refreshPlayer(); });
-        // 启动流程
-        await this.api.connect(this.profile);
-        const launchQuery = this.platform.getLaunchQuery();
-        const code = await this.platform.loginCode();
-        const auth = await this.api.login(code || 'offline-code');
-        this.antiAddiction = auth.antiAddiction;
-        await this.refreshPlayer();
-        this.booted = true;
-        this.telemetry('launch', { profile: this.profile, isNew: auth.isNew });
-        // 邀请进游（Section 37：share query → server token）
-        if (launchQuery.invite) {
-            const r = await this.api.post('/v1/social/invite/accept', { token: launchQuery.invite });
-            if (r.ok)
-                this.showToast('邀请奖励到账：金币 +30');
-        }
+        // 游戏资源 manifest（P0-1）：包内 assets/game/manifest.json；失败静默走占位
+        this.assets = new (require('../core/assets').AssetManager)(this.platform);
+        this.assets.loadManifest().then((m) => { if (m)
+            this.telemetry('asset_manifest', { version: m.version }); }).catch(() => { });
         this.platform.onFrame(() => this.frame());
-        this.audioManager.playBgm('home');
+        // 启动流程：合规门（健康游戏忠告+隐私授权）→ completeBoot
+        const { ComplianceGateScreen } = require('../features/compliance_gate');
+        const gate = new ComplianceGateScreen(() => { void this.completeBoot(); });
+        if (this.skipGate) {
+            void this.completeBoot();
+        }
+        else {
+            this.router.push(gate);
+            gate.onEnter();
+        }
+    }
+    /** 合规门通过后的正式启动：登录 → bootstrap → 首页 */
+    async completeBoot() {
+        var _a;
+        if (this.booted)
+            return;
+        try {
+            await this.api.connect(this.profile);
+            const launchQuery = this.platform.getLaunchQuery();
+            const code = await this.platform.loginCode();
+            if (!code)
+                throw new Error('微信登录失败，请重试');
+            const auth = await this.api.login(code);
+            this.antiAddiction = auth.antiAddiction;
+            await this.refreshPlayer();
+            this.booted = true;
+            this.telemetry('launch', { profile: this.profile, isNew: auth.isNew });
+            // 清掉合规门，回主城
+            while (this.router.stack.length)
+                this.router.pop(true);
+            const { SCREEN_ROUTES } = require('../features/registry');
+            if (SCREEN_ROUTES['home'])
+                this.router.push(SCREEN_ROUTES['home']());
+            this.audioManager.playBgm('home');
+            // 邀请进游（Section 37：share query → server token）
+            if (launchQuery.invite) {
+                const r = await this.api.post('/v1/social/invite/accept', { token: launchQuery.invite });
+                if (r.ok)
+                    this.showToast('邀请奖励到账：金币 +30');
+            }
+        }
+        catch (e) {
+            // 启动完成段失败：回退到合规门重试路径（不静默吞掉状态）
+            const err = e;
+            this.showToast('启动失败: ' + String((err === null || err === void 0 ? void 0 : err.message) || e).slice(0, 20));
+            this.booted = false;
+            const gate = this.router.stack.find((screen) => screen.route === '/compliance-gate');
+            (_a = gate === null || gate === void 0 ? void 0 : gate.resetForRetry) === null || _a === void 0 ? void 0 : _a.call(gate);
+        }
     }
     async refreshPlayer() {
         const res = await this.api.get('/v1/player/state');
-        if (res.ok)
+        if (res.ok) {
+            if (this.lastLevel && res.player.level > this.lastLevel) {
+                this.audioManager.playSfx('levelup');
+                this.showToast(`升级到 Lv.${res.player.level}！`);
+            }
+            this.lastLevel = res.player.level;
             this.player = res.player;
+        }
     }
     showToast(text) { this.toast = { text, until: Date.now() + 2600 }; }
     showModal(title, lines, actions = []) {
         this.modal = { title, lines, actions };
         // modal 按钮注册在 frame 渲染时进行；onTap 后关闭
         this.pendingModalActions = actions;
+    }
+    /** 全屏动画 overlay（大演出槽位通用接线口）：一次性播放后自动关闭 */
+    playOverlay(slotId, ms = 1600) {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { FrameClip } = require('../ui/frame_clip');
+            const clip = new FrameClip(this.assets, slotId, 'launch', { loop: false, fitHeight: Math.min(260, this.ui.h * 0.42) });
+            clip.play();
+            this.audioManager.playSfx('open');
+            this.overlay = { clip, until: Date.now() + ms };
+            this.telemetry('anim_overlay', { slot: slotId });
+        }
+        catch { /* 资产缺失静默跳过 */ }
     }
     telemetry(name, props) {
         this.telemetryBuf.push({ name, at: Date.now(), props });
@@ -123,7 +217,7 @@ class LomoClientApp {
     }
     /** 处理带奖励的玩法响应：toast + 刷新 */
     handleGameResponse(r) {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f;
         if (r.ok === false) {
             this.showToast(r.message || '操作失败');
             this.audioManager.playSfx('fail');
@@ -132,16 +226,28 @@ class LomoClientApp {
         if (r.message)
             this.showToast(r.message);
         const hasReward = ((_b = (_a = r.rewards) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) > 0;
+        if (hasReward && ((_c = r.rewards) !== null && _c !== void 0 ? _c : []).some((x) => x.assetId === 'COIN'))
+            this.audioManager.playSfx('coin');
         if (hasReward)
             this.audioManager.playSfx('reward');
-        if ((_c = r.fx) === null || _c === void 0 ? void 0 : _c.includes('win'))
+        if ((_d = r.fx) === null || _d === void 0 ? void 0 : _d.includes('win')) {
             this.platform.vibrate(true);
-        if ((_d = r.fx) === null || _d === void 0 ? void 0 : _d.includes('lose'))
+            this.audioManager.playSfx('win');
+        }
+        if ((_e = r.fx) === null || _e === void 0 ? void 0 : _e.includes('lose')) {
             this.platform.vibrate(false);
+            this.audioManager.playSfx('lose');
+        }
+        if ((_f = r.fx) === null || _f === void 0 ? void 0 : _f.includes('levelup'))
+            this.audioManager.playSfx('levelup');
         this.refreshPlayer();
         return true;
     }
     frame() {
+        var _a, _b;
+        const nowMs = Date.now();
+        this.frameDt = Math.max(4, Math.min(100, nowMs - this.lastFrameAt));
+        this.lastFrameAt = nowMs;
         this.fpsCount++;
         const now = Date.now();
         if (now - this.fpsAt >= 1000) {
@@ -153,8 +259,8 @@ class LomoClientApp {
         const ctx = this.ui.ctx;
         ctx.fillStyle = theme_1.THEME.bg;
         ctx.fillRect(0, 0, this.ui.w, this.ui.h);
-        if (!this.booted) {
-            this.ui.textCenter('LOMO 小游戏 · 正在启动…', this.ui.w / 2, this.ui.h / 2, { size: 15, color: theme_1.THEME.textDim });
+        if (!this.booted && !this.router.stack.length) {
+            this.ui.textCenter(brand_1.BRAND.loadingText, this.ui.w / 2, this.ui.h / 2, { size: 15, color: theme_1.THEME.textDim });
             return;
         }
         const screen = this.router.current;
@@ -168,6 +274,7 @@ class LomoClientApp {
         this.renderHud();
         // Tab 栏（先画，屏幕可覆盖注册自己的命中）
         this.renderTabBar(bottom);
+        this.syncBgm();
         // 屏幕渲染（内部自行避开 top/bottom）
         try {
             screen.render();
@@ -186,6 +293,19 @@ class LomoClientApp {
             const actions = this.modal.actions.length ? this.modal.actions : [{ label: '知道了', onTap: () => { this.modal = null; } }];
             this.ui.modal(this.modal.title, this.modal.lines, () => { this.modal = null; }, actions.map((a) => ({ ...a, onTap: () => { this.modal = null; a.onTap(); } })));
         }
+        // 氛围窗：当前玩法家族的自制动画轮播（屏幕层之上、半透明，不挡命中）
+        if (!this.ambience)
+            this.ambience = new (require('../ui/ambience').AmbienceWindow)();
+        this.ambience.setFamily((_b = (_a = this.router.current) === null || _a === void 0 ? void 0 : _a.route) !== null && _b !== void 0 ? _b : '/home');
+        this.ambience.draw(this, this.ui, this.ui.w - 70, bottom - 66, 62, this.frameDt, 0.62);
+        if (this.overlay) {
+            const c2 = this.ui.ctx;
+            c2.fillStyle = 'rgba(6,8,16,0.72)';
+            c2.fillRect(0, top, this.ui.w, bottom - top);
+            this.overlay.clip.draw(this.ui, this.ui.w / 2, (top + bottom) / 2, this.frameDt);
+            if (now >= this.overlay.until || (this.overlay.clip.state && this.overlay.clip.state.finished))
+                this.overlay = null;
+        }
         if (this.toast && now < this.toast.until) {
             const lines = wrapText(this.toast.text, 32);
             const th = 20 + lines.length * 16;
@@ -200,6 +320,18 @@ class LomoClientApp {
             this.toast = null;
         if (screen.loading)
             this.ui.textCenter('加载中…', this.ui.w / 2, top + 24, { size: 11, color: theme_1.THEME.textDim });
+    }
+    bgmForRoute() {
+        var _a, _b;
+        const r = (_b = (_a = this.router.current) === null || _a === void 0 ? void 0 : _a.route) !== null && _b !== void 0 ? _b : '/home';
+        return /battleRoyal|arena|boss|monkeyFight|dagger|robbery|nxArena|apeRabbit|beast/.test(r) ? 'battle' : 'home';
+    }
+    syncBgm() {
+        const want = this.router.stack.length ? this.bgmForRoute() : 'home';
+        if (this.lastBgm !== want) {
+            this.lastBgm = want;
+            this.audioManager.playBgm(want);
+        }
     }
     renderHud() {
         const ui = this.ui;
@@ -227,7 +359,7 @@ class LomoClientApp {
             ui.text(chip, x + 6, 21, { size: 11, color: theme_1.THEME.textDim });
             x += w + 6;
         }
-        ui.text(`${this.profile === 'full-clone' ? 'FULL CLONE（沙盒）' : 'WECHAT RELEASE'} · ${p.nick} · FPS ${this.fps}`, 78, 42, { size: 10, color: theme_1.THEME.textDim });
+        ui.text(`${brand_1.BRAND.appName} · ${this.profile === 'full-clone' ? '研究沙盒' : '正式版'} · ${p.nick} · FPS ${this.fps}`, 78, 42, { size: 10, color: theme_1.THEME.textDim });
         if (this.antiAddiction && !this.antiAddiction.playableNow) {
             ui.text('⏸ 防沉迷限制中', ui.w - 90, 42, { size: 10, color: theme_1.THEME.red });
         }
@@ -252,7 +384,7 @@ class LomoClientApp {
         });
     }
 }
-exports.LomoClientApp = LomoClientApp;
+exports.MiniGameClientApp = MiniGameClientApp;
 function wrapText(text, maxChars) {
     const lines = [];
     for (let i = 0; i < text.length; i += maxChars)

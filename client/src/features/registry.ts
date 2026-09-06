@@ -17,7 +17,10 @@ export function registerRoute(routeId: string, factory: ScreenFactory): void {
 export function openFeature(app: any, featureId: string): void {
   const policy = app.api.bootstrap?.featurePolicies?.[featureId];
   const profile = app.profile;
-  const blockedInRelease = profile === 'wechat-release' && policy && policy !== 'keep' && policy !== 'sandbox' && false;
+  if (profile === 'wechat-release' && policy === 'cut') {
+    app.showModal('功能暂不可用', ['该功能不属于微信正式版能力范围。', '请使用合规替代玩法。']);
+    return;
+  }
   const factory = SCREEN_ROUTES[featureId];
   if (!factory) {
     app.showModal('功能未实装', [`「${titleOf(featureId)}」暂无独立页面，请从对应 Tab 枢纽进入相关玩法。`, `featureId=${featureId}`]);

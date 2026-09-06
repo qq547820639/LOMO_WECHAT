@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.daily = exports.box = exports.gacha = exports.cards = void 0;
 exports.markDailyTask = markDailyTask;
 /**
- * Wave 1/5 —— 收集与成长：卡牌合成 / 扭蛋兔养成 / 盲盒福袋 / 每日签到任务。
+ * Wave 1/5 —— 收集与成长：卡牌合成 / 萌宠扭蛋 / 盲盒福袋 / 每日签到任务。
  * 证据: SynthesisCardActivity / MyCardLibraryActivity / ApeComposeCardActivity / ApeSplitCardActivity、normal_egg / medal_egg / rock_egg / dress_*、
  *       OpenBoxActivity / TreasureBoxActivity / LuckyBagActivity（免费钥匙链路）。
  * 合规: 付费随机抽取关闭；全部为免费产出/任务钥匙链路；概率走 RemoteConfig。
@@ -78,7 +78,7 @@ function drawCard(rng) {
     const t = rng.weighted(card_data_1.CARD_TEMPLATES.map((c) => ({ value: c, weight: c.rarity === 'N' ? 60 : c.rarity === 'R' ? 27 : c.rarity === 'SR' ? 10 : 3 })));
     return t;
 }
-// ---------------- 扭蛋兔（normal_egg/medal_egg/rock_egg + dress_* + strengthen） ----------------
+// ---------------- 萌宠扭蛋（normal_egg/medal_egg/rock_egg + dress_* + strengthen） ----------------
 exports.gacha = {
     id: 'gacha',
     readState: (ctx) => {

@@ -7,6 +7,13 @@ import { UI } from '../ui/widgets';
 import { THEME, fmtNum, fmtTime } from '../core/theme';
 import { registerRoute } from './registry';
 
+export function eggProgress(readyAt: number, now = Date.now(), durationMs = 30000): number {
+  if (!(readyAt > 0)) return 0;
+  if (readyAt <= now) return 1;
+  const duration = durationMs > 0 ? durationMs : 30000;
+  return Math.max(0, Math.min(1, 1 - (readyAt - now) / duration));
+}
+
 // ---------------- 虎口逃生（三车道跑酷） ----------------
 export class EscapeTigerScreen extends ApiScreen {
   readonly route = '/escapeTiger';
@@ -134,8 +141,7 @@ export class ChickenScreen extends ApiScreen {
     this.chickenClip?.draw(ui, ui.w - 52, y + 30, this.app.frameDt);
     ui.textCenter(eggReady ? '🥚 蛋已成熟！' : eggPending ? '🥚 孵化中…' : '🐔 鸡窝空空', ui.w / 2, y + 30, { size: 15, bold: true, color: eggReady ? THEME.gold : THEME.text });
     if (eggPending) {
-      const remain = st.eggReadyAt - this.app.lastFrameTime;
-      ui.progress(28, y + 46, ui.w - 56, 8, Math.max(0, Math.min(1, 1 - remain / 30000)), THEME.gold);
+      ui.progress(28, y + 46, ui.w - 56, 8, eggProgress(st.eggReadyAt, Date.now(), st.eggDurationMs ?? 30000), THEME.gold);
     }
     const thiefWarn = (st.thiefWarningAt ?? 0) > 0;
     ui.textCenter(thiefWarn ? '⚠ 偷鸡者来袭！赶紧布防！' : `收获 ${st.eggsCollected} · 防守 ${st.guarded} · 被偷 ${st.stolen}`, ui.w / 2, y + 76, { size: 11, color: thiefWarn ? THEME.red : THEME.textDim });

@@ -1,11 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiClient = exports.InProcessTransport = exports.HttpTransport = void 0;
+const config_1 = require("../../../shared/src/config");
 class HttpTransport {
     constructor(platform, baseUrl, timeout = 10000) {
         this.platform = platform;
-        this.baseUrl = baseUrl;
         this.timeout = timeout;
+        this.baseUrl = baseUrl.replace(/\/+$/, '');
     }
     async request(path, method, body, headers) {
         let lastErr = null;
@@ -29,13 +30,13 @@ class HttpTransport {
     }
 }
 exports.HttpTransport = HttpTransport;
-/** 进程内 Transport：require 编译产物 server/src/app.js（standalone/测试用；wx 真机打包也包含它） */
+/** 进程内 Transport：require 编译产物 server/src/app.js（仅 standalone/测试用，微信真机固定使用 HTTP） */
 class InProcessTransport {
     constructor(profile) {
         // 延迟 require：仅在 standalone 模式加载（app.ts 不依赖 node:http/fs 顶层）
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { LomoApp } = require('../../../server/src/app');
-        this.app = new LomoApp({ profile });
+        const { GameApp } = require('../../../server/src/app');
+        this.app = new GameApp({ profile });
         this.routes = this.app.routes();
     }
     get appInstance() { return this.app; }
@@ -96,7 +97,18 @@ class ApiClient {
         return this.token ? { authorization: `Bearer ${this.token}` } : {};
     }
     async connect(profile) {
+        var _a, _b;
         this.bootstrap = await this.request('/v1/config/bootstrap', 'GET');
+        if (!this.bootstrap || this.bootstrap.ok === false)
+            throw new Error(((_a = this.bootstrap) === null || _a === void 0 ? void 0 : _a.message) || 'bootstrap failed');
+        if (this.bootstrap.profile !== profile || ((_b = this.bootstrap.release) === null || _b === void 0 ? void 0 : _b.profile) !== profile) {
+            throw new Error(`server profile mismatch: expected ${profile}`);
+        }
+        if (profile === 'wechat-release') {
+            const unsafe = config_1.RELEASE_LOCKED_FLAGS.filter((key) => { var _a; return ((_a = this.bootstrap.release) === null || _a === void 0 ? void 0 : _a[key]) === true; });
+            if (unsafe.length)
+                throw new Error(`release server enables locked capabilities: ${unsafe.join(',')}`);
+        }
         this.connected = true;
     }
     async login(code) {

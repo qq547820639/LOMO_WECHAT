@@ -51,7 +51,7 @@ ysf.nosdn.127.net                                                              �
 
 - **登录后页面遍历未做**：微信登录在模拟器无微信环境无法完成（这是原 App 的正常依赖，非工程缺陷），
   因此 567 个业务页的运行时遍历、网络域名全量观察、在线数值抓取均未发生——
-  原服数值仍为 INFERRED（RUNTIME_REQUIRED 维持，需真实账号环境）。
+  原服历史数值仍不可验证；运行时使用已校验的 `OWNED_LAUNCH_DEFAULTS`，真实账号环境仅用于后续运营校准。
 - logcat 全量存档：`evidence/runtime-evidence/logcat_login_session.txt`（4821 行）。
 - 采集截图：01 登录页 / 02 登录按钮点击后（无变化，因协议未勾）/ 03 隐私政策 WebView。
 

@@ -23,8 +23,8 @@ npm run gen:assets   # 资源管线（可加 --apk xx.apk --out dir 做真实提
 
 1. 打开微信开发者工具 → 导入项目 → 选择 `build/wechat-full-clone/`（或 `build/wechat-release/`）。
 2. AppID 使用测试号（touristappid，已在 project.config.json 中）。
-3. 包内默认使用**进程内权威后端**（与 `server/` 同一套编译代码，wx 真机可运行）。
-4. 如需连接真实服务端：`LOMO_SERVER_URL=http://host:8787 node dist/tools/src/build_wechat.js --profile wechat-release` 重新构建。
+3. 微信包必须连接远端权威服务端；未注入 `APP_SERVER_URL` 的验收包会在启动页明确提示配置缺失，不能直接上真机。
+4. 使用自有 HTTPS 服务端构建：`APP_SERVER_URL=https://api.your-domain.com npm run build:wechat`。进程内服务端仅供 Node/验收 mock 的 `standalone` 模式。
 
 ## 三大输入与证据
 
@@ -38,13 +38,13 @@ npm run gen:assets   # 资源管线（可加 --apk xx.apk --out dir 做真实提
 
 ```
 shared/src/       资产目录/账本/确定性RNG/RemoteConfig/协议/注册表类型（双端共用）
-server/src/       参考服务端：app.ts（可移植，wx 进程内可跑）+ index.ts（HTTP 入口）
+server/src/       参考服务端：app.ts（可移植核心，供 HTTP 与 Node standalone 验收）+ index.ts（HTTP 入口）
   server/src/games/   22 个玩法的服务端权威实现（大逃杀/地下城/竞技场/矿场/宇宙/小游戏矩阵/卡牌…）
 client/src/       小游戏客户端：引擎壳/路由/立即模式UI/平台适配/网络/音频
   client/src/features/ 48 功能族页面（与 data.gen FEATURES 一一对应）
 tools/src/        gen_data / route_parity / asset_pipeline / build_wechat / verify
 data/             routes.json(680) assets.json(14092) features.json economy.json screens.json…
-configs/          full-clone.json / wechat-release.json / tuning-baseline.json(INFERRED 标注)
+configs/          full-clone.json / wechat-release.json / tuning-baseline.json（OWNED_LAUNCH_DEFAULTS，版本化自有参数）
 tests/            unit_core / gameplay_server / release_safety / integration_client
 docs/             18 篇交付文档（含 ROUTE_PARITY_680 / TEST_REPORT 自动生成）
 evidence/         full_clone + cleanroom 原包归档 + apk_assets_sample（管线真实提取样本）
@@ -58,7 +58,7 @@ build/            微信小游戏双产物（verify 生成）
 - **FULL CLONE**（`configs/full-clone.json`）：完整复刻 680 页面生态与经济关系；真钱类界面 1:1 复刻但绑定沙盒桥（TEST_CREDIT，永不兑付）。
 - **WECHAT RELEASE**（`configs/wechat-release.json`）：现金钱包/提现/下注/付费随机/竞拍/P2P 交易/代理/现金红包在 **客户端 Feature Flag + 服务端 API 拦截 + 配置锁定** 三层关闭；下注房间→门票房间、现金奖池→赛季积分、矿石交易→NPC 兑换。tests/release_safety.ts 自动断言。
 
-诚实声明：所有无法从加固 APK 静态证明的原服数值（概率/奖池/协议签名/掉落表）一律标记 `INFERRED_NOT_ORIGINAL` 并置于 `configs/tuning-baseline.json` + RemoteConfig，可被真实数据一键替换。见 `docs/KNOWN_DIFFERENCES.md`。
+数值治理：无法从加固 APK 静态证明的原服数值不再作为运行时缺口；项目使用已校验、版本化的 `OWNED_LAUNCH_DEFAULTS` 自有运营参数，并通过签名 RemoteConfig 灰度调优。原服不可验证性和证据边界记录于 `docs/KNOWN_DIFFERENCES.md`。
 
 ## 文档索引
 

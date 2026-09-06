@@ -5,7 +5,7 @@ import * as assert from 'node:assert';
 import { Ledger, LedgerError } from '../shared/src/ledger';
 import { Rng } from '../shared/src/rng';
 import { ASSET_CATALOG, ALL_ASSET_IDS } from '../shared/src/assets';
-import { CASH_SENSITIVE_FEATURES, RELEASE_LOCKED_FLAGS, featureEnabledInProfile } from '../shared/src/config';
+import { CASH_SENSITIVE_FEATURES, RELEASE_LOCKED_FLAGS, featureEnabledInProfile, validateTuningConfig, TuningConfigError } from '../shared/src/config';
 
 export function run(): void {
   // Ledger
@@ -74,6 +74,17 @@ export function run(): void {
   assert.equal(featureEnabledInProfile('keep', 'wechat-release'), true);
   assert.ok(Object.keys(CASH_SENSITIVE_FEATURES).length >= 15);
   assert.ok(RELEASE_LOCKED_FLAGS.includes('allowWithdrawal'));
+
+  const ownedTuning = validateTuningConfig({
+    schemaVersion: '1.0.0', status: 'OWNED_LAUNCH_DEFAULTS', provenance: 'CLEAN_ROOM_PRODUCT_DEFAULTS', effectiveFrom: '2026-09-06T00:00:00Z', owner: 'test',
+    progression: { levelXpBase: 100, levelXpStep: 40, levelUpEnergy: 5 },
+    energy: { initial: 30, max: 120, regenMinutes: 6, battleCost: 3, mineCost: 2, exploreCost: 4, minigameCost: 1 },
+    economy: { initialCoin: 500, initialTicket: 5, mineCoinRange: [3, 8], refineOreCost: 10, refineCoin: 35 },
+  });
+  assert.equal(ownedTuning.status, 'OWNED_LAUNCH_DEFAULTS');
+  assert.throws(() => validateTuningConfig({ ...ownedTuning, economy: { ...ownedTuning.economy, mineCoinRange: [8, 3] } }), TuningConfigError);
+  assert.throws(() => validateTuningConfig({ ...ownedTuning, status: 'LEGACY_UNVERIFIED' }), TuningConfigError);
+  assert.throws(() => validateTuningConfig({ ...ownedTuning, energy: { ...ownedTuning.energy, max: 10 } }), TuningConfigError);
 
   console.log('unit-core ok: ledger/rng/assets/config');
 }

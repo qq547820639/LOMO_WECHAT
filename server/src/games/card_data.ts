@@ -1,6 +1,6 @@
 /**
  * 卡牌模板数据（图鉴）。命名与 APK 语义对齐：猿卡/星球卡/闪卡。
- * 数值 INFERRED（原正式服卡牌表不可静态恢复）。
+ * 数值采用 OWNED_LAUNCH_DEFAULTS（原正式服卡牌表不可静态恢复，运营可版本化调整）。
  */
 import { CardTemplate } from '../../../shared/src/registry';
 

@@ -13,6 +13,44 @@ class WxPlatform {
         const c = this.wx.createCanvas();
         return c;
     }
+    createImage() {
+        const img = this.wx.createImage();
+        return img;
+    }
+    readTextFile(path) {
+        var _a, _b;
+        try {
+            const fsm = (_b = (_a = this.wx).getFileSystemManager) === null || _b === void 0 ? void 0 : _b.call(_a);
+            return fsm ? fsm.readFileSync(path, 'utf8') : null;
+        }
+        catch {
+            return null;
+        }
+    }
+    async getPrivacySetting() {
+        return new Promise((resolve) => {
+            if (!this.wx.getPrivacySetting)
+                return resolve({ needAuthorization: false, privacyContractName: '', supported: false });
+            this.wx.getPrivacySetting({
+                success: (r) => resolve({ needAuthorization: !!r.needAuthorization, privacyContractName: r.privacyContractName || '《隐私保护指引》', supported: true }),
+                fail: () => resolve({ needAuthorization: false, privacyContractName: '', supported: false }),
+            });
+        });
+    }
+    requirePrivacyAuthorize() {
+        return new Promise((resolve) => {
+            if (!this.wx.requirePrivacyAuthorize)
+                return resolve(true); // 平台不支持=无强制要求
+            this.wx.requirePrivacyAuthorize({ success: () => resolve(true), fail: () => resolve(false) });
+        });
+    }
+    exitMiniProgram() {
+        var _a, _b;
+        try {
+            (_b = (_a = this.wx).exitMiniProgram) === null || _b === void 0 ? void 0 : _b.call(_a);
+        }
+        catch { /* 忽略 */ }
+    }
     getWindowSize() {
         try {
             const s = this.wx.getSystemInfoSync();
@@ -46,8 +84,8 @@ class WxPlatform {
     loginCode() {
         return new Promise((resolve) => {
             if (!this.wx.login)
-                return resolve('offline-code');
-            this.wx.login({ success: (r) => resolve(r.code || 'offline-code'), fail: () => resolve('offline-code') });
+                return resolve(null);
+            this.wx.login({ success: (r) => resolve(r.code || null), fail: () => resolve(null) });
         });
     }
     httpRequest(opts) {
@@ -121,9 +159,15 @@ class NodePlatform {
     constructor() {
         this.kind = 'node';
         this.drawCalls = 0;
+        this.drawImageCalls = 0;
         this.taps = [];
         this.frameCbs = [];
         this.store = {};
+        this.images = [];
+        this.privacyNeedAuth = false;
+        this.privacyAgreed = null;
+        this.exited = false;
+        this.__tapStartCb = null;
         this.__tapCb = null;
         this.launchQuery = {};
     }
@@ -136,8 +180,8 @@ class NodePlatform {
                 get(target, prop) {
                     if (prop in target)
                         return target[prop];
-                    return (...args) => { self.drawCalls++; if (prop === 'fillRect' || prop === 'fillText')
-                        return; return undefined; };
+                    return (...args) => { self.drawCalls++; if (prop === 'drawImage')
+                        self.drawImageCalls++; return undefined; };
                 },
                 set() { return true; },
             }),
@@ -145,11 +189,50 @@ class NodePlatform {
         };
     }
     getWindowSize() { return { w: 375, h: 667, dpr: 1 }; }
+    createImage() {
+        const img = { src: '', width: 64, height: 64, onload: null, onerror: null };
+        this.images.push(img);
+        // 模拟异步解码成功
+        Promise.resolve().then(() => { var _a; return (_a = img.onload) === null || _a === void 0 ? void 0 : _a.call(img); });
+        return img;
+    }
+    readTextFile(path) {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const fs = require('node:fs');
+            if (fs.existsSync(path))
+                return fs.readFileSync(path, 'utf8');
+            // 测试镜像：包内 assets/game/ 路径映射到仓库 game-assets/（manifest 由构建生成并入库）
+            if (path.startsWith('assets/game/')) {
+                const rel = path.slice('assets/game/'.length);
+                const mirrored = `${process.cwd()}/game-assets/${rel}`;
+                if (fs.existsSync(mirrored))
+                    return fs.readFileSync(mirrored, 'utf8');
+            }
+            return null;
+        }
+        catch {
+            return null;
+        }
+    }
+    async getPrivacySetting() {
+        return { needAuthorization: this.privacyNeedAuth, privacyContractName: '《猿岛隐私保护指引》(mock)', supported: true };
+    }
+    async requirePrivacyAuthorize() {
+        this.privacyAgreed = true;
+        return true;
+    }
+    exitMiniProgram() { this.exited = true; }
     onFrame(cb) { this.frameCbs.push(cb); }
     pumpFrames(n = 1) { for (let i = 0; i < n; i++)
         this.frameCbs.forEach((f) => f()); }
-    tap(x, y) { this.taps.push([x, y]); }
-    onTouchStart(cb) { }
+    tap(x, y) {
+        var _a, _b;
+        this.taps.push([x, y]);
+        (_a = this.__tapStartCb) === null || _a === void 0 ? void 0 : _a.call(this, x, y);
+        (_b = this.__tapCb) === null || _b === void 0 ? void 0 : _b.call(this, x, y);
+    }
+    onTouchStart(cb) { this.__tapStartCb = cb; }
     onTouchEnd(cb) { this.__tapCb = cb; }
     onTouchMove(cb) { }
     storageGet(key) { var _a; return (_a = this.store[key]) !== null && _a !== void 0 ? _a : null; }

@@ -46,10 +46,14 @@ export class MiniGameClientApp {
   private dragTrack: { id: string; startY: number } | null = null;
   skipGate = false;
 
-  constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; skipComplianceGate?: boolean }) {
+  constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
     this.skipGate = !!opts.skipComplianceGate;
     this.platform = platform;
     this.profile = opts.profile;
+    const standalone = opts.standalone ?? platform.kind === 'node';
+    if (!opts.serverUrl && platform.kind === 'wx' && !standalone) {
+      throw new Error('APP_SERVER_URL is required for WeChat runtime; standalone is Node/test only');
+    }
     const transport = opts.serverUrl ? new HttpTransport(platform, opts.serverUrl) : new InProcessTransport(opts.profile);
     this.api = new ApiClient(transport);
     this.audioManager = new AudioManager(platform);
@@ -102,12 +106,21 @@ export class MiniGameClientApp {
     registerAllScreens(this);
     this.router.switchTab('games');
 
-    this.platform.onTouchStart((x, y) => { this.lastTouchStart = [x / dscale, y / dscale]; });
+    const inputScale = size.w / 375;
+
+    this.platform.onTouchStart((x, y) => {
+      const logicalY = y / inputScale;
+      this.lastTouchStart = [x / inputScale, logicalY];
+      const currentRoute = this.router.current?.route ?? '';
+      this.dragTrack = currentRoute.startsWith('/') && !this.router.stack.length
+        ? { id: 'hub-' + currentRoute.slice(1), startY: logicalY }
+        : null;
+    });
     this.platform.onTouchMove((x, y) => {
-      if (this.lastTouchStart && this.dragTrack) this.ui.handleDrag(this.dragTrack.id, this.dragTrack.startY, y / dscale);
+      if (this.lastTouchStart && this.dragTrack) this.ui.handleDrag(this.dragTrack.id, this.dragTrack.startY, y / inputScale);
     });
     this.platform.onTouchEnd((x, y) => {
-      const lx = x / dscale, ly = y / dscale;
+      const lx = x / inputScale, ly = y / inputScale;
       const start = this.lastTouchStart;
       this.lastTouchStart = null;
       this.dragTrack = null;
@@ -142,7 +155,8 @@ export class MiniGameClientApp {
     await this.api.connect(this.profile);
     const launchQuery = this.platform.getLaunchQuery();
     const code = await this.platform.loginCode();
-    const auth = await this.api.login(code || 'offline-code');
+    if (!code) throw new Error('微信登录失败，请重试');
+    const auth = await this.api.login(code);
     this.antiAddiction = auth.antiAddiction;
     await this.refreshPlayer();
     this.booted = true;
@@ -162,6 +176,8 @@ export class MiniGameClientApp {
       const err: any = e;
       this.showToast('启动失败: ' + String(err?.message || e).slice(0, 20));
       this.booted = false;
+      const gate = this.router.stack.find((screen: any) => screen.route === '/compliance-gate') as any;
+      gate?.resetForRetry?.();
     }
   }
 

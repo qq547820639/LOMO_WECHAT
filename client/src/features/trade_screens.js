@@ -226,7 +226,7 @@ class PolicyScreen extends router_1.Screen {
         this.route = '/' + featureId;
     }
     render() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+        var _a, _b, _c, _d;
         const ui = this.app.ui;
         const top = 64;
         const release = (_a = this.meta.release) !== null && _a !== void 0 ? _a : 'cut';
@@ -241,12 +241,11 @@ class PolicyScreen extends router_1.Screen {
         const lines = wrap((_d = this.meta.notes) !== null && _d !== void 0 ? _d : '该模块保留产品模型与页面映射，按发布策略裁剪。', 24);
         lines.slice(0, 3).forEach((l, i) => ui.text(l, 24, y + 40 + i * 16, { size: 11 }));
         y += 86;
-        ui.panel({ x: 12, y, w: ui.w - 24, h: 20 + ((_f = (_e = this.meta.evidence) === null || _e === void 0 ? void 0 : _e.length) !== null && _f !== void 0 ? _f : 0) * 18 }, theme_1.THEME.panel);
-        ui.text('APK 原始证据', 24, y + 18, { size: 12, bold: true });
-        ((_g = this.meta.evidence) !== null && _g !== void 0 ? _g : []).slice(0, 4).forEach((e, i) => {
-            ui.text(`· ${e}`.slice(0, 38), 24, y + 36 + i * 18, { size: 10, color: theme_1.THEME.textDim });
-        });
-        y += 30 + ((_j = (_h = this.meta.evidence) === null || _h === void 0 ? void 0 : _h.length) !== null && _j !== void 0 ? _j : 0) * 18;
+        // SANITIZATION P1-3：原版内部类名不随发布包渲染，研究细节见归档文档
+        ui.panel({ x: 12, y, w: ui.w - 24, h: 38 }, theme_1.THEME.panel);
+        ui.text('原始证据', 24, y + 16, { size: 12, bold: true });
+        ui.text('研究归档：ROUTE_PARITY_680.md（不随发布包分发）', 24, y + 30, { size: 10, color: theme_1.THEME.textDim });
+        y += 46;
         if (release === 'defer') {
             ui.text('FULL CLONE 下相关沙盒玩法可从对应生态入口体验。', 16, y + 6, { size: 10, color: theme_1.THEME.gold });
         }

@@ -21,7 +21,7 @@
 
 ## 双产物构建（tools/src/build_wechat.ts，实测通过）
 
-- `build/wechat-full-clone/`：完整生态+沙盒结算；game.js → wx_entry → LomoClientApp（进程内 LomoApp 同包内置，真机单机可玩）
+- `build/wechat-full-clone/`：完整生态+沙盒结算；game.js → wx_entry → LomoClientApp（微信运行时连接远端服务端；Node standalone 仅用于验收）
 - `build/wechat-release/`：同一代码+release 配置；现金类 API 服务端 403（bundle-smoke 在 Node 中以 wx mock 实际启动两包，渲染帧验证通过）
 - 两包均含 game.json（portrait）/project.config.json（touristappid）/README.txt
 

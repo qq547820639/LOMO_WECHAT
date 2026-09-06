@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MonkeyKingScreen = exports.TugScreen = exports.SportsScreen = exports.MarblesScreen = exports.ChickenScreen = exports.EscapeTigerScreen = void 0;
+exports.eggProgress = eggProgress;
 exports.registerMinigameScreens = registerMinigameScreens;
 /**
  * 小游戏屏幕：虎口逃生 / 今晚吃鸡 / 弹珠 / 运动会 / 拔河 / 炸猴王。
@@ -9,14 +10,32 @@ exports.registerMinigameScreens = registerMinigameScreens;
 const base_1 = require("./base");
 const theme_1 = require("../core/theme");
 const registry_1 = require("./registry");
+function eggProgress(readyAt, now = Date.now(), durationMs = 30000) {
+    if (!(readyAt > 0))
+        return 0;
+    if (readyAt <= now)
+        return 1;
+    const duration = durationMs > 0 ? durationMs : 30000;
+    return Math.max(0, Math.min(1, 1 - (readyAt - now) / duration));
+}
 // ---------------- 虎口逃生（三车道跑酷） ----------------
 class EscapeTigerScreen extends base_1.ApiScreen {
+    runnerFor(animal) {
+        try {
+            return new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId(`escape_animal__${animal}`), 'launch', { loop: true, fitHeight: 52 });
+        }
+        catch {
+            return null;
+        }
+    }
     constructor() {
         super('escapeTiger', '虎口逃生');
         this.route = '/escapeTiger';
         this.sessionId = null;
         this.animal = 'monkey';
         this.lastMsg = '';
+        this.runnerClip = null;
+        this.tigerClip = null;
     }
     async fetchState() {
         var _a, _b;
@@ -26,7 +45,7 @@ class EscapeTigerScreen extends base_1.ApiScreen {
         return r;
     }
     render() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -44,6 +63,10 @@ class EscapeTigerScreen extends base_1.ApiScreen {
                 ui.button({ x: 12 + i * (aw + 5), y, w: aw, h: 40 }, (_a = { cow: '牛', dog: '狗', fox: '狐', monkey: '猴', pig: '猪', raccoon: '浣' }[a]) !== null && _a !== void 0 ? _a : a, () => { this.animal = a; }, { color: this.animal === a ? theme_1.THEME.accent : theme_1.THEME.panel2, size: 14 });
             });
             y += 50;
+            if (!this.runnerClip || ((_b = this.runnerClip.state) === null || _b === void 0 ? void 0 : _b.failed)) {
+                this.runnerClip = this.runnerFor(this.animal);
+            }
+            (_c = this.runnerClip) === null || _c === void 0 ? void 0 : _c.draw(ui, ui.w / 2, y + 24, this.app.frameDt);
             ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '开始逃亡（体力 -1）', async () => {
                 const s = await this.app.api.post('/v1/game/session/start', { featureId: 'escapeTiger' });
                 if (!s.ok) {
@@ -62,28 +85,59 @@ class EscapeTigerScreen extends base_1.ApiScreen {
             y += 56;
         }
         else {
-            const data = (_b = st.active) !== null && _b !== void 0 ? _b : {};
-            // 进度 + 虎距离
-            ui.panel({ x: 12, y, w: ui.w - 24, h: 96 }, theme_1.THEME.panel);
-            ui.text(`第 ${(_c = data.step) !== null && _c !== void 0 ? _c : 0} / ${st.stepsPerRun} 步`, 24, y + 20, { size: 13, bold: true });
-            ui.progress(24, y + 32, ui.w - 48, 10, ((_d = data.step) !== null && _d !== void 0 ? _d : 0) / st.stepsPerRun, theme_1.THEME.accent2);
-            ui.text(`虎口距离 ${Math.max(0, Math.ceil((_e = data.tigerDist) !== null && _e !== void 0 ? _e : 6))} 步`, 24, y + 58, { size: 12, color: ((_f = data.tigerDist) !== null && _f !== void 0 ? _f : 6) < 3 ? theme_1.THEME.red : theme_1.THEME.green });
-            ui.text(`Buff: ${((_g = data.buffs) !== null && _g !== void 0 ? _g : []).join(', ') || '无'}`, 24, y + 78, { size: 10, color: theme_1.THEME.purple });
-            y += 104;
-            // 三车道
+            const data = (_d = st.active) !== null && _d !== void 0 ? _d : {};
+            // v3 跑道视觉：虎在身后追 + 三车道 + 跑者动物 + 障碍闪红
+            ui.panel({ x: 12, y, w: ui.w - 24, h: 176 }, theme_1.THEME.panel);
+            const trackTop = y + 8, trackH = 150;
+            // 三车道底
+            const laneW = (ui.w - 24) / 3;
+            const tc = this.app.ui.ctx;
+            for (let li = 0; li < 3; li++) {
+                tc.fillStyle = li === ((_e = data.lane) !== null && _e !== void 0 ? _e : 1) ? theme_1.THEME.panel2 : theme_1.THEME.bg2;
+                tc.fillRect(12 + li * laneW, trackTop, laneW, trackH);
+                tc.strokeStyle = theme_1.THEME.line;
+                tc.strokeRect(12 + li * laneW, trackTop, laneW, trackH);
+            }
+            // 虎（追击者，距离越近越靠右）
+            const dist = Math.max(0, (_f = data.tigerDist) !== null && _f !== void 0 ? _f : 6);
+            if (!this.tigerClip) {
+                try {
+                    this.tigerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('escape_animal__tiger'), 'launch', { loop: true, fitHeight: 54 });
+                    this.tigerClip.play();
+                }
+                catch {
+                    this.tigerClip = null;
+                }
+            }
+            const tigerX = 20 + (dist / 6) * (ui.w - 110);
+            (_g = this.tigerClip) === null || _g === void 0 ? void 0 : _g.draw(ui, tigerX, trackTop + trackH * 0.32, this.app.frameDt);
+            ui.text('虎', tigerX, trackTop + trackH * 0.62, { size: 11, color: theme_1.THEME.red });
+            // 跑者动物（我的位置：当前车道）
+            if (!this.runnerClip || ((_h = this.runnerClip.state) === null || _h === void 0 ? void 0 : _h.failed))
+                this.runnerClip = this.runnerFor(this.animal);
+            const laneCx = 12 + ((_j = data.lane) !== null && _j !== void 0 ? _j : 1) * laneW + laneW / 2;
+            (_k = this.runnerClip) === null || _k === void 0 ? void 0 : _k.draw(ui, laneCx, trackTop + trackH * 0.68, this.app.frameDt);
+            // 进度/距离/Buff
+            ui.text(`第 ${(_l = data.step) !== null && _l !== void 0 ? _l : 0} / ${st.stepsPerRun} 步`, 24, trackTop + trackH + 6, { size: 12, bold: true });
+            ui.progress(110, trackTop + trackH + 6, ui.w - 190, 8, ((_m = data.step) !== null && _m !== void 0 ? _m : 0) / st.stepsPerRun, theme_1.THEME.accent2);
+            ui.text(`虎距 ${Math.max(0, Math.ceil(dist))}`, ui.w - 70, trackTop + trackH + 6, { size: 11, color: dist < 3 ? theme_1.THEME.red : theme_1.THEME.green });
+            ui.text(`Buff: ${((_o = data.buffs) !== null && _o !== void 0 ? _o : []).join(', ') || '无'}`, 24, trackTop + trackH + 20, { size: 9, color: theme_1.THEME.purple });
+            y += 186;
+            // 三车道选择
             ui.text('选择车道（躲开障碍！）', 16, y + 12, { size: 12, color: theme_1.THEME.textDim });
             y += 18;
             const lw = (ui.w - 24 - 12) / 3;
             ['左', '中', '右'].forEach((lane, i) => {
-                ui.button({ x: 12 + i * (lw + 6), y, w: lw, h: 74 }, lane, () => this.act('step', { lane: i }, this.sessionId), { color: theme_1.THEME.panel2, size: 20 });
+                var _a;
+                ui.button({ x: 12 + i * (lw + 6), y, w: lw, h: 64 }, ['左', '中', '右'][i], () => this.act('step', { lane: i }, this.sessionId), { color: i === ((_a = data.lane) !== null && _a !== void 0 ? _a : 1) ? theme_1.THEME.accent2 : theme_1.THEME.panel2, size: 20 });
             });
-            y += 84;
+            y += 72;
             ui.text(this.lastMsg || '虎口还差 6 步', 16, y + 8, { size: 11, color: theme_1.THEME.text });
             y += 22;
             ui.button({ x: 12, y, w: ui.w - 24, h: 36 }, '放弃（按进度结算）', () => this.act('abort', {}, this.sessionId), { size: 12, color: theme_1.THEME.bg2 });
             y += 44;
         }
-        ui.text(`最佳: ${(_h = st.best) !== null && _h !== void 0 ? _h : 0} 金币 · 记录: ${((_l = (_k = (_j = st.history) === null || _j === void 0 ? void 0 : _j[0]) === null || _k === void 0 ? void 0 : _k.summary) !== null && _l !== void 0 ? _l : '暂无').slice(0, 28)}`, 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
+        ui.text(`最佳: ${(_p = st.best) !== null && _p !== void 0 ? _p : 0} 金币 · 记录: ${((_s = (_r = (_q = st.history) === null || _q === void 0 ? void 0 : _q[0]) === null || _r === void 0 ? void 0 : _r.summary) !== null && _s !== void 0 ? _s : '暂无').slice(0, 28)}`, 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
     }
     async act(actionId, payload, sessionId) {
         const r = await this.app.api.action('escapeTiger', actionId, payload, sessionId, Date.now() % 1e6);
@@ -103,10 +157,11 @@ class ChickenScreen extends base_1.ApiScreen {
     constructor() {
         super('chicken', '今晚吃鸡');
         this.route = '/chicken';
+        this.chickenClip = null;
     }
     pollMs() { return 3000; }
     render() {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f, _g;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -117,12 +172,21 @@ class ChickenScreen extends base_1.ApiScreen {
         ui.panel({ x: 12, y, w: ui.w - 24, h: 96 }, theme_1.THEME.panel);
         const eggReady = st.eggReady;
         const eggPending = ((_a = st.eggReadyAt) !== null && _a !== void 0 ? _a : 0) > 0 && !eggReady;
+        if (!this.chickenClip) {
+            try {
+                this.chickenClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('chicken__'), 'launch', { loop: true, fitHeight: 40 });
+                this.chickenClip.play();
+            }
+            catch {
+                this.chickenClip = null;
+            }
+        }
+        (_b = this.chickenClip) === null || _b === void 0 ? void 0 : _b.draw(ui, ui.w - 52, y + 30, this.app.frameDt);
         ui.textCenter(eggReady ? '🥚 蛋已成熟！' : eggPending ? '🥚 孵化中…' : '🐔 鸡窝空空', ui.w / 2, y + 30, { size: 15, bold: true, color: eggReady ? theme_1.THEME.gold : theme_1.THEME.text });
         if (eggPending) {
-            const remain = st.eggReadyAt - this.app.lastFrameTime;
-            ui.progress(28, y + 46, ui.w - 56, 8, Math.max(0, Math.min(1, 1 - remain / 30000)), theme_1.THEME.gold);
+            ui.progress(28, y + 46, ui.w - 56, 8, eggProgress(st.eggReadyAt, Date.now(), (_c = st.eggDurationMs) !== null && _c !== void 0 ? _c : 30000), theme_1.THEME.gold);
         }
-        const thiefWarn = ((_b = st.thiefWarningAt) !== null && _b !== void 0 ? _b : 0) > 0;
+        const thiefWarn = ((_d = st.thiefWarningAt) !== null && _d !== void 0 ? _d : 0) > 0;
         ui.textCenter(thiefWarn ? '⚠ 偷鸡者来袭！赶紧布防！' : `收获 ${st.eggsCollected} · 防守 ${st.guarded} · 被偷 ${st.stolen}`, ui.w / 2, y + 76, { size: 11, color: thiefWarn ? theme_1.THEME.red : theme_1.THEME.textDim });
         y += 106;
         const bw = (ui.w - 24 - 12) / 3;
@@ -131,7 +195,7 @@ class ChickenScreen extends base_1.ApiScreen {
         ui.button({ x: 12 + (bw + 6) * 2, y, w: bw, h: 46 }, '收蛋', () => this.act('collect'), { color: theme_1.THEME.green, disabled: !eggReady });
         y += 56;
         ui.text('喂养 → 孵化 30s → 收蛋；偷鸡者中途来袭需布防', 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
-        ui.text('记录: ' + ((_e = (_d = (_c = st.log) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.summary) !== null && _e !== void 0 ? _e : '暂无').slice(0, 32), 16, y + 24, { size: 10, color: theme_1.THEME.textDim });
+        ui.text('记录: ' + ((_g = (_f = (_e = st.log) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.summary) !== null && _g !== void 0 ? _g : '暂无').slice(0, 32), 16, y + 24, { size: 10, color: theme_1.THEME.textDim });
     }
 }
 exports.ChickenScreen = ChickenScreen;
@@ -143,7 +207,17 @@ class MarblesScreen extends base_1.ApiScreen {
         this.sessionId = null;
         this.angle = 45;
         this.power = 60;
+        this.launchClip = null;
+        this.launchVisible = false;
     }
+    onEnter() {
+        // SANITIZATION P0-2 处置：发射特效 = 自绘 6 帧图集（fx_launch）；图集缺失时降级程序化绘制
+        if (!this.launchClip && this.app.assets) {
+            this.launchClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'fx_launch', 'launch', { loop: false, fitHeight: 56 });
+        }
+        return super.onEnter();
+    }
+    onExit() { this.launchClip = null; this.launchVisible = false; }
     async fetchState() {
         var _a, _b;
         const r = await this.app.api.gameState('marbles');
@@ -189,8 +263,24 @@ class MarblesScreen extends base_1.ApiScreen {
             this.app.ui.ctx.fillRect(ox - 4, oy - 4, 8, 8);
             // 摆锤（服务端下发）
             for (const peg of (_b = d.pegs) !== null && _b !== void 0 ? _b : []) {
-                this.app.ui.ctx.fillStyle = theme_1.THEME.purple;
-                this.app.ui.ctx.fillRect(ox + ((_c = peg.x) !== null && _c !== void 0 ? _c : 0) * 0.85 - ((_d = peg.r) !== null && _d !== void 0 ? _d : 10) / 2, oy - ((_e = peg.y) !== null && _e !== void 0 ? _e : 0) * 0.3 - ((_f = peg.r) !== null && _f !== void 0 ? _f : 10) / 2, ((_g = peg.r) !== null && _g !== void 0 ? _g : 10), ((_h = peg.r) !== null && _h !== void 0 ? _h : 10));
+                const pc = this.app.ui.ctx;
+                pc.fillStyle = theme_1.THEME.purple;
+                pc.beginPath();
+                pc.arc(ox + ((_c = peg.x) !== null && _c !== void 0 ? _c : 0) * 0.85, oy - ((_d = peg.y) !== null && _d !== void 0 ? _d : 0) * 0.3, ((_e = peg.r) !== null && _e !== void 0 ? _e : 10) / 1.6, 0, Math.PI * 2);
+                pc.fill();
+                pc.fillStyle = theme_1.THEME.accent;
+                pc.beginPath();
+                pc.arc(ox + ((_f = peg.x) !== null && _f !== void 0 ? _f : 0) * 0.85 - 2, oy - ((_g = peg.y) !== null && _g !== void 0 ? _g : 0) * 0.3 - 2, ((_h = peg.r) !== null && _h !== void 0 ? _h : 10) / 5, 0, Math.PI * 2);
+                pc.fill();
+            }
+            // 发射特效（自制美术）：待机静帧，发射时播放一遍；图集加载失败自动降级程序化
+            if (this.launchClip && 'state' in this.launchClip && this.launchClip.state.failed) {
+                this.launchClip = new (require('../ui/procedural_clips').LaunchPulse)();
+            }
+            if (this.launchClip) {
+                this.launchClip.draw(ui, ox + 60, oy - 30, this.launchVisible ? this.app.frameDt : 0);
+                if (this.launchClip.state.finished)
+                    this.launchVisible = false;
             }
             // 射程预览线
             const range = (this.power * Math.sin((2 * this.angle * Math.PI) / 180)) / 2.2;
@@ -211,7 +301,14 @@ class MarblesScreen extends base_1.ApiScreen {
             ui.text(`${this.power}`, ui.w - 50, y + 12, { size: 11, color: theme_1.THEME.gold });
             y += 32;
             const bw = (ui.w - 24 - 8) / 2;
-            ui.button({ x: 12, y, w: bw, h: 44 }, `发射（剩 ${st.shotsPerRound - ((_k = d.shot) !== null && _k !== void 0 ? _k : 0)}）`, () => this.act('shot', { angle: this.angle, power: this.power }, this.sessionId), { color: theme_1.THEME.accent });
+            ui.button({ x: 12, y, w: bw, h: 44 }, `发射（剩 ${st.shotsPerRound - ((_k = d.shot) !== null && _k !== void 0 ? _k : 0)}）`, () => {
+                if (this.launchClip) {
+                    this.launchClip.reset();
+                    this.launchClip.play();
+                    this.launchVisible = true;
+                }
+                void this.act('shot', { angle: this.angle, power: this.power }, this.sessionId);
+            }, { color: theme_1.THEME.accent });
             ui.button({ x: 12 + bw + 8, y, w: bw, h: 44 }, '结束本局', () => { this.sessionId = null; this.onEnter(); }, { color: theme_1.THEME.bg2, size: 12 });
             y += 54;
         }
@@ -242,6 +339,7 @@ class SportsScreen extends base_1.ApiScreen {
         this.route = '/sports';
         this.sessionId = null;
         this.roundStartAt = 0;
+        this.runnerClip = null;
     }
     async fetchState() {
         var _a, _b;
@@ -251,7 +349,7 @@ class SportsScreen extends base_1.ApiScreen {
         return r;
     }
     render() {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -291,6 +389,16 @@ class SportsScreen extends base_1.ApiScreen {
             if (nextGun != null)
                 ui.text(`发令: +${(nextGun / 1000).toFixed(1)}s`, ui.w - 90, y + 76, { size: 11, color: theme_1.THEME.textDim });
             y += 120;
+            if (!this.runnerClip) {
+                try {
+                    this.runnerClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('sport__'), 'launch', { loop: true, fitHeight: 46 });
+                    this.runnerClip.play();
+                }
+                catch {
+                    this.runnerClip = null;
+                }
+            }
+            (_e = this.runnerClip) === null || _e === void 0 ? void 0 : _e.draw(ui, ui.w / 2, y + 34, this.app.frameDt);
             ui.button({ x: 12, y, w: ui.w - 24, h: 70 }, 'GO！（点击反应）', () => {
                 var _a;
                 const reaction = Date.now() - this.roundStartAt - ((_a = gunTimes[round]) !== null && _a !== void 0 ? _a : 0);
@@ -300,7 +408,7 @@ class SportsScreen extends base_1.ApiScreen {
             ui.button({ x: 12, y, w: ui.w - 24, h: 34 }, '放弃本场', () => { this.sessionId = null; this.onEnter(); }, { size: 12, color: theme_1.THEME.bg2 });
             y += 42;
         }
-        ui.text(`最佳 ${(_e = st.best) !== null && _e !== void 0 ? _e : 0} · 记录: ${((_h = (_g = (_f = st.history) === null || _f === void 0 ? void 0 : _f[0]) === null || _g === void 0 ? void 0 : _g.summary) !== null && _h !== void 0 ? _h : '暂无')}`, 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
+        ui.text(`最佳 ${(_f = st.best) !== null && _f !== void 0 ? _f : 0} · 记录: ${((_j = (_h = (_g = st.history) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.summary) !== null && _j !== void 0 ? _j : '暂无')}`, 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
     }
 }
 exports.SportsScreen = SportsScreen;
@@ -311,6 +419,7 @@ class TugScreen extends base_1.ApiScreen {
         this.route = '/tug';
         this.sessionId = null;
         this.beatStart = 0;
+        this.tugClip = null;
     }
     async fetchState() {
         var _a, _b;
@@ -320,7 +429,7 @@ class TugScreen extends base_1.ApiScreen {
         return r;
     }
     render() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -360,7 +469,17 @@ class TugScreen extends base_1.ApiScreen {
             this.app.ui.ctx.fillRect(20, y + 40, ui.w - 40, 5);
             this.app.ui.ctx.fillStyle = theme_1.THEME.accent;
             this.app.ui.ctx.fillRect(pos - 6, y + 32, 12, 20);
-            ui.text(`节拍 ${(_c = d.beatIdx) !== null && _c !== void 0 ? _c : 0}/10`, 24, y + 76, { size: 11, color: theme_1.THEME.textDim });
+            if (!this.tugClip) {
+                try {
+                    this.tugClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('tug__'), 'launch', { loop: true, fitHeight: 44 });
+                    this.tugClip.play();
+                }
+                catch {
+                    this.tugClip = null;
+                }
+            }
+            (_c = this.tugClip) === null || _c === void 0 ? void 0 : _c.draw(ui, ui.w / 2, y + 66, this.app.frameDt);
+            ui.text(`节拍 ${(_d = d.beatIdx) !== null && _d !== void 0 ? _d : 0}/10`, 24, y + 76, { size: 11, color: theme_1.THEME.textDim });
             y += 100;
             ui.button({ x: 12, y, w: ui.w - 24, h: 70 }, '拉！！', () => {
                 var _a, _b, _c;

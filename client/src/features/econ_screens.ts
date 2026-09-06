@@ -2,9 +2,58 @@
  * 生产/养成屏幕：猿岛矿场 / 黄金矿场 / 多人矿坑 / 宇宙 / 魔兽 / 萌宠扭蛋 / 卡牌 / 盲盒 / 每日。
  */
 import { ApiScreen } from './base';
+import { Screen } from '../core/router';
 import { UI } from '../ui/widgets';
 import { THEME, fmtNum, fmtTime } from '../core/theme';
-import { registerRoute } from './registry';
+import { registerRoute, openFeature } from './registry';
+
+// ---------------- 猿岛总览 ----------------
+export class ApeOverviewScreen extends Screen {
+  readonly route = '/ape';
+  readonly title = '猿岛总览';
+  private minerClip: import('../ui/frame_clip').FrameClip | null = null;
+
+  onEnter(): void {
+    if (!this.minerClip && this.app.assets) {
+      const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'miner', 'idle', { fitHeight: 86, placeholderColor: THEME.gold });
+      clip.play();
+      this.minerClip = clip;
+    }
+  }
+
+  onExit(): void { this.minerClip = null; }
+
+  render(): void {
+    const ui = this.app.ui as UI;
+    const top = 64;
+    const p = this.app.player;
+    let y = top + 6;
+    ui.panel({ x: 12, y, w: ui.w - 24, h: 116 }, THEME.panel);
+    this.minerClip?.draw(ui, ui.w - 62, y + 52, this.app.frameDt);
+    ui.text('猿岛基地', 24, y + 25, { size: 18, bold: true, color: THEME.gold });
+    ui.text(`${p?.nick ?? '玩家'} · Lv.${p?.level ?? 1}`, 24, y + 49, { size: 12, color: THEME.text });
+    const b = p?.balances ?? {};
+    ui.text(`宝石 ${fmtNum(b.GEMSTONE)} · 金沙 ${fmtNum(b.SAND)} · 猿石 ${fmtNum(b.APE_STONE)}`, 24, y + 70, { size: 11, color: THEME.textDim });
+    ui.text('从生产、探索到养成，所有成长资源在此汇合', 24, y + 92, { size: 10, color: THEME.textDim });
+    y += 128;
+    const entries: Array<[string, string, string]> = [
+      ['apeMine', '猿岛矿场', '定时生产宝石与金沙'],
+      ['goldMine', '黄金矿场', '挖矿、精炼与 NPC 兑换'],
+      ['gacha', '萌宠扭蛋', '收集部件并提升战力'],
+      ['universe', '宇宙探索', '探索星球与升级飞艇'],
+      ['undertown', '地下城', '逐层破砖获取宝石'],
+    ];
+    entries.forEach(([id, label, note], i) => {
+      const h = 58;
+      ui.panel({ x: 12, y, w: ui.w - 24, h: h - 6 }, THEME.panel2);
+      ui.text(label, 24, y + 22, { size: 14, bold: true });
+      ui.text(note, 24, y + 41, { size: 10, color: THEME.textDim });
+      ui.text('进入 ›', ui.w - 66, y + 31, { size: 10, color: THEME.accent2 });
+      ui.hits.push({ x: 12, y, w: ui.w - 24, h: h - 6, onTap: () => openFeature(this.app, id), id: `ape-${id}` });
+      y += h;
+    });
+  }
+}
 
 // ---------------- 猿岛矿场 ----------------
 export class ApeMineScreen extends ApiScreen {
@@ -342,6 +391,7 @@ export class DailyScreen extends ApiScreen {
 }
 
 export function registerEconScreens(): void {
+  registerRoute('ape', () => new ApeOverviewScreen());
   registerRoute('apeMine', () => new ApeMineScreen());
   registerRoute('goldMine', () => new GoldMineScreen());
   registerRoute('multiplePit', () => new MultiplePitScreen());

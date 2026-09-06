@@ -1,6 +1,6 @@
 # KNOWN_DIFFERENCES
 
-> 诚实清单（Section 95）。分类：MATCHED / HIGH_CONFIDENCE_REIMPLEMENTATION / INFERRED / SERVER_REQUIRED / RUNTIME_REQUIRED / RELEASE_ADAPTED / NOT_REPRODUCIBLE_FROM_APK。
+> 诚实清单（Section 95）。分类：MATCHED / HIGH_CONFIDENCE_REIMPLEMENTATION / OWNED_DEFAULTS / SERVER_REQUIRED / RUNTIME_REQUIRED / RELEASE_ADAPTED / NOT_REPRODUCIBLE_FROM_APK。
 
 ## MATCHED（结构级与 APK 证据一致）
 
@@ -17,7 +17,7 @@
 - 扭蛋兔：三蛋型、六装备部位、高替换低分解、战力入挑战
 - 炸猴王：1/10/100 三档投弹 + 猴王池
 
-## INFERRED（合理工程重建，原值未知）
+## OWNED_DEFAULTS（可上线的自有参数，原值不可验证）
 
 - 全部数值：房间数 6、门耐久 100、杀手伤害 18、各玩法产出区间、成长曲线、合成权重、体力速率
 - 卡牌 18 模板的命名/稀有度/战力
@@ -26,7 +26,7 @@
 
 ## SERVER_REQUIRED（客观不可静态恢复，全部走 RemoteConfig）
 
-- 正式服概率/奖池/手续费/风控参数
+- 正式服概率/奖池/手续费/风控参数的历史值不可验证；当前运行时使用 `OWNED_LAUNCH_DEFAULTS`，带 schema、版本、范围校验和 RemoteConfig 签名
 - API 签名与加密实现
 - 精确掉落表、离线产出公式
 

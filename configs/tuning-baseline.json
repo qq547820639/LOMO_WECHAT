@@ -1,6 +1,10 @@
 {
-  "status": "INFERRED_NOT_ORIGINAL",
-  "explanation": "APK 使用 360 加固（com.stub.StubApp + libjiagu*），业务 DEX 运行时解密。以下全部数值为 clean-room 可运行默认值，绝不声称等于原正式服数值。原值必须来自真实后端/抓包/运营配置，接入后仅需替换本文件与 RemoteConfig 下发。",
+  "schemaVersion": "1.0.0",
+  "status": "OWNED_LAUNCH_DEFAULTS",
+  "provenance": "CLEAN_ROOM_PRODUCT_DEFAULTS",
+  "effectiveFrom": "2026-09-06T00:00:00Z",
+  "owner": "ApeIsland Product Operations",
+  "explanation": "这是可直接运行的自有产品默认参数，已通过范围校验并由 RemoteConfig 签名下发。它不宣称复原原服数值；后续运营调优通过版本化配置变更，不修改玩法代码。",
   "progression": { "levelXpBase": 100, "levelXpStep": 40, "levelUpEnergy": 5 },
   "energy": { "initial": 30, "max": 120, "regenMinutes": 6, "battleCost": 3, "mineCost": 2, "exploreCost": 4, "minigameCost": 1 },
   "economy": { "initialCoin": 500, "initialTicket": 5, "mineCoinRange": [3, 8], "refineOreCost": 10, "refineCoin": 35 },

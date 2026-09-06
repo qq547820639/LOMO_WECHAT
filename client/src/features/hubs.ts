@@ -100,27 +100,38 @@ export class HomeHub extends Screen {
       y += 60;
     }
 
-    // 功能族列表
     const rowH = 52;
-    for (const f of feats) {
+    const listTop = y;
+    const listBottom = bottom - 8;
+    const contentHeight = feats.length * rowH + (this.tab === 'mine' ? 36 : 0);
+    const listHeight = Math.max(0, listBottom - listTop);
+    const scrollId = 'hub-' + this.tab;
+    const maxOffset = Math.max(0, contentHeight - listHeight);
+    const offset = Math.max(0, Math.min(maxOffset, this.app.ui.scrollOffsets[scrollId] ?? 0));
+    this.app.ui.scrollOffsets[scrollId] = offset;
+    for (const [index, f] of feats.entries()) {
+      const rowY = listTop + index * rowH - offset;
       const policyColor = f.release === 'keep' ? THEME.green : f.release === 'defer' ? THEME.gold : THEME.red;
       const policyLabel = { keep: '上线', defer: '延后', cut: '仅生态保留' }[f.release as 'keep'] ?? f.release;
       if (f.release === 'cut' && this.app.profile === 'wechat-release') continue;
-      ui.panel({ x: 12, y, w: ui.w - 24, h: rowH - 6 }, THEME.panel);
-      ui.text(f.title, 24, y + 22, { size: 14, bold: true });
-      ui.text(f.notes.slice(0, 34), 24, y + 39, { size: 10, color: THEME.textDim });
-      ui.text(policyLabel, ui.w - 66, y + 22, { size: 11, color: policyColor, bold: true });
-      ui.text('›', ui.w - 30, y + 24, { size: 16, color: THEME.textDim });
+      ui.panel({ x: 12, y: rowY, w: ui.w - 24, h: rowH - 6 }, THEME.panel);
+      ui.text(f.title, 24, rowY + 22, { size: 14, bold: true });
+      ui.text(f.notes.slice(0, 34), 24, rowY + 39, { size: 10, color: THEME.textDim });
+      ui.text(policyLabel, ui.w - 66, rowY + 22, { size: 11, color: policyColor, bold: true });
+      ui.text('›', ui.w - 30, rowY + 24, { size: 16, color: THEME.textDim });
       const ff = f;
-      ui.hits.push({ x: 12, y: y - 3, w: ui.w - 24, h: rowH, onTap: () => { this.app.telemetry('feature_enter', { feature: ff.id }); openFeature(this.app, ff.id); }, id: 'f-' + ff.id });
-      y += rowH;
+      if (rowY + rowH >= listTop && rowY <= listBottom) {
+        ui.hits.push({ x: 12, y: rowY - 3, w: ui.w - 24, h: rowH, onTap: () => { this.app.telemetry('feature_enter', { feature: ff.id }); openFeature(this.app, ff.id); }, id: 'f-' + ff.id });
+      }
     }
 
     if (this.tab === 'mine') {
-      ui.text(BRAND.versionFooter + this.app.profile, 16, y + 10, { size: 10, color: THEME.textDim });
-      ui.text('健康游戏，适度娱乐。未成年人应在监护人监督下适度游戏。', 16, y + 26, { size: 10, color: THEME.textDim });
+      const footerY = listTop + feats.length * rowH - offset + 10;
+      if (footerY < listBottom + 30) {
+        ui.text(BRAND.versionFooter + this.app.profile, 16, footerY, { size: 10, color: THEME.textDim });
+        ui.text('健康游戏，适度娱乐。未成年人应在监护人监督下适度游戏。', 16, footerY + 16, { size: 10, color: THEME.textDim });
+      }
     }
-    this.app.ui.scrollOffsets['hub-' + this.tab] = this.app.ui.scrollOffsets['hub-' + this.tab] ?? 0;
   }
 }
 

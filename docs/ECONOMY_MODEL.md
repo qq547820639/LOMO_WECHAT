@@ -1,6 +1,6 @@
 # ECONOMY_MODEL
 
-> 资产目录与账本为工程重建（结构 MATCHED / 数值 INFERRED）。定义源：shared/src/assets.ts；数据投照：data/economy.json。
+> 资产目录与账本为工程重建（结构 MATCHED / 数值采用 `OWNED_LAUNCH_DEFAULTS`）。定义源：shared/src/assets.ts；数据投照：data/economy.json。
 
 ## 资产目录（20 种，字段完整满足 Section 18）
 
@@ -8,7 +8,7 @@
 |---|---|---|---|---|---|---|---|---|
 | GEMSTONE | 宝石 | 2 | apeMine/undertown/arena/daily | gacha/exchange/upgrade | ✅沙盒 | ❌ | ❌ | currency |
 | MEDAL | 勋章 | 2 | undertown/daily/arena | gacha/exchange | ✅沙盒 | ❌ | ❌ | currency |
-| NDTU | NDTU | 4 | universe/contract | ship/exchange | ✅沙盒 | ❌ | ❌ | currency |
+| STARDUST | 星尘 | 4 | universe/contract | ship/exchange | ✅沙盒 | ❌ | ❌ | currency |
 | WORLD_COIN | 世界币 | 4 | legacy | exchange | ✅沙盒 | ❌ | ❌ | currency |
 | APE_STONE | 猿石 | 2 | warcraft/npcExchange | warcraft/gacha | ✅沙盒 | ❌ | ❌ | material |
 | SAND | 金沙 | 2 | apeMine/goldMine | exchange/production | ✅沙盒 | ❌ | ❌ | material |

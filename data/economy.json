@@ -1,5 +1,7 @@
 {
- "status": "INFERRED_STRUCTURES_NOT_ORIGINAL_VALUES",
+ "status": "OWNED_LAUNCH_DEFAULTS",
+ "schemaVersion": "1.0.0",
+ "provenance": "CLEAN_ROOM_PRODUCT_DEFAULTS",
  "assets": {
   "GEMSTONE": {
    "assetId": "GEMSTONE",

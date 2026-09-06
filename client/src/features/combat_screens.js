@@ -11,12 +11,23 @@ const theme_1 = require("../core/theme");
 const registry_1 = require("./registry");
 // ---------------- 大逃杀 ----------------
 class BattleRoyalScreen extends base_1.ApiScreen {
+    avatarFor() {
+        var _a, _b, _c;
+        const tone = (((_c = (_b = (_a = this.app.player) === null || _a === void 0 ? void 0 : _a.counters) === null || _b === void 0 ? void 0 : _b['arena.streak']) !== null && _c !== void 0 ? _c : 0) >= 3) ? 'gold' : 'normal';
+        try {
+            return new (require('../ui/frame_clip').FrameClip)(this.app.assets, `pag__battleRoyal__myself_idle_${tone}`, 'launch', { loop: true, fitHeight: 40 });
+        }
+        catch {
+            return null;
+        }
+    }
     constructor() {
         super('battleRoyal', '大逃杀');
         this.route = '/battleRoyal';
         this.roomId = 2;
         this.sessionId = null;
         this.feed = [];
+        this.avatarClip = null;
     }
     async fetchState() {
         var _a, _b, _c;
@@ -30,7 +41,7 @@ class BattleRoyalScreen extends base_1.ApiScreen {
         return r;
     }
     render() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -74,21 +85,41 @@ class BattleRoyalScreen extends base_1.ApiScreen {
             y += 56;
         }
         else {
+            if (!this.avatarClip)
+                this.avatarClip = this.avatarFor();
+            (_a = this.avatarClip) === null || _a === void 0 ? void 0 : _a.draw(ui, 30, y + 26, this.app.frameDt);
             // 局内：房间门耐久 + 事件流 + 行动
-            const data = (_a = st.active) === null || _a === void 0 ? void 0 : _a.data;
-            const rooms = (_b = data === null || data === void 0 ? void 0 : data.rooms) !== null && _b !== void 0 ? _b : [];
+            const data = (_b = st.active) === null || _b === void 0 ? void 0 : _b.data;
+            const rooms = (_c = data === null || data === void 0 ? void 0 : data.rooms) !== null && _c !== void 0 ? _c : [];
             ui.panel({ x: 12, y, w: ui.w - 24, h: 30 }, theme_1.THEME.panel2);
-            ui.text(`第 ${(_c = data === null || data === void 0 ? void 0 : data.round) !== null && _c !== void 0 ? _c : 0} 轮 · 你的房间 ${(_d = data === null || data === void 0 ? void 0 : data.playerRoom) !== null && _d !== void 0 ? _d : '-'} · 奖池 ${(0, theme_1.fmtNum)((_e = data === null || data === void 0 ? void 0 : data.pool) !== null && _e !== void 0 ? _e : 0)}`, 24, y + 20, { size: 12, bold: true, color: theme_1.THEME.gold });
+            ui.text(`第 ${(_d = data === null || data === void 0 ? void 0 : data.round) !== null && _d !== void 0 ? _d : 0} 轮 · 你的房间 ${(_e = data === null || data === void 0 ? void 0 : data.playerRoom) !== null && _e !== void 0 ? _e : '-'} · 奖池 ${(0, theme_1.fmtNum)((_f = data === null || data === void 0 ? void 0 : data.pool) !== null && _f !== void 0 ? _f : 0)}`, 24, y + 20, { size: 12, bold: true, color: theme_1.THEME.gold });
             y += 38;
             const bw = (ui.w - 24 - 10) / 3;
+            const bc = this.app.ui.ctx;
             rooms.forEach((room, i) => {
+                var _a;
                 const bx = 12 + (i % 3) * (bw + 5);
                 const by = y + Math.floor(i / 3) * 58;
                 const mine = room.id === (data === null || data === void 0 ? void 0 : data.playerRoom);
                 ui.panel({ x: bx, y: by, w: bw, h: 52 }, room.alive ? theme_1.THEME.panel : theme_1.THEME.bg2);
-                ui.textCenter(`${room.id}号${mine ? '(你)' : room.alive ? '' : '✝'}`, bx + bw / 2, by + 16, { size: 11, bold: mine, color: mine ? theme_1.THEME.gold : room.alive ? theme_1.THEME.text : theme_1.THEME.red });
-                ui.progress(bx + 6, by + 26, bw - 12, 6, room.doorHp / (room.maxDoorHp || 100), room.doorHp > 50 ? theme_1.THEME.green : room.doorHp > 20 ? theme_1.THEME.gold : theme_1.THEME.red);
-                ui.textCenter(`耐久 ${Math.max(0, room.doorHp)}`, bx + bw / 2, by + 46, { size: 9, color: theme_1.THEME.textDim });
+                const doorW = 14, doorH = 34, dx = bx + 8, dy = by + 9;
+                bc.fillStyle = room.alive ? (mine ? '#5a4632' : '#4a3a28') : '#2a2a30';
+                bc.fillRect(dx, dy, doorW, doorH);
+                bc.strokeStyle = mine ? theme_1.THEME.gold : theme_1.THEME.line;
+                bc.strokeRect(dx, dy, doorW, doorH);
+                if (room.alive) {
+                    const hpR = Math.max(0, Math.min(1, room.doorHp / (room.maxDoorHp || 100)));
+                    bc.fillStyle = hpR > 0.5 ? theme_1.THEME.green : hpR > 0.2 ? theme_1.THEME.gold : theme_1.THEME.red;
+                    bc.fillRect(dx + doorW + 3, dy + doorH * (1 - hpR), 4, doorH * hpR);
+                    bc.fillStyle = theme_1.THEME.gold;
+                    bc.fillRect(dx + doorW - 4, dy + doorH / 2, 2, 2);
+                }
+                else {
+                    ui.text('✝', dx + doorW / 2 - 4, dy + doorH / 2 + 4, { size: 12, color: theme_1.THEME.red });
+                }
+                ui.text(`${room.id}号${mine ? '(你)' : ''}`, bx + doorW + 16, by + 18, { size: 11, bold: mine, color: mine ? theme_1.THEME.gold : room.alive ? theme_1.THEME.text : theme_1.THEME.red });
+                ui.text(`耐久 ${Math.max(0, room.doorHp)}`, bx + doorW + 16, by + 34, { size: 9, color: theme_1.THEME.textDim });
+                ui.text(`×${((_a = room.players) !== null && _a !== void 0 ? _a : []).length}`, bx + doorW + 16, by + 46, { size: 9, color: theme_1.THEME.textDim });
             });
             y += Math.ceil(rooms.length / 3) * 58 + 6;
             const bw2 = (ui.w - 24 - 12) / 3;
@@ -104,16 +135,16 @@ class BattleRoyalScreen extends base_1.ApiScreen {
             y += 54;
             // 事件流
             ui.panel({ x: 12, y, w: ui.w - 24, h: 84 }, theme_1.THEME.panel);
-            const lastMsg = ((_f = this.state.lastMsg) !== null && _f !== void 0 ? _f : '');
+            const lastMsg = ((_g = this.state.lastMsg) !== null && _g !== void 0 ? _g : '');
             this.app.ui.text(lastMsg || '杀手在暗处窥伺……', 20, y + 20, { size: 11, color: theme_1.THEME.text });
             ui.text('提示: 修门恢复耐久；杀手目标保密，听音辨位', 20, y + 40, { size: 10, color: theme_1.THEME.textDim });
-            ui.text(`历史: ${((_j = (_h = (_g = st.history) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.summary) !== null && _j !== void 0 ? _j : '暂无').slice(0, 30)}`, 20, y + 62, { size: 10, color: theme_1.THEME.textDim });
+            ui.text(`历史: ${((_k = (_j = (_h = st.history) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.summary) !== null && _k !== void 0 ? _k : '暂无').slice(0, 30)}`, 20, y + 62, { size: 10, color: theme_1.THEME.textDim });
             y += 92;
         }
         // 赛季榜
-        ui.panel({ x: 12, y, w: ui.w - 24, h: Math.min(150, 24 + ((_l = (_k = st.rank) === null || _k === void 0 ? void 0 : _k.length) !== null && _l !== void 0 ? _l : 0) * 18) }, theme_1.THEME.panel);
+        ui.panel({ x: 12, y, w: ui.w - 24, h: Math.min(150, 24 + ((_m = (_l = st.rank) === null || _l === void 0 ? void 0 : _l.length) !== null && _m !== void 0 ? _m : 0) * 18) }, theme_1.THEME.panel);
         ui.text('赛季积分榜', 24, y + 18, { size: 12, bold: true, color: theme_1.THEME.purple });
-        ((_m = st.rank) !== null && _m !== void 0 ? _m : []).slice(0, 6).forEach((r, i) => {
+        ((_o = st.rank) !== null && _o !== void 0 ? _o : []).slice(0, 6).forEach((r, i) => {
             ui.text(`${i + 1}. ${r.nick}`, 24, y + 38 + i * 17, { size: 11 });
             ui.text(String(r.score), ui.w - 40, y + 38 + i * 17, { size: 11, color: theme_1.THEME.gold });
         });
@@ -137,7 +168,7 @@ class UndertownScreen extends base_1.ApiScreen {
         this.route = '/undertown';
     }
     render() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -151,13 +182,24 @@ class UndertownScreen extends base_1.ApiScreen {
         // 砖块网格
         const cols = 6;
         const bw = (ui.w - 24 - (cols - 1) * 5) / cols;
+        const openedSet = new Set((_a = st.openedIdx) !== null && _a !== void 0 ? _a : []);
         for (let i = 1; i <= st.bricks; i++) {
             const bx = 12 + ((i - 1) % cols) * (bw + 5);
             const by = y + Math.floor((i - 1) / cols) * 50;
             const idx = i;
-            ui.button({ x: bx, y: by, w: bw, h: 44 }, `${i}`, () => this.act('openBrick', { brickIndex: idx }), {
-                color: theme_1.THEME.panel2, size: 13,
-            });
+            if (openedSet.has(i)) {
+                ui.panel({ x: bx, y: by, w: bw, h: 44 }, theme_1.THEME.bg2);
+                ui.textCenter('✓', bx + bw / 2, by + 26, { size: 14, color: theme_1.THEME.textDim });
+            }
+            else {
+                ui.button({ x: bx, y: by, w: bw, h: 44 }, `${i}`, () => {
+                    this.app.audioManager.playSfx('tick');
+                    void this.act('openBrick', { brickIndex: idx }).then((r) => {
+                        if (r.ok && (r.message.includes('解锁') || r.message.includes('保底')))
+                            this.app.playOverlay('pag__ready_go__ready_go', 1300);
+                    });
+                }, { color: theme_1.THEME.panel2, size: 13 });
+            }
         }
         y += Math.ceil(st.bricks / cols) * 50 + 6;
         const bw2 = (ui.w - 24 - 8) / 2;
@@ -175,18 +217,73 @@ class UndertownScreen extends base_1.ApiScreen {
             this.app.showModal('地下城每日百强', rows.length ? rows.slice(0, 8) : ['暂无数据']);
         }, { color: theme_1.THEME.panel2 });
         y += 46;
-        ui.text('记录: ' + ((_c = (_b = (_a = st.history) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.summary) !== null && _c !== void 0 ? _c : '暂无').slice(0, 36), 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
+        ui.text('记录: ' + ((_d = (_c = (_b = st.history) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.summary) !== null && _d !== void 0 ? _d : '暂无').slice(0, 36), 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
     }
 }
 exports.UndertownScreen = UndertownScreen;
 // ---------------- 竞技场 / Boss / 斗猿 / 猿兔（三回合克制对战） ----------------
 const moveLabel = (m) => (m === 'attack' ? '攻击' : m === 'defend' ? '防御' : '蓄力');
 class DuelArenaScreen extends base_1.ApiScreen {
+    /** v3 对战场景：对峙→三回合突进（每次命中音）→ 结果 overlay */
+    startCinematic() {
+        if (this.cine)
+            return;
+        const me = (() => { try {
+            return new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__battleRoyal__myself_idle_normal', 'launch', { loop: true, fitHeight: 56 });
+        }
+        catch {
+            return null;
+        } })();
+        const foe = (() => { try {
+            return new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__battleRoyal__killer_walk', 'launch', { loop: true, fitHeight: 56 });
+        }
+        catch {
+            return null;
+        } })();
+        this.cine = { startAt: Date.now(), me, foe };
+    }
+    renderCinematic(ui, top) {
+        var _a, _b;
+        if (!this.cine)
+            return false;
+        const el = Date.now() - this.cine.startAt;
+        const c = this.app.ui.ctx;
+        c.fillStyle = theme_1.THEME.bg2;
+        c.fillRect(12, top + 6, ui.w - 24, 120);
+        c.strokeStyle = theme_1.THEME.line;
+        c.strokeRect(12, top + 6, ui.w - 24, 120);
+        // 突进：每 400ms 一次互冲（共 3 回合），2s 后收
+        const round = Math.min(3, Math.floor(el / 400));
+        const lunge = (el % 400) < 200 ? Math.min(1, (el % 400) / 200) : 0;
+        const myX = 60 + lunge * 70, foeX = ui.w - 60 - lunge * 70;
+        const gy = top + 88;
+        (_a = this.cine.me) === null || _a === void 0 ? void 0 : _a.draw(ui, myX, gy, this.app.frameDt);
+        (_b = this.cine.foe) === null || _b === void 0 ? void 0 : _b.draw(ui, foeX, gy, this.app.frameDt);
+        if (lunge > 0.8) {
+            this.app.audioManager.playSfx('hit');
+            c.fillStyle = theme_1.THEME.gold;
+            c.fillRect(ui.w / 2 - 14, gy - 40, 28, 3);
+        }
+        // 回合 pip（我方连招）
+        for (let i = 0; i < 3; i++) {
+            const played = i < round;
+            const label = this.moveSeq[i] === 'attack' ? '攻' : this.moveSeq[i] === 'defend' ? '防' : this.moveSeq[i] === 'charge' ? '蓄' : '·';
+            c.fillStyle = played ? theme_1.THEME.gold : theme_1.THEME.panel2;
+            c.fillRect(16 + i * 20, top + 14, 16, 16);
+            ui.text(played ? label : '·', 19 + i * 20, top + 26, { size: 11, bold: played, color: played ? theme_1.THEME.bg2 : theme_1.THEME.textDim });
+        }
+        ui.textCenter('VS', ui.w / 2, top + 30, { size: 16, bold: true, color: theme_1.THEME.accent });
+        if (el > 2000) {
+            this.cine = null;
+        }
+        return true;
+    }
     constructor(featureId, title) {
         super(featureId, title);
         this.opponents = [];
         this.selIdx = 0;
         this.moveSeq = [];
+        this.cine = null;
         this.title = title;
     }
     async fetchState() {
@@ -202,6 +299,8 @@ class DuelArenaScreen extends base_1.ApiScreen {
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
+            return;
+        if (this.renderCinematic(ui, top))
             return;
         const st = this.state;
         let y = top + 6;
@@ -238,7 +337,13 @@ class DuelArenaScreen extends base_1.ApiScreen {
         ui.text('已选: ' + (this.moveSeq.map(moveLabel).join('→') || '（自动）'), 16, y + 12, { size: 11, color: theme_1.THEME.gold });
         y += 20;
         ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `挑战 ${(_d = (_c = this.opponents[this.selIdx]) === null || _c === void 0 ? void 0 : _c.nick) !== null && _d !== void 0 ? _d : '对手'}！`, () => {
-            this.act('fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then(() => { this.moveSeq = []; });
+            if (this.featureId === 'monkeyFight')
+                this.app.playOverlay(this.app.assets.resolveSlotId('monkeyfighting__'), 1200);
+            void this.app.api.action('arena', 'fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then((r) => {
+                this.app.playOverlay(r.ok && r.message.includes('胜') ? 'arena__result_success' : 'pag__pag_levelup_fail', 1500);
+                this.moveSeq = [];
+                this.onEnter();
+            });
         }, { color: theme_1.THEME.accent });
         y += 56;
         ui.text('记录: ' + ((_g = (_f = (_e = st.history) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.summary) !== null && _g !== void 0 ? _g : '暂无'), 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
@@ -257,7 +362,21 @@ class BossScreen extends base_1.ApiScreen {
     constructor() {
         super('boss', 'Boss 挑战');
         this.route = '/boss';
+        this.bossClip = null;
     }
+    onEnter() {
+        if (!this.bossClip && this.app.assets) {
+            try {
+                this.bossClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, this.app.assets.resolveSlotId('challenge_boss__boss_circle'), 'launch', { loop: true, fitHeight: 84 });
+                this.bossClip.play();
+            }
+            catch {
+                this.bossClip = null;
+            }
+        }
+        return super.onEnter();
+    }
+    onExit() { this.bossClip = null; }
     render() {
         var _a, _b, _c, _d, _e, _f, _g;
         const ui = this.app.ui;
@@ -267,6 +386,8 @@ class BossScreen extends base_1.ApiScreen {
         const st = this.state;
         let y = top + 10;
         ui.panel({ x: 12, y, w: ui.w - 24, h: 108 }, theme_1.THEME.panel);
+        if (this.bossClip && !st.dead)
+            this.bossClip.draw(ui, ui.w / 2, y + 46, this.app.frameDt);
         ui.textCenter(st.dead ? 'Boss 已被击败（等待刷新）' : '远古猿王 Boss', ui.w / 2, y + 24, { size: 15, bold: true, color: theme_1.THEME.red });
         ui.progress(28, y + 40, ui.w - 56, 14, st.maxHp ? st.hp / st.maxHp : 0, st.hp / st.maxHp > 0.5 ? theme_1.THEME.green : theme_1.THEME.red);
         ui.textCenter(`${st.hp} / ${st.maxHp}`, ui.w / 2, y + 72, { size: 12, bold: true });
@@ -326,7 +447,7 @@ class RobberyScreen extends base_1.ApiScreen {
         ui.text(`体力消耗 ${st.energyCost} · 基础成功率 ${(st.successBase * 100).toFixed(0)}%（战力加成）`, 24, y + 40, { size: 10, color: theme_1.THEME.textDim });
         ui.text('原玩家间资产抢夺已改为 PvE 积分制（RELEASE 合规改造）', 24, y + 56, { size: 9, color: theme_1.THEME.gold });
         y += 78;
-        ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '发起争夺', () => this.act('raid'), { color: theme_1.THEME.accent });
+        ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '发起争夺', () => { void this.act('raid').then(() => this.app.playOverlay(this.app.assets.resolveSlotId('rob__du'), 1100)); }, { color: theme_1.THEME.accent });
         y += 56;
         if ((_a = st.rank) === null || _a === void 0 ? void 0 : _a.length) {
             ui.panel({ x: 12, y, w: ui.w - 24, h: 24 + st.rank.length * 17 }, theme_1.THEME.panel);

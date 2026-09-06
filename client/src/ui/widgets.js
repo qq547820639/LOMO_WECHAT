@@ -65,6 +65,21 @@ class UI {
         c.fillStyle = color;
         c.fillRect(x, y, Math.max(0, Math.min(1, ratio)) * w, h);
     }
+    /** 图像帧绘制（P0-1）：优先 9 参子矩形；img 为 ImageLike/Canvas。alpha 0-1 */
+    image(img, dx, dy, dw, dh, opts = {}) {
+        var _a, _b;
+        const c = this.ctx;
+        if (!img)
+            return;
+        c.save();
+        if (opts.alpha != null)
+            c.globalAlpha = opts.alpha;
+        if (opts.sx != null)
+            c.drawImage(img, opts.sx, opts.sy, (_a = opts.sw) !== null && _a !== void 0 ? _a : dw, (_b = opts.sh) !== null && _b !== void 0 ? _b : dh, dx, dy, dw, dh);
+        else
+            c.drawImage(img, dx, dy, dw, dh);
+        c.restore();
+    }
     button(r, label, onTap, opts = {}) {
         var _a, _b, _c, _d;
         const c = this.ctx;

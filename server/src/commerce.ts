@@ -12,8 +12,9 @@ import type { GameApp } from './app';
 import { EconomyOps } from './economy';
 
 export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
+  const own = <T>(obj: Record<string, T>, key: string): T | undefined => Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined;
   const authed = (ctx: HttpCtx): string | null =>
-    app.verifyToken((ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (ctx.body?.token as string));
+    app.verifyToken(String(ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (typeof ctx.body?.token === 'string' ? ctx.body.token : undefined));
   const guard = (ctx: HttpCtx): string | null => {
     const playerId = authed(ctx);
     if (!playerId) { ctx.status(401); ctx.json({ ok: false, code: 'AUTH_REQUIRED', message: '缺少有效 token' }); return null; }
@@ -36,6 +37,16 @@ export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
     kind: l.kind, createdAt: l.createdAt, expiresAt: l.expiresAt, topBid: l.topBid, closed: !!l.closed,
   });
 
+  const expireListing = (l: import('./store').ListingRecord): void => {
+    if (l.closed) return;
+    const econ = new EconomyOps(app.store, app.profile);
+    if (l.topBidder && l.topBid) econ.grant(l.topBidder, 'TEST_CREDIT', l.topBid, 'auction.expire.refund', l.listingId, `expire-refund:${l.listingId}`);
+    if (l.templateId) econ.addItems(l.sellerId, l.templateId, l.qty);
+    else if (l.assetId) econ.grant(l.sellerId, l.assetId, l.qty, 'market.expire.refund', l.listingId, `expire-asset:${l.listingId}`);
+    l.closed = true;
+    app.store.audit(l.sellerId, 'market.expire', { listingId: l.listingId });
+  };
+
   routes.push(
     {
       method: 'GET', pattern: '/v1/market/listings', handler: (ctx) => {
@@ -43,7 +54,10 @@ export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
         if (!commerceAllowed(ctx, 'p2pTrade')) return;
         const kind = ctx.query.get('kind');
         const list = Object.values(app.store.data.listings)
-          .filter((l) => !l.closed && (!kind || l.kind === kind))
+          .filter((l) => {
+            if (!l.closed && l.expiresAt <= Date.now()) expireListing(l);
+            return !l.closed && (!kind || l.kind === kind);
+          })
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, 80)
           .map(listingDto);
@@ -56,16 +70,22 @@ export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
         const playerId = guard(ctx); if (!playerId) return;
         if (!commerceAllowed(ctx, 'p2pTrade')) return;
         const { assetId, templateId, qty, unitPrice, kind } = ctx.body || {};
-        const q = Math.max(1, Math.floor(Number(qty) || 1));
-        const price = Math.max(1, Math.floor(Number(unitPrice) || 0));
-        if (!price) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'unitPrice required' }); return; }
+        const q = qty === undefined ? 1 : Number(qty);
+        const price = Number(unitPrice);
+        if (!Number.isSafeInteger(q) || q < 1 || !Number.isSafeInteger(price) || price < 1) {
+          ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'qty/unitPrice 必须为正整数' }); return;
+        }
+        const k = String(kind || 'market');
+        if (k !== 'market' && k !== 'consignment' && k !== 'auction') {
+          ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'kind 必须是 market/consignment/auction' }); return;
+        }
         const econ = new EconomyOps(app.store, app.profile);
         if (templateId) {
-          if (!econ.takeItems(playerId, String(templateId), q)) { ctx.status(409); ctx.json({ ok: false, code: 'INSUFFICIENT', message: '物品数量不足' }); return; }
+          const template = String(templateId);
+          if (template === '__proto__' || template === 'constructor' || template === 'prototype' || !econ.takeItems(playerId, template, q)) { ctx.status(409); ctx.json({ ok: false, code: 'INSUFFICIENT', message: '物品数量不足' }); return; }
         } else if (assetId) {
           try { econ.spend(playerId, assetId, q, 'market.list', 'lock'); } catch { ctx.status(409); ctx.json({ ok: false, code: 'INSUFFICIENT', message: '资产余额不足' }); return; }
         } else { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'assetId/templateId required' }); return; }
-        const k = String(kind || 'market');
         const days = (app.tuning as any).market?.consignmentMaxDays ?? 7;
         const l = {
           listingId: randomId(12), sellerId: playerId, assetId, templateId: templateId ? String(templateId) : undefined,
@@ -82,8 +102,9 @@ export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
         const playerId = guard(ctx); if (!playerId) return;
         if (!commerceAllowed(ctx, 'p2pTrade')) return;
         const { listingId } = ctx.body || {};
-        const l = app.store.data.listings[String(listingId || '')];
+        const l = own(app.store.data.listings, String(listingId || ''));
         if (!l || l.closed) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '挂单不存在或已成交' }); return; }
+        if (l.expiresAt <= Date.now()) { expireListing(l); ctx.status(410); ctx.json({ ok: false, code: 'NOT_FOUND', message: '挂单已过期' }); return; }
         if (l.sellerId === playerId) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '不能购买自己的挂单' }); return; }
         const econ = new EconomyOps(app.store, app.profile);
         const feeRate = (app.tuning as any).market?.feeRate ?? 0.05;
@@ -105,10 +126,16 @@ export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
         const playerId = guard(ctx); if (!playerId) return;
         if (!commerceAllowed(ctx, 'digitalTrade')) return;
         const { listingId, bid } = ctx.body || {};
-        const l = app.store.data.listings[String(listingId || '')];
+        const l = own(app.store.data.listings, String(listingId || ''));
         if (!l || l.closed || l.kind !== 'auction') { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '竞拍单不存在' }); return; }
+        if (l.expiresAt <= Date.now()) { expireListing(l); ctx.status(410); ctx.json({ ok: false, code: 'NOT_FOUND', message: '竞拍已结束' }); return; }
+        if (l.sellerId === playerId) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '卖家不能竞拍自己的挂单' }); return; }
         const min = Math.ceil((l.topBid ?? l.unitPrice) * (1 + ((app.tuning as any).market?.auctionMinIncrement ?? 0.05)));
         const v = Math.floor(Number(bid) || 0);
+        if (l.topBidder === playerId && l.topBid === v) {
+          ctx.json({ ok: true, message: `出价成功（沙盒）：${v}`, topBid: v });
+          return;
+        }
         if (v < min) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: `出价需 ≥ ${min}` }); return; }
         const econ = new EconomyOps(app.store, app.profile);
         try { econ.spend(playerId, 'TEST_CREDIT', v, 'auction.bid', l.listingId, `bid:${l.listingId}:${v}`); } catch { ctx.status(409); ctx.json({ ok: false, code: 'INSUFFICIENT', message: '沙盒余额不足' }); return; }
@@ -123,9 +150,10 @@ export function attachCommerceRoutes(app: GameApp, routes: RouteDef[]): void {
         const playerId = guard(ctx); if (!playerId) return;
         if (!commerceAllowed(ctx, 'digitalTrade')) return;
         const { listingId } = ctx.body || {};
-        const l = app.store.data.listings[String(listingId || '')];
+        const l = own(app.store.data.listings, String(listingId || ''));
         if (!l || l.closed || l.kind !== 'auction') { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '竞拍单不存在' }); return; }
         if (l.sellerId !== playerId) { ctx.status(403); ctx.json({ ok: false, code: 'AUTH_REQUIRED', message: '仅卖家可结算' }); return; }
+        if (l.expiresAt > Date.now()) { ctx.status(409); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '竞拍尚未结束' }); return; }
         const econ = new EconomyOps(app.store, app.profile);
         if (l.topBidder && l.topBid) {
           const payout = Math.floor(l.topBid * (1 - ((app.tuning as any).market?.feeRate ?? 0.05)));

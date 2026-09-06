@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.randomId = randomId;
 exports.hmac = hmac;
+exports.safeEqual = safeEqual;
 /**
  * 服务端工具（无 node 原生依赖，可在微信小游戏进程内运行）。
  */
@@ -32,5 +33,21 @@ function hmac(secret, data) {
         h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
         h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
         return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+    }
+}
+function safeEqual(left, right) {
+    try {
+        const { timingSafeEqual } = require('node:crypto');
+        const a = Buffer.from(left);
+        const b = Buffer.from(right);
+        return a.length === b.length && timingSafeEqual(a, b);
+    }
+    catch {
+        if (left.length !== right.length)
+            return false;
+        let diff = 0;
+        for (let i = 0; i < left.length; i++)
+            diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+        return diff === 0;
     }
 }

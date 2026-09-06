@@ -19,7 +19,7 @@ curl -X POST http://127.0.0.1:8787/v1/auth/wechat -H 'content-type: application/
 ## 微信开发者工具运行
 
 1. 导入 `build/wechat-full-clone/`（完整沙盒）或 `build/wechat-release/`（合规版）
-2. AppID 选"测试号"即可运行（包内进程内后端，无需外部服务）
+2. AppID 可先选"测试号"进行包冒烟；微信运行时仍需远端 HTTPS 服务端，验收包缺少 `APP_SERVER_URL` 会明确提示配置错误。
 3. 首屏 → 主城大厅：签到 → 大逃杀（选房/修门/躲避/结算）→ 地下城（点砖）→ 卡牌合成 → 潮玩/猿宇宙/交易/我的 五 Tab 全部可点
 
 ## 重新生成数据/产物

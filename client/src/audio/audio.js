@@ -16,7 +16,7 @@ class AudioManager {
         if (!this.bgmOn)
             return;
         (_a = this.bgm) === null || _a === void 0 ? void 0 : _a.stop();
-        const h = this.platform.audio(`audio/bgm/${track}.mp3`, true, 0.6);
+        const h = this.platform.audio(`assets/game/audio/bgm/${track}.mp3`, true, 0.6);
         h.play();
         this.bgm = h;
     }
@@ -32,7 +32,7 @@ class AudioManager {
         this.lastPlayed[name] = now;
         let h = this.sfxCache[name];
         if (!h) {
-            h = this.platform.audio(`audio/sfx/${name}.mp3`, false, 0.9);
+            h = this.platform.audio(`assets/game/audio/sfx/${name}.mp3`, false, 0.9);
             this.sfxCache[name] = h;
         }
         h.play();

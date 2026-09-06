@@ -18,6 +18,7 @@ async function main(): Promise<void> {
     { name: 'unit-assets+compliance', fn: () => require('../../tests/unit_assets').run() },
     { name: 'unit-pack', fn: () => require('../../tests/unit_pack').run() },
     { name: 'slot-ref-integrity', fn: () => require('./check_slot_refs').run() },
+    { name: 'screen-route-integrity', fn: () => require('./check_screen_routes').run() },
     { name: 'frame-qa', fn: () => require('./qa_frames').run() },
     { name: 'gameplay-server', fn: () => require('../../tests/gameplay_server').run() },
     { name: 'release-safety', fn: () => require('../../tests/release_safety').run() },
@@ -49,12 +50,12 @@ async function main(): Promise<void> {
             if (k.includes('/build/')) delete require.cache[k];
           }
           const { start } = require(entryPath);
-          await start({ profile: dir.endsWith('release') ? 'wechat-release' : 'full-clone' });
+          await start({ profile: dir.endsWith('release') ? 'wechat-release' : 'full-clone', standalone: true });
           await mock.__settle(600);
           assertBoot(mock);
           const callsAtGate = mock.__drawCalls;
-          // 点合规门「进入游戏」按钮（逻辑坐标 ×dscale(2)）：按钮区 x 24..351, y≈414..458
-          mock.__dispatchTap(187 * 2, 436 * 2);
+          // 点合规门「进入游戏」按钮（CSS/逻辑坐标）：按钮区 x 24..351, y≈414..458
+          mock.__dispatchTap(187, 436);
           await mock.__settle(700);
           assert.ok(mock.__drawCalls > callsAtGate + 40, `home rendered after gate pass (gate=${callsAtGate}, now=${mock.__drawCalls})`);
           assert.ok(mock.__drawImageCalls > 0, 'atlas frames drawn via drawImage in bundle');

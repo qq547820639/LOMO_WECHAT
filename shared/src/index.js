@@ -20,3 +20,4 @@ __exportStar(require("./rng"), exports);
 __exportStar(require("./config"), exports);
 __exportStar(require("./protocol"), exports);
 __exportStar(require("./registry"), exports);
+__exportStar(require("./brand"), exports);

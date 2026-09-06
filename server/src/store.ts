@@ -86,7 +86,14 @@ export class Store {
   constructor(txnIdGen: () => string, persistPath?: string) {
     this.ledger = new Ledger(txnIdGen);
     this.persistPath = persistPath ?? null;
-    if (this.persistPath) this.tryRestore();
+    if (this.persistPath) {
+      try {
+        const fs = require('node:fs') as typeof import('node:fs');
+        const path = require('node:path') as typeof import('node:path');
+        fs.mkdirSync(path.dirname(this.persistPath), { recursive: true, mode: 0o700 });
+      } catch { /* persistence remains best-effort */ }
+      this.tryRestore();
+    }
   }
 
   setCards(cards: CardTemplate[]): void { this.cards = cards; }
@@ -120,10 +127,14 @@ export class Store {
   session(id: string): SessionRecord | undefined { return this.data.sessions[id]; }
 
   // ---- ranks ----
-  rankScore(board: string, playerId: string): number { return this.data.ranks[board]?.[playerId] ?? 0; }
+  rankScore(board: string, playerId: string): number {
+    const scores = Object.prototype.hasOwnProperty.call(this.data.ranks, board) ? this.data.ranks[board] : undefined;
+    return scores && Object.prototype.hasOwnProperty.call(scores, playerId) ? scores[playerId] : 0;
+  }
 
   rankAdd(board: string, playerId: string, delta: number): number {
-    if (!this.data.ranks[board]) this.data.ranks[board] = {};
+    if (board === '__proto__' || board === 'constructor' || board === 'prototype') return 0;
+    if (!Object.prototype.hasOwnProperty.call(this.data.ranks, board)) this.data.ranks[board] = {};
     const cur = this.data.ranks[board][playerId] ?? 0;
     const next = cur + delta;
     this.data.ranks[board][playerId] = next;
@@ -132,7 +143,7 @@ export class Store {
   }
 
   rankTop(board: string, limit: number): Array<{ playerId: string; score: number }> {
-    const m = this.data.ranks[board] || {};
+    const m = Object.prototype.hasOwnProperty.call(this.data.ranks, board) ? this.data.ranks[board] : {};
     return Object.entries(m).map(([playerId, score]) => ({ playerId, score })).sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
@@ -178,7 +189,9 @@ export class Store {
     try {
       const fs = require('node:fs') as typeof import('node:fs');
       const snapshot = JSON.stringify({ ...this.data, _ledger: this.ledger.dump() });
-      fs.writeFileSync(this.persistPath, snapshot);
+      const tmpPath = `${this.persistPath}.tmp`;
+      fs.writeFileSync(tmpPath, snapshot, { encoding: 'utf8', mode: 0o600 });
+      fs.renameSync(tmpPath, this.persistPath);
       this.dirty = false;
     } catch { /* 持久化失败不阻塞游戏 */ }
   }

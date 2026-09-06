@@ -1,17 +1,67 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DailyScreen = exports.BoxScreen = exports.CardsScreen = exports.GachaScreen = exports.WarcraftScreen = exports.UniverseScreen = exports.MultiplePitScreen = exports.GoldMineScreen = exports.ApeMineScreen = void 0;
+exports.DailyScreen = exports.BoxScreen = exports.CardsScreen = exports.GachaScreen = exports.WarcraftScreen = exports.UniverseScreen = exports.MultiplePitScreen = exports.GoldMineScreen = exports.ApeMineScreen = exports.ApeOverviewScreen = void 0;
 exports.registerEconScreens = registerEconScreens;
 /**
- * 生产/养成屏幕：猿矿场 / 黄金矿场 / 多人矿坑 / 宇宙 / 魔兽 / 扭蛋兔 / 卡牌 / 盲盒 / 每日。
+ * 生产/养成屏幕：猿岛矿场 / 黄金矿场 / 多人矿坑 / 宇宙 / 魔兽 / 萌宠扭蛋 / 卡牌 / 盲盒 / 每日。
  */
 const base_1 = require("./base");
+const router_1 = require("../core/router");
 const theme_1 = require("../core/theme");
 const registry_1 = require("./registry");
-// ---------------- 猿宇宙矿场 ----------------
+// ---------------- 猿岛总览 ----------------
+class ApeOverviewScreen extends router_1.Screen {
+    constructor() {
+        super(...arguments);
+        this.route = '/ape';
+        this.title = '猿岛总览';
+        this.minerClip = null;
+    }
+    onEnter() {
+        if (!this.minerClip && this.app.assets) {
+            const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'miner', 'idle', { fitHeight: 86, placeholderColor: theme_1.THEME.gold });
+            clip.play();
+            this.minerClip = clip;
+        }
+    }
+    onExit() { this.minerClip = null; }
+    render() {
+        var _a, _b, _c, _d;
+        const ui = this.app.ui;
+        const top = 64;
+        const p = this.app.player;
+        let y = top + 6;
+        ui.panel({ x: 12, y, w: ui.w - 24, h: 116 }, theme_1.THEME.panel);
+        (_a = this.minerClip) === null || _a === void 0 ? void 0 : _a.draw(ui, ui.w - 62, y + 52, this.app.frameDt);
+        ui.text('猿岛基地', 24, y + 25, { size: 18, bold: true, color: theme_1.THEME.gold });
+        ui.text(`${(_b = p === null || p === void 0 ? void 0 : p.nick) !== null && _b !== void 0 ? _b : '玩家'} · Lv.${(_c = p === null || p === void 0 ? void 0 : p.level) !== null && _c !== void 0 ? _c : 1}`, 24, y + 49, { size: 12, color: theme_1.THEME.text });
+        const b = (_d = p === null || p === void 0 ? void 0 : p.balances) !== null && _d !== void 0 ? _d : {};
+        ui.text(`宝石 ${(0, theme_1.fmtNum)(b.GEMSTONE)} · 金沙 ${(0, theme_1.fmtNum)(b.SAND)} · 猿石 ${(0, theme_1.fmtNum)(b.APE_STONE)}`, 24, y + 70, { size: 11, color: theme_1.THEME.textDim });
+        ui.text('从生产、探索到养成，所有成长资源在此汇合', 24, y + 92, { size: 10, color: theme_1.THEME.textDim });
+        y += 128;
+        const entries = [
+            ['apeMine', '猿岛矿场', '定时生产宝石与金沙'],
+            ['goldMine', '黄金矿场', '挖矿、精炼与 NPC 兑换'],
+            ['gacha', '萌宠扭蛋', '收集部件并提升战力'],
+            ['universe', '宇宙探索', '探索星球与升级飞艇'],
+            ['undertown', '地下城', '逐层破砖获取宝石'],
+        ];
+        entries.forEach(([id, label, note], i) => {
+            const h = 58;
+            ui.panel({ x: 12, y, w: ui.w - 24, h: h - 6 }, theme_1.THEME.panel2);
+            ui.text(label, 24, y + 22, { size: 14, bold: true });
+            ui.text(note, 24, y + 41, { size: 10, color: theme_1.THEME.textDim });
+            ui.text('进入 ›', ui.w - 66, y + 31, { size: 10, color: theme_1.THEME.accent2 });
+            ui.hits.push({ x: 12, y, w: ui.w - 24, h: h - 6, onTap: () => (0, registry_1.openFeature)(this.app, id), id: `ape-${id}` });
+            y += h;
+        });
+    }
+}
+exports.ApeOverviewScreen = ApeOverviewScreen;
+// ---------------- 猿岛矿场 ----------------
 class ApeMineScreen extends base_1.ApiScreen {
     constructor() {
-        super('apeMine', '猿宇宙矿场');
+        super('apeMine', '猿岛矿场');
         this.route = '/apeMine';
     }
     pollMs() { return 5000; }
@@ -59,9 +109,32 @@ class GoldMineScreen extends base_1.ApiScreen {
     constructor() {
         super('goldMine', '黄金矿场');
         this.route = '/goldMine';
+        this.minerClip = null;
+        this.bgClip = null;
+    }
+    onEnter() {
+        if (!this.bgClip && this.app.assets) {
+            try {
+                this.bgClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__bg_starship', 'launch', { loop: true, fitHeight: 60 });
+                this.bgClip.play();
+            }
+            catch {
+                this.bgClip = null;
+            }
+        }
+        // P0-1 demo：真实 APK 矿工帧序列（game-assets/miner，构建期入包 assets/game/）
+        if (!this.minerClip && this.app.assets) {
+            const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'miner', 'idle', { fitHeight: 64, placeholderColor: theme_1.THEME.gold });
+            clip.play();
+            this.minerClip = clip;
+        }
+        return super.onEnter();
+    }
+    onExit() {
+        this.minerClip = null; // 屏幕 pop 即释放引用（图集本身由 AssetManager LRU 管理）
     }
     render() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -72,6 +145,8 @@ class GoldMineScreen extends base_1.ApiScreen {
         ui.text(`矿石 ${(0, theme_1.fmtNum)(st.ore)} · 黄金 ${(0, theme_1.fmtNum)(st.gold)}`, 24, y + 20, { size: 13, bold: true, color: theme_1.THEME.gold });
         ui.progress(24, y + 34, ui.w - 48, 8, st.stamina / st.maxStamina, theme_1.THEME.green);
         ui.text(`矿工体力 ${st.stamina}/${st.maxStamina} · 交易模式: ${st.tradeMode === 'npc-exchange' ? 'NPC 兑换' : '沙盒市场'}`, 24, y + 56, { size: 10, color: theme_1.THEME.textDim });
+        // 矿工帧动画（P0-1 图像层验证位；缺图时为占位块）
+        (_a = this.minerClip) === null || _a === void 0 ? void 0 : _a.draw(ui, ui.w - 52, y + 30, this.app.frameDt);
         y += 76;
         const bw = (ui.w - 24 - 12) / 3;
         ui.button({ x: 12, y, w: bw, h: 46 }, '挖矿(-10体力)', () => this.act('dig'), { color: theme_1.THEME.gold });
@@ -79,7 +154,7 @@ class GoldMineScreen extends base_1.ApiScreen {
         ui.button({ x: 12 + (bw + 6) * 2, y, w: bw, h: 46 }, '兑猿石 x1', () => this.act('tradeOre', { qty: 1 }), { color: theme_1.THEME.purple });
         y += 56;
         ui.text('挖掘→精炼成黄金；矿石可按 10:1 兑换猿石', 16, y + 8, { size: 10, color: theme_1.THEME.textDim });
-        ui.text('记录: ' + ((_c = (_b = (_a = st.history) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.summary) !== null && _c !== void 0 ? _c : '暂无').slice(0, 34), 16, y + 24, { size: 10, color: theme_1.THEME.textDim });
+        ui.text('记录: ' + ((_d = (_c = (_b = st.history) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.summary) !== null && _d !== void 0 ? _d : '暂无').slice(0, 34), 16, y + 24, { size: 10, color: theme_1.THEME.textDim });
     }
 }
 exports.GoldMineScreen = GoldMineScreen;
@@ -112,9 +187,25 @@ class MultiplePitScreen extends base_1.ApiScreen {
 exports.MultiplePitScreen = MultiplePitScreen;
 // ---------------- 宇宙探索 ----------------
 class UniverseScreen extends base_1.ApiScreen {
-    constructor(featureId = 'universe', title = '宇宙探索') { super(featureId, title); }
+    constructor(featureId = 'universe', title = '宇宙探索') {
+        super(featureId, title);
+        this.bgClip = null;
+    }
+    onEnter() {
+        if (!this.bgClip && this.app.assets) {
+            try {
+                this.bgClip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, 'pag__airship', 'launch', { loop: true, fitHeight: 60 });
+                this.bgClip.play();
+            }
+            catch {
+                this.bgClip = null;
+            }
+        }
+        return super.onEnter();
+    }
+    onExit() { this.bgClip = null; }
     render() {
-        var _a;
+        var _a, _b;
         const ui = this.app.ui;
         const top = 64;
         if (this.renderStatus(ui, top))
@@ -122,7 +213,8 @@ class UniverseScreen extends base_1.ApiScreen {
         const st = this.state;
         let y = top + 6;
         ui.panel({ x: 12, y, w: ui.w - 24, h: 80 }, theme_1.THEME.panel);
-        ui.text(`飞船 Lv.${st.shipLevel} · 已探索 ${st.planetsVisited} 星球 · NDTU ${(0, theme_1.fmtNum)(st.ndtu)}`, 24, y + 20, { size: 13, bold: true, color: theme_1.THEME.purple });
+        (_a = this.bgClip) === null || _a === void 0 ? void 0 : _a.draw(ui, ui.w - 52, y + 34, this.app.frameDt);
+        ui.text(`飞船 Lv.${st.shipLevel} · 已探索 ${st.planetsVisited} 星球 · 星尘 ${(0, theme_1.fmtNum)(st.stardust)}`, 24, y + 20, { size: 13, bold: true, color: theme_1.THEME.purple });
         ui.text(`飞船每级探索收益 +10% · 升级需 ${st.upgradeCost} 金币`, 24, y + 40, { size: 10, color: theme_1.THEME.textDim });
         ui.text(`神殿契约: ${st.contractAvailable ? '今日可领' : '今日已完成'}`, 24, y + 60, { size: 11, color: st.contractAvailable ? theme_1.THEME.green : theme_1.THEME.textDim });
         y += 90;
@@ -131,7 +223,7 @@ class UniverseScreen extends base_1.ApiScreen {
         ui.button({ x: 12 + bw + 6, y, w: bw, h: 46 }, `升飞船(${st.upgradeCost})`, () => this.act('upgradeShip'), { color: theme_1.THEME.accent2 });
         ui.button({ x: 12 + (bw + 6) * 2, y, w: bw, h: 46 }, '神殿契约', () => this.act('contract'), { color: theme_1.THEME.gold, disabled: !st.contractAvailable });
         y += 56;
-        ((_a = st.exploreLog) !== null && _a !== void 0 ? _a : []).slice(0, 5).forEach((h, i) => {
+        ((_b = st.exploreLog) !== null && _b !== void 0 ? _b : []).slice(0, 5).forEach((h, i) => {
             ui.text(`· ${h.summary}`.slice(0, 40), 16, y + i * 17, { size: 10, color: theme_1.THEME.textDim });
         });
     }
@@ -162,12 +254,30 @@ class WarcraftScreen extends base_1.ApiScreen {
     }
 }
 exports.WarcraftScreen = WarcraftScreen;
-// ---------------- 扭蛋兔 ----------------
+// ---------------- 萌宠扭蛋 ----------------
 class GachaScreen extends base_1.ApiScreen {
     constructor() {
-        super('gacha', '扭蛋兔养成');
+        super('gacha', '萌宠扭蛋');
         this.route = '/gacha';
+        this.partClips = [];
     }
+    onEnter() {
+        if (!this.partClips.length && this.app.assets) {
+            const slots = ['strengthen__ear_left', 'strengthen__ear_right', 'strengthen__eye_nose', 'strengthen__hand_left'];
+            this.partClips = slots.map((sid, i) => {
+                try {
+                    const clip = new (require('../ui/frame_clip').FrameClip)(this.app.assets, sid, 'launch', { loop: true, fitHeight: 44 });
+                    clip.play();
+                    return { clip, x: 40 + i * 80 };
+                }
+                catch {
+                    return null;
+                }
+            }).filter(Boolean);
+        }
+        return super.onEnter();
+    }
+    onExit() { this.partClips = []; }
     render() {
         var _a, _b;
         const ui = this.app.ui;
@@ -177,6 +287,7 @@ class GachaScreen extends base_1.ApiScreen {
         const st = this.state;
         let y = top + 6;
         ui.panel({ x: 12, y, w: ui.w - 24, h: 66 }, theme_1.THEME.panel);
+        this.partClips.forEach((pc) => pc.clip.draw(ui, pc.x, y + 36, this.app.frameDt));
         ui.text(`总战力 ${st.power} · 已开蛋 ${st.eggsOpened} · 单蛋 ${st.eggCostCoin} 金币`, 24, y + 20, { size: 13, bold: true, color: theme_1.THEME.accent });
         ui.text(`部位战力: ${Object.entries((_a = st.equipped) !== null && _a !== void 0 ? _a : {}).filter(([, v]) => v).map(([k]) => k).join('/') || '未穿戴'}`, 24, y + 40, { size: 10, color: theme_1.THEME.textDim });
         y += 76;
@@ -203,7 +314,16 @@ class GachaScreen extends base_1.ApiScreen {
 exports.GachaScreen = GachaScreen;
 // ---------------- 卡牌 ----------------
 class CardsScreen extends base_1.ApiScreen {
-    constructor(featureId = 'cards', title = '卡牌收集与合成') { super(featureId, title); }
+    constructor(featureId = 'cards', title = '卡牌收集与合成') {
+        super(featureId, title);
+        this.cardsAtlas = null;
+    }
+    onEnter() {
+        if (!this.cardsAtlas && this.app.assets) {
+            void this.app.assets.getAtlas('cards').then((a) => { this.cardsAtlas = a; });
+        }
+        return super.onEnter();
+    }
     render() {
         var _a;
         const ui = this.app.ui;
@@ -225,12 +345,19 @@ class CardsScreen extends base_1.ApiScreen {
         const cols = 3;
         const cw = (ui.w - 24 - (cols - 1) * 6) / cols;
         st.collection.forEach((c, i) => {
-            var _a;
+            var _a, _b, _c;
             const cx = 12 + (i % cols) * (cw + 6);
             const cy = y + Math.floor(i / cols) * 66;
             const owned = c.owned > 0;
             ui.panel({ x: cx, y: cy, w: cw, h: 60 }, owned ? theme_1.THEME.panel : theme_1.THEME.bg2);
-            const rarityColor = (_a = { N: theme_1.THEME.textDim, R: theme_1.THEME.accent2, SR: theme_1.THEME.purple, SSR: theme_1.THEME.gold }[c.rarity]) !== null && _a !== void 0 ? _a : theme_1.THEME.text;
+            if (owned && ((_b = (_a = this.cardsAtlas) === null || _a === void 0 ? void 0 : _a.frameImages) === null || _b === void 0 ? void 0 : _b.get(c.templateId))) {
+                const img = this.cardsAtlas.frameImages.get(c.templateId);
+                ui.image(img, cx + 2, cy + 2, cw - 4, 56);
+                const cc = ui.ctx;
+                cc.fillStyle = 'rgba(10,12,24,0.72)';
+                cc.fillRect(cx + 2, cy + 12, cw - 4, 46);
+            }
+            const rarityColor = (_c = { N: theme_1.THEME.textDim, R: theme_1.THEME.accent2, SR: theme_1.THEME.purple, SSR: theme_1.THEME.gold }[c.rarity]) !== null && _c !== void 0 ? _c : theme_1.THEME.text;
             ui.textCenter(owned ? c.name : '???', cx + cw / 2, cy + 18, { size: 10, bold: true, color: owned ? rarityColor : theme_1.THEME.disabled });
             ui.textCenter(`${c.rarity}·战力${c.power}`, cx + cw / 2, cy + 32, { size: 9, color: theme_1.THEME.textDim });
             ui.textCenter(owned ? `持有 ${c.owned}${c.plus ? '+' + c.plus : ''}` : '未获得', cx + cw / 2, cy + 46, { size: 9, color: owned ? theme_1.THEME.green : theme_1.THEME.disabled });
@@ -238,7 +365,7 @@ class CardsScreen extends base_1.ApiScreen {
                 ui.hits.push({ x: cx, y: cy, w: cw, h: 60, onTap: () => {
                         this.app.showModal(c.name, [`稀有度 ${c.rarity} · 战力 ${c.power}`, `类型 ${c.cardType} · 持有 ${c.owned} 张`], [
                             { label: `合成${c.owned >= st.synthNeed ? '' : '(不足)'}`, onTap: () => this.act('synth', { templateId: c.templateId }) },
-                            { label: '拆分', onTap: () => this.act('split', { templateId: c.templateId }) },
+                            { label: '拆分', onTap: () => { void this.act('split', { templateId: c.templateId }).then(() => this.app.playOverlay('pag__card_split', 1200)); } },
                         ]);
                     }, id: 'card' + i });
             }
@@ -265,7 +392,7 @@ class BoxScreen extends base_1.ApiScreen {
         ui.text('付费随机获利链路已切断；RELEASE 下此玩法为任务钥匙制', 24, y + 56, { size: 9, color: theme_1.THEME.green });
         y += 76;
         const bw = (ui.w - 24 - 8) / 2;
-        ui.button({ x: 12, y, w: bw, h: 48 }, '开箱（1 钥匙）', () => this.act('openFree'), { color: theme_1.THEME.gold, disabled: st.keys < 1 });
+        ui.button({ x: 12, y, w: bw, h: 48 }, '开箱（1 钥匙）', () => { void this.act('openFree').then(() => this.app.playOverlay('pag__luckybag', 1300)); }, { color: theme_1.THEME.gold, disabled: st.keys < 1 });
         ui.button({ x: 12 + bw + 8, y, w: bw, h: 48 }, '做任务得钥匙(-4体)', () => this.act('earnKey'), { color: theme_1.THEME.accent2 });
         y += 58;
         ((_a = st.history) !== null && _a !== void 0 ? _a : []).slice(0, 6).forEach((h, i) => {
@@ -289,7 +416,7 @@ class DailyScreen extends base_1.ApiScreen {
         ui.text(st.checkedToday ? '今日已签到 ✓' : '今日未签到', 24, y + 22, { size: 14, bold: true, color: st.checkedToday ? theme_1.THEME.green : theme_1.THEME.gold });
         ui.text(`连续签到 ${st.streak} 天（每 7 天里程碑奖券 +2）`, 24, y + 42, { size: 11, color: theme_1.THEME.textDim });
         y += 70;
-        ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, st.checkedToday ? '已签到' : '签到', () => this.act('checkin'), { color: theme_1.THEME.accent, disabled: st.checkedToday });
+        ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, st.checkedToday ? '已签到' : '签到', () => { void this.act('checkin').then(() => this.app.playOverlay('pag__pag_levelup', 1300)); }, { color: theme_1.THEME.accent, disabled: st.checkedToday });
         y += 58;
         ui.text('每日任务', 16, y + 12, { size: 13, bold: true });
         y += 20;
@@ -306,6 +433,7 @@ class DailyScreen extends base_1.ApiScreen {
 }
 exports.DailyScreen = DailyScreen;
 function registerEconScreens() {
+    (0, registry_1.registerRoute)('ape', () => new ApeOverviewScreen());
     (0, registry_1.registerRoute)('apeMine', () => new ApeMineScreen());
     (0, registry_1.registerRoute)('goldMine', () => new GoldMineScreen());
     (0, registry_1.registerRoute)('multiplePit', () => new MultiplePitScreen());

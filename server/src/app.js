@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LomoApp = void 0;
+exports.GameApp = void 0;
 const paths_1 = require("../../shared/src/paths");
+const brand_1 = require("../../shared/src/brand");
 const util_1 = require("./util");
 const commerce_1 = require("./commerce");
 const store_1 = require("./store");
@@ -15,13 +16,16 @@ const TUNING_FALLBACK = {
     energy: { initial: 30, max: 120, regenMinutes: 6, battleCost: 3, mineCost: 2, exploreCost: 4, minigameCost: 1 },
     economy: { initialCoin: 500, initialTicket: 5, mineCoinRange: [3, 8], refineOreCost: 10, refineCoin: 35 },
 };
-class LomoApp {
+class GameApp {
     constructor(opts = {}) {
         var _a, _b, _c, _d, _e;
         this.rateBuckets = new Map();
         this.playerSeedCounter = new Map();
-        this.profile = (_b = (_a = opts.profile) !== null && _a !== void 0 ? _a : process.env.LOMO_PROFILE) !== null && _b !== void 0 ? _b : 'full-clone';
-        this.secret = (_d = (_c = opts.secret) !== null && _c !== void 0 ? _c : process.env.LOMO_SECRET) !== null && _d !== void 0 ? _d : 'lomo-dev-secret-DO-NOT-USE-IN-PROD';
+        const profile = (_b = (_a = opts.profile) !== null && _a !== void 0 ? _a : process.env.APP_PROFILE) !== null && _b !== void 0 ? _b : 'full-clone';
+        if (profile !== 'full-clone' && profile !== 'wechat-release')
+            throw new Error(`invalid APP_PROFILE: ${profile}`);
+        this.profile = profile;
+        this.secret = (_d = (_c = opts.secret) !== null && _c !== void 0 ? _c : process.env.APP_SECRET) !== null && _d !== void 0 ? _d : 'dev-only-secret-DO-NOT-USE-IN-PROD';
         this.tokenSecret = this.secret + ':token';
         this.tuning = this.loadTuning();
         this.configVersion = `tuning-${this.profile}-1`;
@@ -32,18 +36,29 @@ class LomoApp {
             this.seedNpcPlayers();
     }
     loadTuning() {
+        let raw;
         try {
             const fs = require('node:fs');
             const p = (0, paths_1.rootPath)('configs/tuning-baseline.json');
-            return JSON.parse(fs.readFileSync(p, 'utf8'));
+            raw = fs.readFileSync(p, 'utf8');
         }
-        catch {
-            return TUNING_FALLBACK;
+        catch (error) {
+            if (error.code === 'ENOENT')
+                return TUNING_FALLBACK;
+            throw new config_1.TuningConfigError(`config read failed: ${String(error)}`);
         }
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        }
+        catch (error) {
+            throw new config_1.TuningConfigError(`JSON parse failed: ${String(error)}`);
+        }
+        return (0, config_1.validateTuningConfig)(parsed);
     }
     /** NPC/机器人玩家：让排行榜/矿场好友可交互可测试 */
     seedNpcPlayers() {
-        const names = ['猿大圣', '矿工老王', '潮玩酱', '宇宙飞侠', '地下城主', '吃鸡达人', '弹珠高手', '拔河队长'];
+        const names = ['猿大圣', '矿工老王', '收藏酱', '宇宙飞侠', '地下城主', '吃鸡达人', '弹珠高手', '拔河队长'];
         names.forEach((n, i) => {
             const { player } = this.store.ensurePlayer(`npc-${i}`, n, Date.now() - i * 86400000);
             player.level = 3 + ((i * 7) % 20);
@@ -103,16 +118,24 @@ class LomoApp {
     }
     // ---------- auth ----------
     issueToken(playerId) {
-        return `t1.${playerId}.${(0, util_1.hmac)(this.tokenSecret, playerId)}`;
+        const expiresAt = Date.now() + GameApp.TOKEN_TTL_MS;
+        const payload = `${playerId}.${expiresAt}`;
+        return `t1.${payload}.${(0, util_1.hmac)(this.tokenSecret, payload)}`;
     }
     verifyToken(token) {
         if (!token || !token.startsWith('t1.'))
             return null;
         const parts = token.split('.');
-        if (parts.length !== 3)
+        if (parts.length !== 4)
             return null;
         const playerId = parts[1];
-        if ((0, util_1.hmac)(this.tokenSecret, playerId) !== parts[2])
+        const expiresAt = Number(parts[2]);
+        if (!playerId || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now())
+            return null;
+        const payload = `${playerId}.${expiresAt}`;
+        if (!(0, util_1.safeEqual)((0, util_1.hmac)(this.tokenSecret, payload), parts[3]))
+            return null;
+        if (!this.store.player(playerId))
             return null;
         return playerId;
     }
@@ -215,7 +238,7 @@ class LomoApp {
     }
     routes() {
         const app = this;
-        const authed = (ctx) => { var _a; return app.verifyToken((ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || ((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.token)); };
+        const authed = (ctx) => { var _a; return app.verifyToken(String(ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (typeof ((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.token) === 'string' ? ctx.body.token : undefined)); };
         const guard = (ctx) => {
             const playerId = authed(ctx);
             if (!playerId) {
@@ -247,7 +270,7 @@ class LomoApp {
                     const { player, isNew } = this.store.ensurePlayer(openId, nick, Date.now());
                     if (isNew) {
                         this.initPlayerAssets(player.playerId);
-                        this.store.sendMail({ playerId: player.playerId, title: '欢迎来到 LOMO 小游戏', body: '迁移版欢迎礼包已到账，祝玩得开心！', rewards: [{ assetId: 'COIN', delta: 100 }] });
+                        this.store.sendMail({ playerId: player.playerId, title: brand_1.BRAND.welcomeMailTitle, body: brand_1.BRAND.welcomeMailBody, rewards: [{ assetId: 'COIN', delta: 100 }] });
                     }
                     this.store.telemetry('login', { playerId: player.playerId, isNew });
                     const resp = {
@@ -283,6 +306,25 @@ class LomoApp {
                     if (!playerId)
                         return;
                     ctx.json({ ok: true, antiAddiction: this.antiAddiction(playerId), privacyConsentRequired: this.profile === 'wechat-release' });
+                },
+            },
+            {
+                method: 'POST', pattern: '/v1/compliance/privacy-consent', handler: (ctx) => {
+                    var _a, _b;
+                    const playerId = guard(ctx);
+                    if (!playerId)
+                        return;
+                    const agree = !!((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.agree);
+                    const contract = String(((_b = ctx.body) === null || _b === void 0 ? void 0 : _b.contract) || '');
+                    // 审计留痕（合规可回溯；不记录任何设备信息）
+                    this.store.audit(playerId, 'privacy.consent', { agree, contract });
+                    this.store.telemetry(agree ? 'privacy_consent' : 'privacy_refuse', { playerId, contract: contract.slice(0, 40) });
+                    if (!agree) {
+                        // 拒绝：仅记录，不做任何资产/玩法操作（用户将退出小游戏）
+                        ctx.json({ ok: true, recorded: true, action: 'exit' });
+                        return;
+                    }
+                    ctx.json({ ok: true, recorded: true, action: 'proceed' });
                 },
             },
             // ---- game session ----
@@ -323,6 +365,13 @@ class LomoApp {
                     if (!playerId)
                         return;
                     const { featureId, actionId, sessionId, clientSeq, payload, idempotencyKey } = ctx.body || {};
+                    if (typeof featureId !== 'string' || typeof actionId !== 'string' ||
+                        (clientSeq !== undefined && (!Number.isSafeInteger(clientSeq) || clientSeq < 0)) ||
+                        (payload !== undefined && (payload === null || typeof payload !== 'object' || Array.isArray(payload)))) {
+                        ctx.status(400);
+                        ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'featureId/actionId/clientSeq/payload 格式无效' });
+                        return;
+                    }
                     const game = games_1.FEATURES_GAMES[featureId];
                     if (!game || typeof game.actions[actionId] !== 'function') {
                         ctx.status(404);
@@ -553,10 +602,16 @@ class LomoApp {
                     if (!playerId)
                         return;
                     const token = String(((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.token) || '');
-                    const rec = this.store.data.inviteTokens[token];
+                    const rec = Object.prototype.hasOwnProperty.call(this.store.data.inviteTokens, token) ? this.store.data.inviteTokens[token] : undefined;
                     if (!rec) {
                         ctx.status(404);
                         ctx.json({ ok: false, code: 'NOT_FOUND', message: '邀请码无效' });
+                        return;
+                    }
+                    if (Date.now() - rec.createdAt > GameApp.INVITE_TTL_MS) {
+                        delete this.store.data.inviteTokens[token];
+                        ctx.status(410);
+                        ctx.json({ ok: false, code: 'INVITE_EXPIRED', message: '邀请码已过期' });
                         return;
                     }
                     if (rec.usedBy) {
@@ -593,6 +648,8 @@ class LomoApp {
                 method: 'POST', pattern: '/v1/telemetry/events', handler: (ctx) => {
                     var _a;
                     const playerId = guard(ctx);
+                    if (!playerId)
+                        return;
                     const events = Array.isArray((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.events) ? ctx.body.events : [];
                     for (const e of events.slice(0, 100))
                         this.store.telemetry(String(e.name || 'unknown'), { playerId, ...e.props });
@@ -602,9 +659,17 @@ class LomoApp {
             // ---- admin（开发用） ----
             {
                 method: 'POST', pattern: '/v1/admin/reset', handler: (ctx) => {
-                    if (process.env.LOMO_ALLOW_ADMIN !== '1') {
+                    var _a;
+                    if (process.env.APP_ALLOW_ADMIN !== '1') {
                         ctx.status(403);
                         ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: 'admin disabled' });
+                        return;
+                    }
+                    const configured = process.env.APP_ADMIN_TOKEN;
+                    const supplied = String(ctx.req.headers['x-admin-token'] || ((_a = ctx.body) === null || _a === void 0 ? void 0 : _a.adminToken) || '');
+                    if (!configured || !(0, util_1.safeEqual)(supplied, configured)) {
+                        ctx.status(401);
+                        ctx.json({ ok: false, code: 'ADMIN_AUTH_REQUIRED', message: 'admin token required' });
                         return;
                     }
                     this.store.data = { players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [] };
@@ -635,4 +700,6 @@ class LomoApp {
         };
     }
 }
-exports.LomoApp = LomoApp;
+exports.GameApp = GameApp;
+GameApp.TOKEN_TTL_MS = 7 * 86400000;
+GameApp.INVITE_TTL_MS = 7 * 86400000;

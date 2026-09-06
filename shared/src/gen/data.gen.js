@@ -7,11 +7,7 @@ exports.FEATURES = [
         "id": "home",
         "title": "生态大厅",
         "family": "hub",
-        "evidence": [
-            "MainActivity",
-            "MailHomeActivity",
-            "WinningListActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "统一入口、活动与消息；移除资金账户语义。",
@@ -27,13 +23,7 @@ exports.FEATURES = [
         "id": "ape",
         "title": "猿系养成/矿场/竞技",
         "family": "rpg-economy",
-        "evidence": [
-            "ApeActivity",
-            "ApeArenaActivity",
-            "ApeMyGemstoneActivity",
-            "MonkeyKingActivity",
-            "PuzzleIndexActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "保留养成、矿场、PVE/PVP；交易/赠送/租赁独立切除。",
@@ -61,11 +51,7 @@ exports.FEATURES = [
         "id": "goldMine",
         "title": "黄金矿场",
         "family": "mining",
-        "evidence": [
-            "GoldMineActivity",
-            "FineGoldActivity",
-            "OreTradingActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "保留挖矿与精炼；矿石不可提现、不可玩家间交易。",
@@ -83,13 +69,9 @@ exports.FEATURES = [
     },
     {
         "id": "gacha",
-        "title": "扭蛋兔养成",
+        "title": "萌宠扭蛋",
         "family": "collection",
-        "evidence": [
-            "normal_egg/medal_egg/rock_egg",
-            "assets dress_*",
-            "strengthen/*"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "开蛋→部位装备→战力→挑战/产出循环。",
@@ -109,12 +91,7 @@ exports.FEATURES = [
         "id": "universe",
         "title": "宇宙探索",
         "family": "exploration",
-        "evidence": [
-            "UniverseActivity",
-            "ExplorePlanetActivity",
-            "UpgradeUFOActivity",
-            "HeroActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "远征、飞船升级、英雄收集。",
@@ -134,11 +111,7 @@ exports.FEATURES = [
         "id": "undertown",
         "title": "地下城/阶梯",
         "family": "dungeon",
-        "evidence": [
-            "UndertownActivity",
-            "ApeLadderLogsActivity",
-            "ProbDetailActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "概率展示可保留但奖励只能是不可兑付游戏资源。",
@@ -158,11 +131,7 @@ exports.FEATURES = [
         "id": "nxArena",
         "title": "NX 竞技/Boss",
         "family": "combat",
-        "evidence": [
-            "ArenaHomeActivity",
-            "ChallengeBossActivity",
-            "ArenaRankActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "保留竞技场和 Boss；排行榜不展示充值/赢利。",
@@ -182,10 +151,7 @@ exports.FEATURES = [
         "id": "monkeyFight",
         "title": "猿猴格斗",
         "family": "combat",
-        "evidence": [
-            "MonkeyFightingSiteActivity",
-            "MonkeyFightingHistoryActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "作为核心即时对战/PVE。",
@@ -205,10 +171,7 @@ exports.FEATURES = [
         "id": "apeRabbit",
         "title": "猿兔对战",
         "family": "combat",
-        "evidence": [
-            "ApeRabbitMainActivity",
-            "ApeRabbitResultActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "转为技能卡 PVE/PVP。",
@@ -228,11 +191,7 @@ exports.FEATURES = [
         "id": "battleRoyal",
         "title": "大逃杀",
         "family": "combat",
-        "evidence": [
-            "BattleRoyalActivity",
-            "NewBattleRoyalActivity",
-            "blockBattleRoyal/*"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "保留生存战；去除下注与输赢兑付。",
@@ -252,11 +211,7 @@ exports.FEATURES = [
         "id": "dagger",
         "title": "匕首/刺杀",
         "family": "combat",
-        "evidence": [
-            "DaggerActivity",
-            "DaggerNewActivity",
-            "AssassinationHistoryActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "题材需美术降暴力化，首发后再开。",
@@ -276,11 +231,7 @@ exports.FEATURES = [
         "id": "robbery",
         "title": "抢夺玩法",
         "family": "combat",
-        "evidence": [
-            "RobMainActivity",
-            "RobberyKillerActivity",
-            "RobberyRankActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "改名为资源争夺；禁止玩家定向转移可兑付资产。",
@@ -300,11 +251,7 @@ exports.FEATURES = [
         "id": "beast",
         "title": "动物挑战",
         "family": "combat",
-        "evidence": [
-            "AnimalsMainActivity",
-            "BeastPrizesActivity",
-            "HistoryRecordActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "保留动物闯关；奖品改纯虚拟非付费抽取。",
@@ -324,11 +271,7 @@ exports.FEATURES = [
         "id": "tug",
         "title": "拔河",
         "family": "minigame",
-        "evidence": [
-            "TugActivity",
-            "TugRankActivity",
-            "assets/tug/*"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "低风险短局玩法。",
@@ -344,10 +287,7 @@ exports.FEATURES = [
         "id": "marbles",
         "title": "弹珠",
         "family": "minigame",
-        "evidence": [
-            "MarblesActivity",
-            "assets/music/marbles/*"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "物理休闲玩法。",
@@ -363,10 +303,7 @@ exports.FEATURES = [
         "id": "escapeTiger",
         "title": "虎口逃生",
         "family": "minigame",
-        "evidence": [
-            "EscapeTigerMouthActivity",
-            "assets/pag/escape_animal/*"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "风险选择闯关，奖励纯游戏内。",
@@ -386,10 +323,7 @@ exports.FEATURES = [
         "id": "punchIn",
         "title": "打卡挑战",
         "family": "minigame",
-        "evidence": [
-            "PunchInActivity",
-            "PunchInRankActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "签到不可绑定分享/广告提现条件。",
@@ -405,10 +339,7 @@ exports.FEATURES = [
         "id": "sports",
         "title": "运动会",
         "family": "minigame",
-        "evidence": [
-            "SportsMeetActivity",
-            "SportLogsActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "计时/反应类短局。",
@@ -424,11 +355,7 @@ exports.FEATURES = [
         "id": "chicken",
         "title": "小鸡养成",
         "family": "idle",
-        "evidence": [
-            "ChickenActivity",
-            "ChickenLogsActivity",
-            "assets/music/chicken/*"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "喂养-等待-收获循环。",
@@ -448,12 +375,7 @@ exports.FEATURES = [
         "id": "cards",
         "title": "卡牌收集/合成",
         "family": "collection",
-        "evidence": [
-            "SynthesisCardActivity",
-            "MyCardLibraryActivity",
-            "ApeComposeCardActivity",
-            "ApeSplitCardActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "首发仅通过玩法产出；取消付费随机抽取。",
@@ -473,11 +395,7 @@ exports.FEATURES = [
         "id": "box",
         "title": "宝箱/潮盒",
         "family": "loot",
-        "evidence": [
-            "OpenBoxActivity",
-            "TreasureBoxActivity",
-            "TidalBoxSeriesActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "defer",
         "notes": "完整基线保留免费钥匙开箱；所有付费随机、实物/现金兑付关闭。",
@@ -497,11 +415,7 @@ exports.FEATURES = [
         "id": "luckyBag",
         "title": "幸运袋",
         "family": "loot",
-        "evidence": [
-            "LuckyBagActivity",
-            "LuckyBagRankingActivity",
-            "assets/luckyBag/*"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "defer",
         "notes": "仅可改成免费活动掉落；原随机获利链路不首发。",
@@ -521,11 +435,7 @@ exports.FEATURES = [
         "id": "flashCard",
         "title": "闪卡/卡柜",
         "family": "collection",
-        "evidence": [
-            "FlashCardActivity",
-            "FlashcardTradeActivity",
-            "CardCabinetActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "收集和柜藏保留，玩家交易关闭。",
@@ -545,11 +455,7 @@ exports.FEATURES = [
         "id": "mall",
         "title": "商城/实物订单",
         "family": "commerce",
-        "evidence": [
-            "GoodsDetailsActivity",
-            "ConfirmOrderActivity",
-            "LogisticsActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "实物电商与小游戏核心解耦，首发不接。",
@@ -560,12 +466,7 @@ exports.FEATURES = [
         "id": "digitalTrade",
         "title": "数字品/拍卖/竞价",
         "family": "trade",
-        "evidence": [
-            "PrintAuctionActivity",
-            "PrintBiddingActivity",
-            "TideTradeDetailsActivity",
-            "CopyrightSaleActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "高审核与合规风险，不进入小游戏。",
@@ -576,13 +477,7 @@ exports.FEATURES = [
         "id": "walletCash",
         "title": "钱包/余额/提现",
         "family": "finance",
-        "evidence": [
-            "MyWalletActivity",
-            "WithdrawalActivity",
-            "BalanceActivity",
-            "CoinCashActivity",
-            "WithdrawResultActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "彻底移除现金余额、提现与可兑付账户。",
@@ -593,10 +488,7 @@ exports.FEATURES = [
         "id": "betting",
         "title": "下注/输赢记录",
         "family": "gambling-like",
-        "evidence": [
-            "BettingHistoryActivity",
-            "NewBettingHistoryActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "不允许进入上线版本；战斗奖励改固定/非货币化。",
@@ -607,11 +499,7 @@ exports.FEATURES = [
         "id": "redPacket",
         "title": "红包/现金奖励",
         "family": "cash-reward",
-        "evidence": [
-            "RedPackageInfoActivity",
-            "MyNXRedPackageHistoryActivity",
-            "drop_red_package.pag"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "现金红包与提现链路移除；可替换为纯视觉“补给包”。",
@@ -622,13 +510,7 @@ exports.FEATURES = [
         "id": "p2pTrade",
         "title": "玩家交易/赠送/租赁",
         "family": "trade",
-        "evidence": [
-            "ApeTradeCenterActivity",
-            "RareCardTradeActivity",
-            "ApeGemstoneGiftActivity",
-            "GemstoneLeasingActivity",
-            "GiveCardActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "首发不提供玩家间可转移资产，避免涉赌/资金循环。",
@@ -639,11 +521,7 @@ exports.FEATURES = [
         "id": "agent",
         "title": "代理/店长/库存",
         "family": "merchant",
-        "evidence": [
-            "AgentMainActivity",
-            "AgentStockActivity",
-            "StoreDataActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "属于商业/分销体系，与小游戏娱乐产品剥离。",
@@ -654,13 +532,7 @@ exports.FEATURES = [
         "id": "profile",
         "title": "账号/设置/公告",
         "family": "account",
-        "evidence": [
-            "SettingActivity",
-            "AvatarActivity",
-            "NicknameActivity",
-            "NoticeCenterActivity",
-            "LomoDeviceDetailActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "用微信登录态映射玩家 ID；手机号、头像昵称均按最小必要原则授权。",
@@ -676,12 +548,7 @@ exports.FEATURES = [
         "id": "airship",
         "title": "飞艇/收藏运输",
         "family": "collection",
-        "evidence": [
-            "AirshipActivity",
-            "AirshipListActivity",
-            "CollectShipActivity",
-            "ShipLogActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "保留收藏、派遣、日志；物流实物语义不进入核心。",
@@ -701,11 +568,7 @@ exports.FEATURES = [
         "id": "rocksMonkeyKing",
         "title": "岩石猴王/奖池战",
         "family": "combat",
-        "evidence": [
-            "RocksMonkeyKingActivity",
-            "RocksMonkeyKingRankActivity",
-            "RocksMonkeyPoolActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "keep",
         "notes": "战斗与排行可保留；“Pool/奖池”改为赛季积分池，不与充值或提现挂钩。",
@@ -725,11 +588,7 @@ exports.FEATURES = [
         "id": "multiplePit",
         "title": "多人矿坑",
         "family": "mining",
-        "evidence": [
-            "MultiplePitActivity",
-            "GrandPrizeLogActivity",
-            "ParticipateInLogActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "多人协作挖矿可保留；GrandPrize 机制需改为固定赛季奖励并完成概率/付费审查后上线。",
@@ -749,13 +608,7 @@ exports.FEATURES = [
         "id": "creator",
         "title": "设计师/作品/联名",
         "family": "ugc-commerce",
-        "evidence": [
-            "BecomeDesignerActivity",
-            "UploadWorkActivity",
-            "MyWorkActivity",
-            "IpCooperationActivity",
-            "TideCreationActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "UGC 需要内容审核、版权授权和举报链路；首发后接入。",
@@ -766,12 +619,7 @@ exports.FEATURES = [
         "id": "apeHundred",
         "title": "品牌/趋势内容",
         "family": "content",
-        "evidence": [
-            "ApeProductActivity",
-            "ApeTrendsActivity",
-            "ApeBrandActivity",
-            "ApeBrandDetailActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "defer",
         "notes": "非核心内容页，首发后作为图鉴/品牌故事远程内容接入。",
@@ -782,11 +630,7 @@ exports.FEATURES = [
         "id": "superLink",
         "title": "邀请链路/超级链接",
         "family": "referral",
-        "evidence": [
-            "SuperBoxLinkActivity",
-            "SuperLinkInviteCodeActivity",
-            "LinkInviteLogsActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "改微信分享卡片与 scene 参数；不把邀请与现金、抽奖、提现绑定。",
@@ -802,12 +646,7 @@ exports.FEATURES = [
         "id": "moonEvent",
         "title": "月饼/扫码/提货活动",
         "family": "physical-commerce",
-        "evidence": [
-            "MoonCakeMainActivity",
-            "ConfirmMoonOrderActivity",
-            "ScanActivity",
-            "TakeDeliveryActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "cut",
         "notes": "实物购买、券、扫码提货属于独立电商活动，不并入小游戏首发；如后续需要建议独立小程序承接。",
@@ -818,12 +657,7 @@ exports.FEATURES = [
         "id": "digitalGallery",
         "title": "数字作品/图鉴",
         "family": "collection",
-        "evidence": [
-            "DigitalPaintingDetailsActivity",
-            "DigitalCardDetailActivity",
-            "DigitalcardIndexActivity",
-            "GlobalTideActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "仅保留展示、图鉴与不可交易收藏；所有拍卖/竞价/兑付功能由 digitalTrade 切除。",
@@ -843,12 +677,7 @@ exports.FEATURES = [
         "id": "digitalLottery",
         "title": "数字抽奖",
         "family": "random-reward",
-        "evidence": [
-            "DigitalLuckyDrawActivity",
-            "LomoLotteryActivity",
-            "LuckyDraw100Win400Activity",
-            "PrintDrawActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "涉及抽奖、中奖与高价值暗示；不上线。",
@@ -859,12 +688,7 @@ exports.FEATURES = [
         "id": "physicalPrize",
         "title": "实物奖品/提货/物流",
         "family": "physical-reward",
-        "evidence": [
-            "ExchangePrizeSuccessActivity",
-            "CashPrizeActivity",
-            "GoldRabbitDeliveryActivity",
-            "PrizeExtractGoodsActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "cut",
         "notes": "首发不做实物兑奖，避免与随机玩法形成兑换闭环；可在独立合规电商项目另评估。",
@@ -875,10 +699,7 @@ exports.FEATURES = [
         "id": "warcraftFinance",
         "title": "Warcraft 兑换/提现记录",
         "family": "finance",
-        "evidence": [
-            "WarcraftWithdrawLogActivity",
-            "WarcraftExchangeLogActivity"
-        ],
+        "evidence": [],
         "risk": "prohibited_for_release",
         "release": "cut",
         "notes": "与提现/兑换资金链同类，移除。",
@@ -889,12 +710,7 @@ exports.FEATURES = [
         "id": "social",
         "title": "好友/邀请/排行榜",
         "family": "social",
-        "evidence": [
-            "FriendActivity",
-            "InviteLogsActivity",
-            "ApeFriendActivity",
-            "*RankActivity"
-        ],
+        "evidence": [],
         "risk": "review",
         "release": "defer",
         "notes": "保留微信分享/好友排行榜方向；不以分享作为兑奖/提现条件。",
@@ -910,11 +726,7 @@ exports.FEATURES = [
         "id": "customerService",
         "title": "客服/消息",
         "family": "service",
-        "evidence": [
-            "OnlineServiceActivity",
-            "qiyukf unicorn SDK",
-            "JPush"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "defer",
         "notes": "改微信客服与订阅消息，不移植原生推送 SDK。",
@@ -925,11 +737,7 @@ exports.FEATURES = [
         "id": "realName",
         "title": "实名/防沉迷",
         "family": "compliance",
-        "evidence": [
-            "CertificationActivity",
-            "FaceVerifyActivity",
-            "BytedCert/Toyger"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "不用原 App 人脸 SDK；接国家实名防沉迷体系和平台能力。",
@@ -940,9 +748,7 @@ exports.FEATURES = [
         "id": "arena",
         "title": "竞技场",
         "family": "combat",
-        "evidence": [
-            "ApeArenaActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "三回合行为克制对战。",
@@ -958,9 +764,7 @@ exports.FEATURES = [
         "id": "boss",
         "title": "Boss挑战",
         "family": "combat",
-        "evidence": [
-            "ChallengeBossActivity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "血量制 Boss 战。",
@@ -974,11 +778,9 @@ exports.FEATURES = [
     },
     {
         "id": "apeMine",
-        "title": "猿宇宙矿场",
+        "title": "猿岛矿场",
         "family": "mining",
-        "evidence": [
-            "私人矿场/好友矿场/矿坑 Activity"
-        ],
+        "evidence": [],
         "risk": "safe",
         "release": "keep",
         "notes": "矿坑生产-收取循环。",

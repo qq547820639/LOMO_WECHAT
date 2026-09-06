@@ -54,7 +54,8 @@ export class FrameClip {
   private computeDurations(): void {
     const fps = this.loaded!.entry.fps ?? this.opts.fps ?? 12;
     this.frameDurations = this.entryFrames().map((f) => (f.dur ?? Math.round(1000 / fps)));
-    this.totalMs = this.frameDurations.reduce((s, d) => s + d, 0);
+    const { start, names } = this.framesForClip();
+    this.totalMs = names.reduce((sum, _name, i) => sum + this.frameDurations[start + i], 0);
   }
 
   /** 只取本 clip 命名的帧子序列（frame name 以 `${clip}:` 前缀约定，或整图集即该 clip） */
@@ -102,10 +103,10 @@ export class FrameClip {
 
   get frameIndex(): number {
     if (!this.loaded || this.totalMs <= 0) return 0;
-    const { names } = this.framesForClip();
+    const { names, start } = this.framesForClip();
     let acc = 0;
     for (let i = 0; i < names.length; i++) {
-      acc += this.frameDurations[i];
+      acc += this.frameDurations[start + i];
       if (this.playheadMs < acc) return i;
     }
     return Math.max(0, names.length - 1);

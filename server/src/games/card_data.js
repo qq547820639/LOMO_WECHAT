@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CARD_TEMPLATES = void 0;
+// 卡牌系列名「猿仔」：自有命名（BRAND_AUDIT 脱敏项 #5），无第三方 IP 关联
 const mk = (prefix, type, names) => names.map(([name, rarity, power], i) => ({
     templateId: `card_${prefix}_${i + 1}`,
     name: `${name}`,
@@ -11,8 +12,8 @@ const mk = (prefix, type, names) => names.map(([name, rarity, power], i) => ({
 }));
 exports.CARD_TEMPLATES = [
     ...mk('ape', 'APE_CARD', [
-        ['无聊猿·初心', 'N', 8], ['无聊猿·街头', 'N', 10], ['无聊猿·金链', 'R', 18],
-        ['无聊猿·赛博', 'R', 20], ['无聊猿·黄金甲', 'SR', 35], ['无聊猿·创世', 'SSR', 60],
+        ['猿仔·初心', 'N', 8], ['猿仔·街头', 'N', 10], ['猿仔·金链', 'R', 18],
+        ['猿仔·赛博', 'R', 20], ['猿仔·黄金甲', 'SR', 35], ['猿仔·创世', 'SSR', 60],
     ]),
     ...mk('planet', 'PLANET_CARD', [
         ['绯红之星', 'N', 6], ['环带气态星', 'N', 9], ['猿眼卫星', 'R', 16],

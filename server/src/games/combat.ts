@@ -184,8 +184,9 @@ export const dagger: FeatureGame = {
     },
     assassinate: (ctx) => {
       const cost = ctx.num('dagger.assassinateEnergy', 2);
-      if (!ctx.econ.takeItems(ctx.playerId, 'dagger', 1)) return fail('需要 1 把匕首');
+      if (ctx.econ.itemCount(ctx.playerId, 'dagger') < 1) return fail('需要 1 把匕首');
       if (!ctx.econ.payFrom(ctx.player, { ENERGY: cost }, 'dagger.assassinate', 'target')) return fail('体力不足');
+      if (!ctx.econ.takeItems(ctx.playerId, 'dagger', 1)) return fail('需要 1 把匕首');
       const level = ctx.player.counters['dagger.level'] ?? 1;
       const success = ctx.rng.chance(Math.min(0.9, 0.35 + level * 0.06));
       if (success) {

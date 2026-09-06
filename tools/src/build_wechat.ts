@@ -7,7 +7,7 @@
  *   game.js            入口 require('./dist/client/src/app/wx_entry.js')
  *   game.json          小游戏配置
  *   project.config.json appid=游客 / 编译设置
- *   dist/              共享+客户端+服务端(app) 编译产物（standalone：进程内 LomoApp）
+ *   dist/              共享+客户端+服务端(app) 编译产物（standalone 仅供 Node 验收）
  *   config.json        当前 profile 的发布配置（被打包读取）
  *
  * 说明: 不做字符串加密/混淆（开发基线），不内嵌任何真实 AppID/密钥。
@@ -59,15 +59,15 @@ export function build(profile: 'full-clone' | 'wechat-release'): string {
 
   // 3. 入口 game.js
   const serverUrl = process.env.APP_SERVER_URL ?? '';
-  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// 设置 APP_SERVER_URL 构建环境变量可指向远端参考服务端；默认进程内权威后端。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl })});\n`);
+  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, standalone: false })});\n`);
 
   // 4. README（构建产物级）
   fs.writeFileSync(path.join(outDir, 'README.txt'), [
     `猿岛 ApeIsland · ${profile === 'full-clone' ? '研究沙盒构建（FULL CLONE）' : '发布构建（WECHAT RELEASE）'}`,
     '',
     '导入方式: 微信开发者工具 → 导入项目 → 选择本目录 → AppID 使用测试号（touristappid）。',
-    '本包默认使用内嵌进程内权威服务端（与 server/ 参考服务端同一套代码）。',
-    '如需连真实服务端，请以 APP_SERVER_URL=http://your-host:8787 重新构建。',
+    '微信运行时必须连接远端权威服务端；构建时通过 APP_SERVER_URL 注入自有 HTTPS 域名。',
+    '进程内服务端仅供 Node/验收 mock 的 standalone 模式使用，不支持微信真机运行。',
     profile === 'wechat-release' ? 'RELEASE: 现金钱包/提现/下注/竞拍/P2P 交易/代理/现金红包已被客户端+服务端+配置三层关闭。' : 'FULL CLONE: 研究沙盒构建，仅限内部研究环境，禁止对外分发或提审。含沙盒结算桥（TEST_CREDIT），任何界面都不会实际兑付。',
   ].join('\n'));
 

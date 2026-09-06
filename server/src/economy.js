@@ -57,14 +57,18 @@ class EconomyOps {
         return true;
     }
     addItems(playerId, templateId, qty = 1, attrs) {
+        if (templateId === '__proto__' || templateId === 'constructor' || templateId === 'prototype')
+            throw new Error('invalid template id');
         const inv = this.store.player(playerId).inventory;
-        const cur = inv[templateId] || { qty: 0, lockedQty: 0 };
+        const cur = Object.prototype.hasOwnProperty.call(inv, templateId) ? inv[templateId] : { qty: 0, lockedQty: 0 };
         inv[templateId] = { ...cur, qty: cur.qty + Math.max(0, Math.floor(qty)), attrs: attrs !== null && attrs !== void 0 ? attrs : cur.attrs };
         this.store.touch();
     }
     takeItems(playerId, templateId, qty = 1) {
+        if (!Number.isSafeInteger(qty) || qty <= 0 || templateId === '__proto__' || templateId === 'constructor' || templateId === 'prototype')
+            return false;
         const inv = this.store.player(playerId).inventory;
-        const cur = inv[templateId];
+        const cur = Object.prototype.hasOwnProperty.call(inv, templateId) ? inv[templateId] : undefined;
         if (!cur || cur.qty < qty)
             return false;
         cur.qty -= qty;
@@ -74,8 +78,8 @@ class EconomyOps {
         return true;
     }
     itemCount(playerId, templateId) {
-        var _a, _b;
-        return (_b = (_a = this.store.player(playerId).inventory[templateId]) === null || _a === void 0 ? void 0 : _a.qty) !== null && _b !== void 0 ? _b : 0;
+        const inv = this.store.player(playerId).inventory;
+        return Object.prototype.hasOwnProperty.call(inv, templateId) ? inv[templateId].qty : 0;
     }
     /** 体力按时间回复（timestamp based），返回回复后的当前体力 */
     regenEnergy(player, now, max, regenMinutes) {

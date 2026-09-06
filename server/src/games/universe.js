@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.warcraft = exports.universe = void 0;
 /**
  * Wave 3 —— 宇宙探索 + 猿石魔兽。
- * 证据: 宇宙探索 23 页（ExplorePlanet/UpgradeUFO/Hero/Temple/Warehouse/Contract/WizardNDTUPond），
+ * 证据: 宇宙探索 23 页（飞船升级/英雄/神殿/仓库/契约，研究归档），
  *       猿石魔兽 2 页（WarcraftExchangeLog/WarcraftWithdrawLog）。
  */
 const types_1 = require("./types");
@@ -16,7 +16,7 @@ exports.universe = {
             shipLevel: shipLv,
             upgradeCost: ctx.num('universe.shipUpgradeBase', 80) + shipLv * ctx.num('universe.shipUpgradeStep', 40),
             planetsVisited: (_b = ctx.player.counters['universe.planets']) !== null && _b !== void 0 ? _b : 0,
-            ndtu: ctx.store.ledger.balanceOf(ctx.playerId, 'NDTU'),
+            stardust: ctx.store.ledger.balanceOf(ctx.playerId, 'STARDUST'),
             contractAvailable: ((_c = ctx.player.timestamps['universe.contractAt']) !== null && _c !== void 0 ? _c : 0) + 86400000 < ctx.now,
             exploreLog: ctx.store.history(ctx.playerId, 'universe', 20),
         };
@@ -52,16 +52,16 @@ exports.universe = {
             ctx.player.counters['universe.shipLv'] = lv + 1;
             return (0, types_1.ok)(`飞船升级到 Lv.${lv + 1}，探索收益 +10%`);
         },
-        /** 每日神殿契约：NDTU 奖励 */
+        /** 每日神殿契约：星尘奖励 */
         contract: (ctx) => {
             var _a;
             if (((_a = ctx.player.timestamps['universe.contractAt']) !== null && _a !== void 0 ? _a : 0) + 86400000 >= ctx.now)
                 return (0, types_1.fail)('今日契约已完成，明天再来');
             const ndtu = ctx.num('universe.contractRewardNdtu', 1);
-            ctx.econ.grant(ctx.playerId, 'NDTU', ndtu, 'universe', 'contract');
+            ctx.econ.grant(ctx.playerId, 'STARDUST', ndtu, 'universe', 'contract');
             ctx.player.timestamps['universe.contractAt'] = ctx.now;
-            ctx.store.pushHistory(ctx.playerId, 'universe', `神殿契约：NDTU +${ndtu}`, [{ assetId: 'NDTU', delta: ndtu }]);
-            return (0, types_1.ok)(`神殿契约完成，NDTU +${ndtu}`, { rewards: [{ assetId: 'NDTU', delta: ndtu }] });
+            ctx.store.pushHistory(ctx.playerId, 'universe', `神殿契约：星尘 +${ndtu}`, [{ assetId: 'STARDUST', delta: ndtu }]);
+            return (0, types_1.ok)(`神殿契约完成，星尘 +${ndtu}`, { rewards: [{ assetId: 'STARDUST', delta: ndtu }] });
         },
     },
 };

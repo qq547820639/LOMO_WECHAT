@@ -3,7 +3,7 @@
  * 所有游戏奖励/扣费/矿场产出/邮件补偿/广告奖励/商店购买/合成/分解/活动/任务统一经过账本。
  * 禁止重要资产由客户端直接修改。
  */
-import { AssetId, roundToPrecision } from './assets';
+import { ASSET_CATALOG, AssetId, roundToPrecision } from './assets';
 
 export interface LedgerEntry {
   txnId: string;
@@ -63,6 +63,7 @@ export class Ledger {
     metadata?: Record<string, unknown>;
   }): LedgerEntry {
     const { playerId, assetType, delta, sourceType, sourceId } = params;
+    if (!ASSET_CATALOG[assetType]) throw new LedgerError('UNKNOWN_ASSET', `unknown asset: ${assetType}`);
     if (!Number.isFinite(delta) || delta === 0) throw new LedgerError('INVALID_DELTA', `delta must be non-zero finite: ${delta}`);
     if (params.idempotencyKey) {
       const k = `${playerId}:${params.idempotencyKey}`;
@@ -97,6 +98,8 @@ export class Ledger {
     const staged: Array<{ assetType: AssetId; projected: number }> = [];
     const projected = new Map<AssetId, number>();
     for (const op of ops) {
+      if (!ASSET_CATALOG[op.assetType]) throw new LedgerError('UNKNOWN_ASSET', `unknown asset: ${op.assetType}`);
+      if (!Number.isFinite(op.delta) || op.delta === 0) throw new LedgerError('INVALID_DELTA', `delta must be non-zero finite: ${op.delta}`);
       const base = projected.get(op.assetType) ?? this.balanceOf(playerId, op.assetType);
       const next = roundToPrecision(base + op.delta, op.assetType);
       if (next < 0) throw new LedgerError('INSUFFICIENT_BALANCE', `batch: ${op.assetType} ${base} < ${-op.delta}`);
@@ -104,8 +107,8 @@ export class Ledger {
       staged.push({ assetType: op.assetType, projected: next });
     }
     const out: LedgerEntry[] = [];
-    for (const op of ops) {
-      out.push(this.apply({ playerId, ...op, idempotencyKey: idempotencyKey ? `${idempotencyKey}:${op.assetType}` : null }));
+    for (const [index, op] of ops.entries()) {
+      out.push(this.apply({ playerId, ...op, idempotencyKey: idempotencyKey ? `${idempotencyKey}:${index}:${op.assetType}` : null }));
     }
     return out;
   }

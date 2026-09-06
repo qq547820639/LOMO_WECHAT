@@ -5,13 +5,18 @@
  */
 import { PlatformAdapter } from '../platform/platform';
 import { ApiError } from '../../../shared/src/protocol';
+import { RELEASE_LOCKED_FLAGS } from '../../../shared/src/config';
 
 export interface Transport {
   request(path: string, method: 'GET' | 'POST', body?: any, headers?: Record<string, string>): Promise<any>;
 }
 
 export class HttpTransport implements Transport {
-  constructor(private platform: PlatformAdapter, private baseUrl: string, private timeout = 10000) {}
+  private baseUrl: string;
+
+  constructor(private platform: PlatformAdapter, baseUrl: string, private timeout = 10000) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+  }
   async request(path: string, method: 'GET' | 'POST', body?: any, headers?: Record<string, string>): Promise<any> {
     let lastErr: any = null;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -30,7 +35,7 @@ export class HttpTransport implements Transport {
   }
 }
 
-/** 进程内 Transport：require 编译产物 server/src/app.js（standalone/测试用；wx 真机打包也包含它） */
+/** 进程内 Transport：require 编译产物 server/src/app.js（仅 standalone/测试用，微信真机固定使用 HTTP） */
 export class InProcessTransport implements Transport {
   private app: any;
   private routes: any[];
@@ -89,6 +94,14 @@ export class ApiClient {
 
   async connect(profile: 'full-clone' | 'wechat-release'): Promise<void> {
     this.bootstrap = await this.request('/v1/config/bootstrap', 'GET') as any;
+    if (!this.bootstrap || this.bootstrap.ok === false) throw new Error(this.bootstrap?.message || 'bootstrap failed');
+    if (this.bootstrap.profile !== profile || this.bootstrap.release?.profile !== profile) {
+      throw new Error(`server profile mismatch: expected ${profile}`);
+    }
+    if (profile === 'wechat-release') {
+      const unsafe = RELEASE_LOCKED_FLAGS.filter((key) => this.bootstrap.release?.[key] === true);
+      if (unsafe.length) throw new Error(`release server enables locked capabilities: ${unsafe.join(',')}`);
+    }
     this.connected = true;
   }
 

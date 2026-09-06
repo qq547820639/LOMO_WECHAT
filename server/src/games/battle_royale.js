@@ -10,7 +10,7 @@ exports.battleRoyale = void 0;
  *           门破房间淘汰 → 幸存房间按投入比例分池 → 败方按比例铸造匕首。
  * 合规改造: 下注投入 → COIN 软币门票（release）/ TEST_CREDIT 沙盒（full-clone 亦用软币，沙盒币仅结算屏）；
  *           现金奖池 → 软币奖池 + 赛季积分；BettingHistory → 免费的历史记录。
- * 未确认参数全部来自 tuning.battleRoyal（INFERRED_NOT_ORIGINAL）。
+ * 参数来自已校验的 tuning.battleRoyal 自有运营配置，版本由 RemoteConfig 管理。
  */
 const types_1 = require("./types");
 function newRooms(ctx, rng) {

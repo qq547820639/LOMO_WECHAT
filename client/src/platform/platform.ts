@@ -115,8 +115,8 @@ export class WxPlatform implements PlatformAdapter {
   storageSet(key: string, v: any): void { try { this.wx.setStorageSync(key, v); } catch { /* 忽略 */ } }
   loginCode(): Promise<string | null> {
     return new Promise((resolve) => {
-      if (!this.wx.login) return resolve('offline-code');
-      this.wx.login({ success: (r: any) => resolve(r.code || 'offline-code'), fail: () => resolve('offline-code') });
+      if (!this.wx.login) return resolve(null);
+      this.wx.login({ success: (r: any) => resolve(r.code || null), fail: () => resolve(null) });
     });
   }
   httpRequest(opts: { url: string; method: string; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }> {
@@ -219,9 +219,14 @@ export class NodePlatform implements PlatformAdapter {
   exited = false;
   onFrame(cb: () => void): void { this.frameCbs.push(cb); }
   pumpFrames(n = 1): void { for (let i = 0; i < n; i++) this.frameCbs.forEach((f) => f()); }
-  tap(x: number, y: number): void { this.taps.push([x, y]); }
-  onTouchStart(cb: (x: number, y: number) => void): void { /* 由 tap() 显式驱动 */ }
+  tap(x: number, y: number): void {
+    this.taps.push([x, y]);
+    this.__tapStartCb?.(x, y);
+    this.__tapCb?.(x, y);
+  }
+  onTouchStart(cb: (x: number, y: number) => void): void { this.__tapStartCb = cb; }
   onTouchEnd(cb: (x: number, y: number) => void): void { this.__tapCb = cb; }
+  __tapStartCb: ((x: number, y: number) => void) | null = null;
   __tapCb: ((x: number, y: number) => void) | null = null;
   onTouchMove(cb: (x: number, y: number) => void): void { /* 测试可选 */ }
   storageGet(key: string): any { return this.store[key] ?? null; }

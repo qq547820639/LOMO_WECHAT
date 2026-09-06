@@ -44,6 +44,8 @@ class Ledger {
     apply(params) {
         var _a, _b;
         const { playerId, assetType, delta, sourceType, sourceId } = params;
+        if (!assets_1.ASSET_CATALOG[assetType])
+            throw new LedgerError('UNKNOWN_ASSET', `unknown asset: ${assetType}`);
         if (!Number.isFinite(delta) || delta === 0)
             throw new LedgerError('INVALID_DELTA', `delta must be non-zero finite: ${delta}`);
         if (params.idempotencyKey) {
@@ -83,6 +85,10 @@ class Ledger {
         const staged = [];
         const projected = new Map();
         for (const op of ops) {
+            if (!assets_1.ASSET_CATALOG[op.assetType])
+                throw new LedgerError('UNKNOWN_ASSET', `unknown asset: ${op.assetType}`);
+            if (!Number.isFinite(op.delta) || op.delta === 0)
+                throw new LedgerError('INVALID_DELTA', `delta must be non-zero finite: ${op.delta}`);
             const base = (_a = projected.get(op.assetType)) !== null && _a !== void 0 ? _a : this.balanceOf(playerId, op.assetType);
             const next = (0, assets_1.roundToPrecision)(base + op.delta, op.assetType);
             if (next < 0)
@@ -91,8 +97,8 @@ class Ledger {
             staged.push({ assetType: op.assetType, projected: next });
         }
         const out = [];
-        for (const op of ops) {
-            out.push(this.apply({ playerId, ...op, idempotencyKey: idempotencyKey ? `${idempotencyKey}:${op.assetType}` : null }));
+        for (const [index, op] of ops.entries()) {
+            out.push(this.apply({ playerId, ...op, idempotencyKey: idempotencyKey ? `${idempotencyKey}:${index}:${op.assetType}` : null }));
         }
         return out;
     }

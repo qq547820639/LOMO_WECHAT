@@ -2,7 +2,7 @@
  * 统一资产目录 —— Section 18 核心资产模型。
  * 每种资产必须完整定义语义，禁止把所有资产塞进 Record<string, number>。
  * 证据等级: 原始资产名单来自 APK 静态证据（full_clone docs/01 + cleanroom MIGRATION_REPORT），
- * precision/source/sink 为工程重建，标记 INFERRED。
+ * precision/source/sink 为已审计的自有运营默认值，版本化配置可调整。
  */
 
 export type AssetId =

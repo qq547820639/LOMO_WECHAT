@@ -11,7 +11,7 @@
 | 小游戏客户端 | `build/wechat-release/`（或 full-clone） | 导入微信开发者工具，替换 `project.config.json` 的 appid 为**自有 AppID** |
 | 参考服务端 | `server/`（node:http，零运行时依赖） | 部署到自有服务器，客户端经 `APP_SERVER_URL` 指向自有域名 |
 | 通信协议 | `docs/BACKEND_API.md`（全部 /v1/* 路由） | 协议即文档；自有实现只需兼容同一路由 |
-| 数值配置 | `configs/tuning-baseline.json` + RemoteConfig | 全部 INFERRED 数值由**自有运营配置**覆盖下发，与原服数值无关 |
+| 数值配置 | `configs/tuning-baseline.json` + RemoteConfig | `OWNED_LAUNCH_DEFAULTS` 已校验并版本化；运营通过签名配置灰度调优，与原服数值无关 |
 | 资源 | 478 张图集 sheet（tools/bake/out/atlas/） | 上传**自有 CDN/OSS**，manifest.base 指向自有域名 |
 
 ## 2. 服务端部署（最小步骤）
@@ -23,7 +23,8 @@ APP_PROFILE=wechat-release APP_SECRET=<自生成随机密钥> APP_DATA_DIR=/data
   node dist/server/src/index.js
 ```
 
-- `APP_SECRET`：RemoteConfig 签名与 token HMAC 的根密钥，**必须换成自己的随机值**（默认 dev 密钥仅本地）。
+- `APP_SECRET`：RemoteConfig 签名与 token HMAC 的根密钥，**必须换成自己的随机值**（默认 dev 密钥仅本地）。令牌有效期为 7 天。
+- `APP_ALLOW_ADMIN=1` 仅开启管理接口路由；执行 `/v1/admin/reset` 还必须设置 `APP_ADMIN_TOKEN`，并通过 `x-admin-token` 请求头传入，避免仅凭环境开关即可清空数据。
 - `APP_DATA_DIR`：JSON 快照持久化目录。生产建议换数据库（Ledger/Store 接口边界清晰，见 ARCHITECTURE.md）。
 - `APP_PROFILE=wechat-release`：正式发布档；full-clone 档仅内网研究环境使用。
 - 反向代理加 TLS（微信要求 HTTPS/WSS 域名白名单）+ 进程守护（pm2/systemd）。
@@ -33,7 +34,7 @@ APP_PROFILE=wechat-release APP_SECRET=<自生成随机密钥> APP_DATA_DIR=/data
 ```bash
 APP_SERVER_URL=https://api.your-domain.com npm run build:wechat
 # 构建器把 serverUrl 注入 game.js → 客户端 HttpTransport(wx.request) 走自有域名；
-# 不设 APP_SERVER_URL 时为进程内单机模式（演示/无头测试用）。
+# 微信产物未注入 APP_SERVER_URL 会在启动页明确报错；进程内模式仅供 Node/验收 mock。
 ```
 
 微信 mp 后台 → 开发管理 → 服务器域名，将自有域名加入 request/socket 合法域名白名单。

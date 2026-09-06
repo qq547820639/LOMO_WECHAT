@@ -2,11 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FEATURES = exports.HomeHub = void 0;
 /**
- * 五大 Tab 枢纽（Section 17：潮玩 / 猿宇宙 / 游戏 / 交易 / 我的）。
+ * 五大 Tab 枢纽（藏品 / 猿岛 / 游戏 / 交易 / 我的）。
  * 内容按 data.gen FEATURES 生成；每项显示标题 + 发布策略标签；点击进入对应玩法页。
  * 首页(home tab 内容)增加签到/任务/邮件/公告入口与大逃杀等核心入口快捷方式。
  */
 const router_1 = require("../core/router");
+const brand_1 = require("../../../shared/src/brand");
 const theme_1 = require("../core/theme");
 const registry_1 = require("./registry");
 const data_gen_1 = require("../../../shared/src/gen/data.gen");
@@ -23,7 +24,7 @@ class HomeHub extends router_1.Screen {
         ];
         this.tab = tab;
         this.route = '/' + tab;
-        this.title = (_a = { chaowan: '潮玩', ape: '猿宇宙', games: '游戏', trade: '交易', mine: '我的' }[tab]) !== null && _a !== void 0 ? _a : tab;
+        this.title = (_a = { chaowan: '藏品', ape: '猿岛', games: '游戏', trade: '交易', mine: '我的' }[tab]) !== null && _a !== void 0 ? _a : tab;
     }
     onEnter() {
         if (this.tab === 'mine') {
@@ -84,36 +85,47 @@ class HomeHub extends router_1.Screen {
         }
         if (this.tab === 'chaowan') {
             ui.panel({ x: 12, y, w: ui.w - 24, h: 52 }, theme_1.THEME.panel2);
-            ui.text('潮玩生态：卡牌收集 / 合成 / 盲盒 / 图鉴 / 商城', 24, y + 20, { size: 12, color: theme_1.THEME.textDim });
+            ui.text('藏品生态：卡牌收集 / 合成 / 盲盒 / 图鉴 / 商城', 24, y + 20, { size: 12, color: theme_1.THEME.textDim });
             ui.text('付费随机链路已切断，全部为免费产出与固定兑换', 24, y + 38, { size: 11, color: theme_1.THEME.green });
             y += 60;
         }
         if (this.tab === 'ape') {
             ui.panel({ x: 12, y, w: ui.w - 24, h: 52 }, theme_1.THEME.panel2);
-            ui.text('猿宇宙：矿场生产 / 宝石金沙 / 扭蛋养成 / 地下城 / 宇宙', 24, y + 20, { size: 12, color: theme_1.THEME.textDim });
+            ui.text('猿岛：矿场生产 / 宝石金沙 / 萌宠扭蛋 / 地下城 / 宇宙', 24, y + 20, { size: 12, color: theme_1.THEME.textDim });
             y += 60;
         }
-        // 功能族列表
         const rowH = 52;
-        for (const f of feats) {
+        const listTop = y;
+        const listBottom = bottom - 8;
+        const contentHeight = feats.length * rowH + (this.tab === 'mine' ? 36 : 0);
+        const listHeight = Math.max(0, listBottom - listTop);
+        const scrollId = 'hub-' + this.tab;
+        const maxOffset = Math.max(0, contentHeight - listHeight);
+        const offset = Math.max(0, Math.min(maxOffset, (_a = this.app.ui.scrollOffsets[scrollId]) !== null && _a !== void 0 ? _a : 0));
+        this.app.ui.scrollOffsets[scrollId] = offset;
+        for (const [index, f] of feats.entries()) {
+            const rowY = listTop + index * rowH - offset;
             const policyColor = f.release === 'keep' ? theme_1.THEME.green : f.release === 'defer' ? theme_1.THEME.gold : theme_1.THEME.red;
-            const policyLabel = (_a = { keep: '上线', defer: '延后', cut: '仅生态保留' }[f.release]) !== null && _a !== void 0 ? _a : f.release;
+            const policyLabel = (_b = { keep: '上线', defer: '延后', cut: '仅生态保留' }[f.release]) !== null && _b !== void 0 ? _b : f.release;
             if (f.release === 'cut' && this.app.profile === 'wechat-release')
                 continue;
-            ui.panel({ x: 12, y, w: ui.w - 24, h: rowH - 6 }, theme_1.THEME.panel);
-            ui.text(f.title, 24, y + 22, { size: 14, bold: true });
-            ui.text(f.notes.slice(0, 34), 24, y + 39, { size: 10, color: theme_1.THEME.textDim });
-            ui.text(policyLabel, ui.w - 66, y + 22, { size: 11, color: policyColor, bold: true });
-            ui.text('›', ui.w - 30, y + 24, { size: 16, color: theme_1.THEME.textDim });
+            ui.panel({ x: 12, y: rowY, w: ui.w - 24, h: rowH - 6 }, theme_1.THEME.panel);
+            ui.text(f.title, 24, rowY + 22, { size: 14, bold: true });
+            ui.text(f.notes.slice(0, 34), 24, rowY + 39, { size: 10, color: theme_1.THEME.textDim });
+            ui.text(policyLabel, ui.w - 66, rowY + 22, { size: 11, color: policyColor, bold: true });
+            ui.text('›', ui.w - 30, rowY + 24, { size: 16, color: theme_1.THEME.textDim });
             const ff = f;
-            ui.hits.push({ x: 12, y: y - 3, w: ui.w - 24, h: rowH, onTap: () => { this.app.telemetry('feature_enter', { feature: ff.id }); (0, registry_1.openFeature)(this.app, ff.id); }, id: 'f-' + ff.id });
-            y += rowH;
+            if (rowY + rowH >= listTop && rowY <= listBottom) {
+                ui.hits.push({ x: 12, y: rowY - 3, w: ui.w - 24, h: rowH, onTap: () => { this.app.telemetry('feature_enter', { feature: ff.id }); (0, registry_1.openFeature)(this.app, ff.id); }, id: 'f-' + ff.id });
+            }
         }
         if (this.tab === 'mine') {
-            ui.text('版本: LOMO 4.3.7 → 微信小游戏迁移 · ' + this.app.profile, 16, y + 10, { size: 10, color: theme_1.THEME.textDim });
-            ui.text('证据等级: 结构 MATCHED / 数值 INFERRED(RemoteConfig)', 16, y + 26, { size: 10, color: theme_1.THEME.textDim });
+            const footerY = listTop + feats.length * rowH - offset + 10;
+            if (footerY < listBottom + 30) {
+                ui.text(brand_1.BRAND.versionFooter + this.app.profile, 16, footerY, { size: 10, color: theme_1.THEME.textDim });
+                ui.text('健康游戏，适度娱乐。未成年人应在监护人监督下适度游戏。', 16, footerY + 16, { size: 10, color: theme_1.THEME.textDim });
+            }
         }
-        this.app.ui.scrollOffsets['hub-' + this.tab] = (_b = this.app.ui.scrollOffsets['hub-' + this.tab]) !== null && _b !== void 0 ? _b : 0;
     }
 }
 exports.HomeHub = HomeHub;
