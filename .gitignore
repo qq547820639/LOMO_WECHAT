@@ -20,3 +20,6 @@ evidence/video_samples/
 evidence/runtime-evidence/
 *.bundle
 game-assets/atlas/
+.env*
+!.env.example
+*.pem

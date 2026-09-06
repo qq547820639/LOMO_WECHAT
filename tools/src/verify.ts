@@ -32,9 +32,26 @@ async function main(): Promise<void> {
     {
       name: 'build-wechat-bundles', fn: async () => {
         const { build } = await import('./build_wechat');
-        const full = build('full-clone');
-        const release = build('wechat-release');
-        return { full, release };
+        // 体积门禁：始终以云资源形态构建（未配置 APP_CLOUD_BASE 时用占位域名），
+        // 保证「主包 ≤4MB」红线在验收中被真实执行，而不是上线前才发现超限。
+        const cloudBase = process.env.APP_CLOUD_BASE || 'https://assets.invalid/assets/game/';
+        const full = build('full-clone', { cloudBase });
+        const release = build('wechat-release', { cloudBase });
+        return { full, release, cloudBase };
+      },
+    },
+    {
+      name: 'bundle-size-gate', fn: async () => {
+        // 微信小游戏红线：主包 ≤4MB（分包合计 ≤30MB，本工程当前不使用分包）
+        const { dirSizeBytes } = await import('./build_wechat');
+        const limit = 4 * 1024 * 1024;
+        const lines: string[] = [];
+        for (const dir of ['build/wechat-full-clone', 'build/wechat-release']) {
+          const bytes = dirSizeBytes(rootPath(dir));
+          lines.push(`${dir}: ${(bytes / 1048576).toFixed(2)}MB / 4.00MB`);
+          assert.ok(bytes <= limit, `${dir} 主包 ${(bytes / 1048576).toFixed(2)}MB 超过微信 4MB 红线（limit=${limit}B）`);
+        }
+        return lines.join('\n');
       },
     },
     {

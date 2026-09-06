@@ -5,9 +5,10 @@
 import { WxPlatform } from '../platform/platform';
 import { MiniGameClientApp } from './main';
 
-export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; standalone?: boolean }): void {
+export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; standalone?: boolean }): void {
   let platform: WxPlatform | null = null;
   try {
+    initCloud(opts.cloudEnv);
     platform = new WxPlatform();
     const app = new MiniGameClientApp(platform, opts);
     app.boot().catch((e) => renderFailure(platform!, e));
@@ -15,6 +16,18 @@ export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUr
     if (platform) renderFailure(platform, e);
     else throw e;
   }
+}
+
+/**
+ * 云开发初始化（仅在微信运行时生效）：env 由构建期 APP_CLOUD_ENV 注入，仅含环境标识、不含密钥。
+ * Node 验收/mock 环境无 wx.cloud → 直接跳过，客户端继续走包内 boot pack + 远端 CDN 资源。
+ */
+function initCloud(env?: string): void {
+  try {
+    const g: any = globalThis as any;
+    if (!env || !g.wx || !g.wx.cloud) return;
+    g.wx.cloud.init({ env });
+  } catch { /* 云开发不可用时不影响启动 */ }
 }
 
 function renderFailure(platform: WxPlatform, e: unknown): void {

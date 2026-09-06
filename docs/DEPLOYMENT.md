@@ -69,3 +69,60 @@ APP_SERVER_URL=https://api.your-domain.com npm run build:wechat
 4. **现金合规**：wechat-release 档已四层关闭现金类能力（tests/release_safety.ts 断言）；
    如后续自有业务需要虚拟支付，按 COMPLIANCE_CURRENT.md 的支付规则流程另行评估。
 5. **数据合规**：自有服务器收集的数据按 PRIVACY_DATA_MAP.md 最小必要口径执行。
+
+## 云开发（CloudBase）资源分载 —— 2026-09-06 已实测打通
+
+**背景**：主包曾达 25MB（其中 23MB 为自制动画帧），远超微信小游戏 **主包 ≤4MB** 红线，上传必被拒。
+现已改为「包内 boot pack + 云开发静态托管 CDN」的资源分载形态。
+
+### 环境
+
+| 项 | 值 |
+|---|---|
+| 环境 ID | `lomo-wechat-d0gcakr952f0d90b8`（个人版 / ap-shanghai） |
+| 静态托管（资源 CDN）域 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com` |
+| 云托管（服务端容器）域 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com` |
+| 资源路径前缀 | `v1/assets/game/`（版本号前缀，便于整版回滚） |
+
+### 上传命令（凭据放本地 `.env.cloud`，绝不入库）
+
+```bash
+set -a; . ./.env.cloud; set +a
+npx -p @cloudbase/cli tcb login --apiKeyId "$TENCENTCLOUD_SECRET_ID" --apiKey "$TENCENTCLOUD_SECRET_KEY"
+npx -p @cloudbase/cli tcb hosting deploy "build/wechat-release/assets/game" "v1/assets/game" -e "$CLOUDBASE_ENV"
+```
+
+### 构建接入
+
+```bash
+APP_CLOUD_BASE="https://<静态托管域>/v1/assets/game/" \
+APP_CLOUD_ENV="lomo-wechat-d0gcakr952f0d90b8" \
+node dist/tools/src/build_wechat.js --profile wechat-release
+```
+
+- 主包保留 **boot pack**（默认 miner + 按 id 序填充至 1.5MB 预算，可用 `bootBudget` 调整），首屏即时可见；
+- 其余图集帧 `file` 改写为远端绝对 URL（`AssetManager.url()` 对 http(s) 直连，不拼本地 base）；
+- 仓库内 `game-assets/manifest.json` 始终写**本地形态**，Node 验收不依赖网络；
+- `verify` 新增 **`bundle-size-gate`** 步骤：主包 >4MB 直接判失败（防回归）。验收时未配置 `APP_CLOUD_BASE` 则用占位域名，同样按云形态构建。
+
+### MP 后台白名单（上线前必填）
+
+开发管理 → 开发设置 → 服务器域名，三处都加：
+
+```
+https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com
+```
+
+（后续若接入云托管服务端，同样把 `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com` 加入。）
+
+### 成本提示
+
+静态托管**不占用**对象存储的 5GB/3GB 免费额度，按 `容量 0.0043 元/(GB·天)` + `流量 0.21 元/GB` 计费：24MB 存储约 ¥0.0001/天，单用户全量下载 24MB 约 ¥0.005。小规模可忽略，放量后按实际流量评估。
+
+### 客户端云初始化
+
+```js
+wx.cloud.init({ env: 'lomo-wechat-d0gcakr952f0d90b8' });
+```
+
+已由 `client/src/app/wx_entry.ts` 的 `initCloud()` 在**微信运行时**调用（env 由构建期 `APP_CLOUD_ENV` 注入，仅环境标识、无密钥）；Node 验收/mock 环境自动跳过。
