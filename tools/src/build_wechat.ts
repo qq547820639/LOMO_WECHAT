@@ -64,7 +64,8 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   // 3. 入口 game.js
   const serverUrl = process.env.APP_SERVER_URL ?? '';
   const cloudEnv = process.env.APP_CLOUD_ENV ?? '';
-  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, standalone: false })});\n`);
+  const cloudService = process.env.APP_CLOUD_SERVICE ?? ''; // CloudBase Run 服务名（X-WX-SERVICE 头），必须与 wx.cloud.callContainer 一致
+  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudService/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, cloudService, standalone: false })});\n`);
 
   // 4. README（构建产物级）
   fs.writeFileSync(path.join(outDir, 'README.txt'), [

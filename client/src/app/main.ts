@@ -96,7 +96,7 @@ export class MiniGameClientApp {
     setTimeout(tick, 500);
   }
 
-  constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
+  constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudService?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
     this.skipGate = !!opts.skipComplianceGate;
     this.platform = platform;
     this.profile = opts.profile;
@@ -104,7 +104,7 @@ export class MiniGameClientApp {
     if (!opts.serverUrl && platform.kind === 'wx' && !standalone) {
       throw new Error('APP_SERVER_URL is required for WeChat runtime; standalone is Node/test only');
     }
-    const transport = opts.serverUrl ? new HttpTransport(platform, opts.serverUrl) : new InProcessTransport(opts.profile);
+    const transport = opts.serverUrl ? new HttpTransport(platform, opts.serverUrl, { cloudService: opts.cloudService }) : new InProcessTransport(opts.profile);
     this.api = new ApiClient(transport);
     this.audioManager = new AudioManager(platform);
   }

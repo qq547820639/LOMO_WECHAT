@@ -44,6 +44,13 @@ export interface PlatformAdapter {
   storageSet(key: string, v: any): void;
   loginCode(): Promise<string | null>;
   httpRequest(opts: { url: string; method: string; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }>;
+  /**
+   * 云开发调用（仅云托管/云函数需要）：小游戏必须走 wx.cloud.callContainer，否则 wx.request 会被网关 401
+   *  - cloudEnv：云开发环境 ID（与 wx.cloud.init 的 env 一致）
+   *  - cloudService：CloudBase Run 服务名（X-WX-SERVICE 头）
+   *  基础库 ≥ 2.13.1
+   */
+  callContainer(opts: { path: string; method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }>;
   showShareMenu?(): void;
   share(opts: { title: string; query?: string }): void;
   vibrate(short: boolean): void;
@@ -58,10 +65,14 @@ export interface PlatformAdapter {
 export class WxPlatform implements PlatformAdapter {
   readonly kind = 'wx' as const;
   private wx: any;
-  constructor() {
+  private cloudEnv: string | null;
+  private cloudService: string | null;
+  constructor(opts?: { cloudEnv?: string; cloudService?: string }) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.wx = (globalThis as any).wx || (typeof GameGlobal !== 'undefined' ? (GameGlobal as any).wx : null);
     if (!this.wx) throw new Error('wx not available');
+    this.cloudEnv = opts?.cloudEnv ?? null;
+    this.cloudService = opts?.cloudService ?? null;
   }
   createCanvas(): any {
     const c = this.wx.createCanvas();
@@ -104,9 +115,15 @@ export class WxPlatform implements PlatformAdapter {
     } catch { return { w: 375, h: 667, dpr: 2 }; }
   }
   onFrame(cb: () => void): void {
-    const wx = this.wx;
-    const loop = () => { cb(); wx.requestAnimationFrame(loop); };
-    wx.requestAnimationFrame(loop);
+    const raf = (this.wx && typeof this.wx.requestAnimationFrame === 'function') ? this.wx.requestAnimationFrame.bind(this.wx) : null;
+    const tick = (): void => { try { cb(); } catch (e) { console.error('[ape] frame error', e); } if (raf) raf(tick); else setTimeout(tick, 16); };
+    if (raf) {
+      try { raf(tick); } catch (e) { console.error('[ape] requestAnimationFrame init failed, falling back to setTimeout', e); setTimeout(tick, 16); }
+    } else {
+      // 兜底：低基础库版本或 DevTools 旧版无 requestAnimationFrame → setTimeout 16ms
+      console.warn('[ape] wx.requestAnimationFrame missing, using setTimeout fallback');
+      setTimeout(tick, 16);
+    }
   }
   onTouchStart(cb: (x: number, y: number) => void): void { this.wx.onTouchStart((e: any) => { const t = e.touches?.[0]; if (t) cb(t.clientX, t.clientY); }); }
   onTouchEnd(cb: (x: number, y: number) => void): void { this.wx.onTouchEnd((e: any) => { const t = e.changedTouches?.[0]; if (t) cb(t.clientX, t.clientY); }); }
@@ -130,6 +147,25 @@ export class WxPlatform implements PlatformAdapter {
   }
   share(opts: { title: string; query?: string }): void {
     try { this.wx.shareAppMessage?.({ title: opts.title, query: opts.query }); } catch { /* 忽略 */ }
+  }
+  callContainer(opts: { path: string; method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }> {
+    // 有 cloudEnv+cloudService → 走 wx.cloud.callContainer（小程序/小游戏调用 CloudBase Run 的标准方式）
+    if (this.cloudEnv && this.cloudService && this.wx?.cloud?.callContainer) {
+      return new Promise((resolve, reject) => {
+        this.wx.cloud.callContainer({
+          config: { env: this.cloudEnv },
+          path: opts.path,
+          method: opts.method ?? 'GET',
+          data: opts.data,
+          header: { 'X-WX-SERVICE': this.cloudService, ...(opts.header ?? {}) },
+          timeout: opts.timeout ?? 10000,
+          success: (r: any) => resolve({ statusCode: r.statusCode, data: r.data }),
+          fail: (e: any) => reject(new Error(e?.errMsg || 'callContainer fail')),
+        });
+      });
+    }
+    // 兜底：无 cloud 配置时退回 wx.request（仅限非 CloudBase 的服务端 URL）
+    return this.httpRequest({ url: opts.path, method: opts.method ?? 'GET', data: opts.data, header: opts.header, timeout: opts.timeout });
   }
   vibrate(short: boolean): void { try { short ? this.wx.vibrateShort?.() : this.wx.vibrateLong?.(); } catch { /* 忽略 */ } }
   audio(src: string, loop: boolean, volume: number) {
@@ -235,6 +271,7 @@ export class NodePlatform implements PlatformAdapter {
   async httpRequest(opts: any): Promise<{ statusCode: number; data: any }> { throw new Error('NodePlatform 无网络'); }
   share(): void {}
   vibrate(): void {}
+  callContainer(): Promise<any> { throw new Error('NodePlatform.callContainer: tests 应使用 InProcessTransport 或直接 HttpTransport.callContainer 兜底'); }
   audio() { return { play() {}, stop() {}, destroy() {}, setVolume() {} }; }
   systemInfo(): Record<string, any> { return { platform: 'node-test' }; }
   onHide(): void {}

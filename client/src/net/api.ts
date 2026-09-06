@@ -13,17 +13,25 @@ export interface Transport {
 
 export class HttpTransport implements Transport {
   private baseUrl: string;
+  /**
+   * 是否走 CloudBase Run（小游戏必须用 wx.cloud.callContainer，否则 wx.request 被网关 401）。
+   * 判定：baseUrl 命中云开发域（默认 *.tcloudbase.com / *.tcb.qcloud.la），或 opts.cloudService 显式声明。
+   */
+  private cloudBacked: boolean;
 
-  constructor(private platform: PlatformAdapter, baseUrl: string, private timeout = 10000) {
+  constructor(private platform: PlatformAdapter, baseUrl: string, opts?: { cloudService?: string }, private timeout = 10000) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.cloudBacked = !!opts?.cloudService || /(tcloudbase\.com|tcb\.qcloud\.la|run\.tcloudbase\.com)/.test(this.baseUrl);
   }
   async request(path: string, method: 'GET' | 'POST', body?: any, headers?: Record<string, string>): Promise<any> {
+    // 路径（去掉 baseUrl 前缀，因为 callContainer 只接受相对路径）
+    const relativePath = path.startsWith(this.baseUrl) ? path.slice(this.baseUrl.length) : path;
     let lastErr: any = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const res = await this.platform.httpRequest({
-          url: this.baseUrl + path, method, data: body, header: { 'content-type': 'application/json', ...(headers || {}) }, timeout: this.timeout,
-        });
+        const res = this.cloudBacked
+          ? await this.platform.callContainer({ path: relativePath, method, data: body, header: headers, timeout: this.timeout })
+          : await this.platform.httpRequest({ url: this.baseUrl + path, method, data: body, header: { 'content-type': 'application/json', ...(headers || {}) }, timeout: this.timeout });
         if (res.statusCode >= 500 && attempt < 2) { await sleep(300 * (attempt + 1)); continue; }
         return res.data;
       } catch (err) {

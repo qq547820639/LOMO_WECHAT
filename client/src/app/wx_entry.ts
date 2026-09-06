@@ -5,12 +5,13 @@
 import { WxPlatform } from '../platform/platform';
 import { MiniGameClientApp } from './main';
 
-export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; standalone?: boolean }): void {
+export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; cloudService?: string; standalone?: boolean }): void {
   let platform: WxPlatform | null = null;
   let app: any = null;
   try {
     initCloud(opts.cloudEnv);
-    platform = new WxPlatform();
+    // CloudBase Run 服务名（X-WX-SERVICE 头）：小游戏必须走 wx.cloud.callContainer
+    platform = new WxPlatform({ cloudEnv: opts.cloudEnv, cloudService: opts.cloudService });
     app = new MiniGameClientApp(platform, opts);
     app.boot().catch((e: unknown) => fail(platform!, app, e));
   } catch (e) {
