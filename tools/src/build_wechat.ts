@@ -80,6 +80,14 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   const manifest = copyGameAssets(outDir, { cloudBase, bootBudget: opts.bootBudget });
   const pkgBytes = dirSizeBytes(outDir);
   const mode = cloudBase ? `cloud-assets (boot pack ${manifest ? countBootAtlases(manifest, cloudBase) : 0})` : 'packaged-assets';
+  const WECHAT_MAIN_PKG_LIMIT = 4 * 1024 * 1024; // 微信小游戏主包红线
+  if (pkgBytes > WECHAT_MAIN_PKG_LIMIT) {
+    // 全量打包（无 APP_CLOUD_BASE）时资源约 6.5MB，必然超限 —— 直接失败，避免产出上传必被拒的包
+    throw new Error(
+      `[build_wechat] ${profile} 主包 ${(pkgBytes / 1048576).toFixed(2)}MB 超过微信 ${WECHAT_MAIN_PKG_LIMIT / 1048576}MB 红线。` +
+      (cloudBase ? '请减小 bootBudget 或改用分包。' : '请设置 APP_CLOUD_BASE=<资源 CDN 前缀> 走云资源形态（主包约 2.5MB）。')
+    );
+  }
   console.log(`[build_wechat] ${profile} → ${outDir} (atlases: ${manifest?.atlases.length ?? 0}, ${mode}, main pkg ${(pkgBytes / 1048576).toFixed(2)}MB)`);
   return outDir;
 }
