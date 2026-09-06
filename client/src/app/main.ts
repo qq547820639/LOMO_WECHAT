@@ -203,6 +203,11 @@ export class MiniGameClientApp {
     });
 
     // 游戏资源 manifest（P0-1）：包内 assets/game/manifest.json；失败静默走占位
+    // 本地分包模式：boot pack 之外的全部资源在 packages/res 分包里，读文件前必须先加载
+    if (typeof (this.platform as any).loadSubpackage === 'function') {
+      try { await (this.platform as any).loadSubpackage('res'); }
+      catch (e) { console.warn('[ape] subpackage res load failed (assets may be missing)', e); }
+    }
     this.assets = new (require('../core/assets').AssetManager)(this.platform);
     this.assets.loadManifest().then((m: unknown) => { if (m) this.telemetry('asset_manifest', { version: (m as any).version }); }).catch(() => {});
 

@@ -111,7 +111,7 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
         // 运行期配置（AppID/AppSecret/签名密钥）：云函数无 CLI 环境变量入口，随包注入。
         // 该目录位于 gitignore 的 build/ 下，密钥不进仓库；部署后仅在云端代码包内。
         const fnCfg: Record<string, string> = {};
-        for (const k of ['APP_WX_APPID', 'APP_WX_APPSECRET', 'APP_SECRET', 'APP_PROFILE', 'APP_PERSISTENCE', 'APP_DATA_DIR']) {
+        for (const k of ['APP_WX_APPID', 'APP_WX_APPSECRET', 'APP_SECRET', 'APP_PROFILE', 'APP_PERSISTENCE', 'APP_DATA_DIR', 'APP_DEBUG']) {
           const v = process.env[k];
           if (v) fnCfg[k] = v;
         }
@@ -150,7 +150,7 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   const manifest = copyGameAssets(outDir, { cloudBase, bootBudget: opts.bootBudget });
   // 主包大小必须**排除 cloudfunctionRoot**：云函数目录由云开发单独部署，
   // 不会打进小游戏代码包（其 node_modules 可达数十 MB，计入会误触发 4MB 红线）
-  const pkgBytes = dirSizeBytes(outDir, ['cloudfunctions']);
+  const pkgBytes = dirSizeBytes(outDir, ['cloudfunctions', 'packages']);
   const mode = cloudBase ? `cloud-assets (boot pack ${manifest ? countBootAtlases(manifest, cloudBase) : 0})` : 'packaged-assets';
   const WECHAT_MAIN_PKG_LIMIT = 4 * 1024 * 1024; // 微信小游戏主包红线
   if (pkgBytes > WECHAT_MAIN_PKG_LIMIT && !opts.allowOversize) {
@@ -319,9 +319,9 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
   // 仓库镜像始终本地形态（Node 验收不依赖网络）
   fs.writeFileSync(rootPath('game-assets', 'manifest.json'), JSON.stringify(manifest));
 
-  // 云资源模式：挑选 boot pack 并将其余图集改写为远端 URL
+  // boot pack 挑选：云资源模式（其余图集改写为远端 URL）与本地分包模式（其余图集移入分包）共用
   const bootIds = new Set<string>();
-  if (opts.cloudBase) {
+  {
     const budget = opts.bootBudget ?? 1_500_000;
     const sizeOf = (id: string): number => Array.from(atlasFiles.get(id) ?? []).reduce((n, p) => n + fs.statSync(path.join(srcDir, p)).size, 0);
     if (atlasFiles.has('miner')) bootIds.add('miner'); // 首屏演示帧
@@ -333,11 +333,13 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
       bootIds.add(a.id);
       used += sz;
     }
-    const base = opts.cloudBase.replace(/\/?$/, '/');
-    for (const a of manifest.atlases) {
-      if (bootIds.has(a.id)) continue;
-      if (a.file) a.file = base + a.file;
-      for (const f of a.frames) if (f.file) f.file = base + f.file;
+    if (opts.cloudBase) {
+      const base = opts.cloudBase.replace(/\/?$/, '/');
+      for (const a of manifest.atlases) {
+        if (bootIds.has(a.id)) continue;
+        if (a.file) a.file = base + a.file;
+        for (const f of a.frames) if (f.file) f.file = base + f.file;
+      }
     }
   }
 
@@ -372,16 +374,57 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
       copyAudio(audioDir, '');
     }
   } else {
-    const copyTree = (dir: string, rel: string): void => {
+    // 本地分包模式：boot pack 进主包 assets/game，其余全部进分包 packages/res/
+    // （普通分包不限大小；客户端启动时 wx.loadSubpackage 后按原相对路径即可读取）
+    const SUB_ROOT = 'packages/res/';
+    const subpaths: string[] = [];
+    const copySub = (relPath: string): void => {
+      subpaths.push(relPath);
+      const dst = path.join(outDir, SUB_ROOT, safeAssetPath(relPath));
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(path.join(srcDir, relPath), dst);
+    };
+    for (const id of bootIds) for (const rel of atlasFiles.get(id) ?? []) copyRel(rel);
+    for (const a of manifest.atlases) {
+      if (bootIds.has(a.id)) continue;
+      // 非 boot 图集：文件复制进分包，并把 manifest 中的路径改写为分包前缀
+      for (const rel of atlasFiles.get(a.id) ?? []) copySub(rel);
+      const sub = (p: string): string => SUB_ROOT + safeAssetPath(p);
+      if (a.file) a.file = sub(a.file);
+      for (const f of a.frames) if (f.file) f.file = sub(f.file);
+    }
+    // 非图集资源（audio/cards/icons 等）也进分包
+    const copyTreeSub = (dir: string, rel: string): void => {
       for (const name of fs.readdirSync(dir)) {
-        if (!rel && name === 'manifest.json') continue;
         const fp = path.join(dir, name);
         const child = rel ? `${rel}/${name}` : name;
-        if (fs.statSync(fp).isDirectory()) copyTree(fp, child);
-        else copyRel(child);
+        if (fs.statSync(fp).isDirectory()) copyTreeSub(fp, child);
+        else if (!atlasFilesOwned(child)) copySub(child);
       }
     };
-    copyTree(srcDir, '');
+    const owned = new Set<string>();
+    for (const rels of atlasFiles.values()) for (const r of rels) owned.add(r);
+    const atlasFilesOwned = (rel: string): boolean => owned.has(rel);
+    const audioDir = path.join(srcDir, 'audio');
+    if (fs.existsSync(audioDir)) {
+      const copyAudio = (dir: string, rel: string): void => {
+        for (const name of fs.readdirSync(dir)) {
+          const fp = path.join(dir, name);
+          const child = rel ? `${rel}/${name}` : name;
+          if (fs.statSync(fp).isDirectory()) copyAudio(fp, child);
+          else if (!atlasFilesOwned(`audio/${child}`)) copySub(`audio/${child}`);
+        }
+      };
+      copyAudio(audioDir, '');
+    }
+    // 分包入口：小游戏要求分包 root 下必须存在 game.js（资源分包无逻辑，占位即可）
+    fs.writeFileSync(path.join(outDir, SUB_ROOT, 'game.js'), '// res 资源分包入口（占位）：本分包仅承载图集/音频等资源文件\n');
+    // game.json 声明分包
+    const gjPath = path.join(outDir, 'game.json');
+    const gj = JSON.parse(fs.readFileSync(gjPath, 'utf8'));
+    gj.subpackages = [{ name: 'res', root: SUB_ROOT }];
+    fs.writeFileSync(gjPath, JSON.stringify(gj, null, 2) + '\n');
+    void subpaths;
   }
   fs.writeFileSync(path.join(dstBase, 'manifest.json'), JSON.stringify(manifest));
   return manifest;

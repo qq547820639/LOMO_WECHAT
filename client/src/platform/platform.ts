@@ -64,6 +64,8 @@ export interface PlatformAdapter {
    * 客户端通过 wx.cloud.callFunction 走微信私有链路 —— 无需配置服务器域名。
    */
   callFunction(name: string, args: Record<string, any>): Promise<any>;
+  /** 分包加载（声明了 subpackages 的本地分包模式）：完成后分包内资源可按路径读取 */
+  loadSubpackage?(name: string): Promise<void>;
   showShareMenu?(): void;
   share(opts: { title: string; query?: string }): void;
   vibrate(short: boolean): void;
@@ -270,6 +272,16 @@ export class WxPlatform implements PlatformAdapter {
         data: args,
         success: (r: any) => resolve(r?.result),
         fail: (e: any) => reject(new Error(e?.errMsg || 'callFunction fail')),
+      });
+    });
+  }
+  loadSubpackage(name: string): Promise<void> {
+    if (!this.wx?.loadSubpackage) return Promise.reject(new Error('wx.loadSubpackage unavailable'));
+    return new Promise((resolve, reject) => {
+      this.wx.loadSubpackage({
+        name,
+        success: () => resolve(),
+        fail: (e: any) => reject(new Error(e?.errMsg || 'loadSubpackage fail')),
       });
     });
   }

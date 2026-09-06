@@ -218,7 +218,12 @@ export class GameApp {
       endpoint.searchParams.set('secret', appSecret!);
       endpoint.searchParams.set('js_code', code);
       endpoint.searchParams.set('grant_type', 'authorization_code');
-      // 云函数运行时是 Node 16（无内置 fetch），改用 Node 内置 https
+      // 运行时适配：有全局 fetch（Node18+/本地/测试 mock）用之；云函数 Node16 无 fetch → Node 内置 https
+      if (typeof (globalThis as any).fetch === 'function') {
+        const response = await (globalThis as any).fetch(endpoint, { signal: controller.signal });
+        if (!response.ok) throw new Error('WeChat authentication service failed');
+        return response.json();
+      }
       const data: string = await new Promise<string>((resolve, reject) => {
         const req = require('https').get(endpoint.toString(), (res: any) => {
           let buf = '';
@@ -438,10 +443,11 @@ export class GameApp {
           try {
             openId = await this.exchangeWechatCode(code);
           } catch (e: any) {
-            // 诊断期：把微信 code2Session 的原始错误带出，便于定位（消息会显示在客户端启动失败画面）
-            const detail = e?.message || String(e);
+            // 细节只进服务端日志；仅 APP_DEBUG=1 时回传诊断（防止内部错误泄漏密钥等敏感信息）
+            console.error('[ape] exchangeWechatCode failed:', e?.message || e);
+            const detail = process.env.APP_DEBUG === '1' ? `（${e?.message || e}）` : '';
             ctx.status(502);
-            ctx.json({ ok: false, code: 'WECHAT_AUTH_FAILED', message: `微信登录暂不可用（${detail}），请稍后重试` });
+            ctx.json({ ok: false, code: 'WECHAT_AUTH_FAILED', message: `微信登录暂不可用${detail}，请稍后重试` });
             return;
           }
           const nick = '玩家' + openId.slice(3, 7);
