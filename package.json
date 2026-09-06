@@ -18,7 +18,8 @@
     "bake:pag": "node dist/tools/src/bake_pag.js",
     "bake:atlas": "npm run build && node dist/tools/src/bake_pag.js --atlas",
     "bake": "npm run build && node dist/tools/src/bake_pag.js",
-    "video:pag": "node dist/tools/src/bake_pag.js --video-only"
+    "video:pag": "node dist/tools/src/bake_pag.js --video-only",
+    "package:server": "node dist/tools/src/package_server.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

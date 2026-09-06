@@ -126,3 +126,62 @@ wx.cloud.init({ env: 'lomo-wechat-d0gcakr952f0d90b8' });
 ```
 
 已由 `client/src/app/wx_entry.ts` 的 `initCloud()` 在**微信运行时**调用（env 由构建期 `APP_CLOUD_ENV` 注入，仅环境标识、无密钥）；Node 验收/mock 环境自动跳过。
+
+## 云托管服务端（CloudBase Run）—— 2026-09-06 已上线
+
+| 项 | 值 |
+|---|---|
+| 服务名 | `lomo-wechat`（容器服务，ap-shanghai） |
+| 公网域名 | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
+| 容器端口 | 8080（`APP_PROFILE=wechat-release`、`APP_ALLOW_ADMIN=0`） |
+| 镜像来源 | `build/cloudrun/`（Dockerfile 云端构建，源 304KB） |
+
+### 部署流程（可复现）
+
+```bash
+npm run build                 # 编译 dist（服务端 + 共享）
+npm run package:server        # 组装 build/cloudrun（Dockerfile + dist + configs，注入密钥）
+set -a; . ./.env.cloud; set +a
+printf '\n' | npx -p @cloudbase/cli tcb cloudrun deploy -s lomo-wechat --port 8080 \
+  --source build/cloudrun --wait --force -e "$CLOUDBASE_ENV"
+```
+
+注意两点（踩过的坑）：
+
+1. **云托管需先在控制台开通资源**，否则 CLI 报 `云托管资源未开通`（与套餐是否含该能力无关）；
+2. `cloudrun deploy` 会交互式询问「是否启用灰度部署」——非交互环境用 `printf '\n' | ...` 选默认 No（发布成功后自动切流）。
+
+### 环境变量与密钥
+
+CLI 的 `cloudrun deploy` **不支持注入环境变量**，当前通过 Dockerfile `ENV` 提供：
+
+- 非密钥：`NODE_ENV / PORT=8080 / APP_PROFILE=wechat-release / APP_DATA_DIR=/app/data / APP_ALLOW_ADMIN=0`
+- 密钥：`APP_SECRET`、`APP_ADMIN_TOKEN` 由 `package:server` 生成并写入本地 `.env.cloud` 后复用（**复用很关键**：每次换密钥会作废所有已登录用户的 token），产物 Dockerfile 中注入；
+- 生产建议：在云托管控制台用环境变量覆盖（控制台值优先于镜像 ENV），镜像内密钥视为可泄露处理并定期轮换。
+
+### 上线自检（已实测）
+
+| 接口 | 期望 | 实测 |
+|---|---|---|
+| `GET /v1/config/bootstrap` | 200，profile=wechat-release | ✅ `OWNED_LAUNCH_DEFAULTS`（自有默认值，非原服数据） |
+| `POST /v1/auth/wechat` | 200，返回 token/playerId/防沉迷 | ✅ |
+| `POST /v1/admin/reset` | 403 FEATURE_DISABLED | ✅（管理端已关闭） |
+
+### MP 后台白名单（两套域名都要加）
+
+```
+https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com        （资源 CDN）
+https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com             （服务端 API）
+```
+
+request / uploadFile / downloadFile 三处均需填写；真机（非调试模式）不填会被拦截。
+
+### 体积口径说明
+
+`verify` 的 `bundle-size-gate` 与构建日志按**文件实际字节**统计（当前主包 **2.48MB / 1535 文件**，红线 4MB）。
+`du -sh` 显示 7MB 是磁盘块分配（大量小帧文件每文件占 4KB），**不是**微信代码包计量口径，勿据此判断超限。
+
+### 已知限制（收费前必须解决）
+
+容器文件系统为临时存储：实例重启/重新部署会丢失 `store.json` 与内存中的玩家进度。
+要承载真实付费用户，必须改为外部持久化（云数据库 / 云托管 MySQL / Redis），否则会出现付费后丢档。

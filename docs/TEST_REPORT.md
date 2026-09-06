@@ -1,40 +1,40 @@
 # TEST_REPORT
 
-> 自动生成: tools/src/verify.ts · 2026-09-06T02:32:33.934Z
+> 自动生成: tools/src/verify.ts · 2026-09-06T02:57:12.382Z
 
-## ✅ route-parity-680 (15ms)
+## ✅ route-parity-680 (16ms)
 
 `{"total":680,"byStatus":{"implemented":354,"sandbox-only":10,"mapped":203,"platform-replaced":113},"byMode":{"CLONE_1_TO_1":513,"UI_CLONE_TEST_ONLY_SETTLEMENT_DISABLED":10,"CLONE_COMMERCE_FLOW_WITH_PAYMENT_ADAPTER":44,"PLATFORM_ADAPTER":113},"ok":true,"problems":[]}`
 
-## ✅ asset-manifest (64ms)
+## ✅ asset-manifest (87ms)
 
 ok
 
-## ✅ unit-core (10ms)
+## ✅ unit-core (9ms)
 
 ok
 
-## ✅ unit-assets+compliance (74ms)
+## ✅ unit-assets+compliance (96ms)
 
 ok
 
-## ✅ unit-pack (5ms)
+## ✅ unit-pack (8ms)
 
 ok
 
-## ✅ slot-ref-integrity (7ms)
+## ✅ slot-ref-integrity (9ms)
 
 `{"checked":14,"unresolved":[]}`
 
-## ✅ screen-route-integrity (0ms)
+## ✅ screen-route-integrity (1ms)
 
 `{"checked":48,"missing":[]}`
 
-## ✅ frame-qa (2499ms)
+## ✅ frame-qa (1643ms)
 
 `{"scanned":6004,"violations":[]}`
 
-## ✅ gameplay-server (10ms)
+## ✅ gameplay-server (11ms)
 
 ok
 
@@ -42,27 +42,27 @@ ok
 
 ok
 
-## ✅ integration-client (431ms)
+## ✅ integration-client (438ms)
 
-integration-client ok: drawCalls=4657 coin 500→436 fpsLoop normal
+integration-client ok: drawCalls=4657 coin 500→435 fpsLoop normal
 
-## ✅ build-wechat-bundles (8598ms)
+## ✅ build-wechat-bundles (6608ms)
 
 `{"full":"/Volumes/Extra/CodeProj/ape/LOMO_WECHAT_FORMAL_MIGRATION/build/wechat-full-clone","release":"/Volumes/Extra/CodeProj/ape/LOMO_WECHAT_FORMAL_MIGRATION/build/wechat-release","cloudBase":"https://assets.invalid/assets/game/"}`
 
-## ✅ bundle-size-gate (48ms)
+## ✅ bundle-size-gate (40ms)
 
 build/wechat-full-clone: 2.48MB / 4.00MB
 build/wechat-release: 2.48MB / 4.00MB
 
-## ✅ bundle-smoke (2723ms)
+## ✅ bundle-smoke (2698ms)
 
-`["build/wechat-full-clone: gate→home ok, drawCalls=14912, drawImage=118","build/wechat-release: gate→home ok, drawCalls=12780, drawImage=118"]`
+`["build/wechat-full-clone: gate→home ok, drawCalls=14596, drawImage=116","build/wechat-release: gate→home ok, drawCalls=12516, drawImage=116"]`
 
 ## 性能/体积
 
-- 无头启动+全功能冒烟: 431ms（含两局完整玩法）
-- 双产物构建耗时: 8598ms
+- 无头启动+全功能冒烟: 438ms（含两局完整玩法）
+- 双产物构建耗时: 6608ms
 - FULL CLONE 包: 2542 KB
 - RELEASE 包: 2542 KB
 
