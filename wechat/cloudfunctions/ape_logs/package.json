@@ -1,0 +1,9 @@
+{
+  "name": "ape_logs",
+  "version": "1.0.0",
+  "description": "ApeIsland client-side error log channel (write/read/clear)",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
