@@ -8,7 +8,7 @@ export async function run(): Promise<void> {
   const wxLike = { kind: 'wx' } as any;
   assert.throws(
     () => new MiniGameClientApp(wxLike, { profile: 'wechat-release', standalone: false }),
-    /APP_SERVER_URL is required for WeChat runtime/,
+    /APP_SERVER_URL or APP_CLOUD_FN is required for WeChat runtime/,
   );
 
   const node = new NodePlatform();
