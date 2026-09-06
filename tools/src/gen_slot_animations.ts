@@ -79,8 +79,9 @@ export class Canvas {
   px: Uint8Array;
   mat: Int8Array;
   mats: Ramp[];
-  constructor(public W: number, public H: number, mats: Ramp[]) {
-    this.px = new Uint8Array(W * 2 * H * 2 * 4);
+  /** outScale：绘制/渲染的固定输出倍率（writeRGB 与 render 均按此坐标写） */
+  constructor(public W: number, public H: number, mats: Ramp[], public outScale = 2) {
+    this.px = new Uint8Array(W * outScale * H * outScale * 4);
     this.mat = new Int8Array(W * H).fill(-1);
     this.mats = mats;
   }
@@ -146,8 +147,8 @@ export class Canvas {
       if (m < 0) continue;
       const r = this.mats[m];
       const rgb = shade[i] === 1 ? r.hi : shade[i] === 2 ? r.lo : r.base;
-      for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
-        const di = ((y * scale + sy) * this.W * scale + (x * scale + sx)) * 4;
+      for (let sy = 0; sy < this.outScale; sy++) for (let sx = 0; sx < this.outScale; sx++) {
+        const di = ((y * this.outScale + sy) * this.W * this.outScale + (x * this.outScale + sx)) * 4;
         this.px[di] = rgb[0]; this.px[di + 1] = rgb[1]; this.px[di + 2] = rgb[2]; this.px[di + 3] = 255;
       }
     }
@@ -158,18 +159,18 @@ export class Canvas {
       if (!(this.filled(x - 1, y) || this.filled(x + 1, y) || this.filled(x, y - 1) || this.filled(x, y + 1))) continue;
       const belowM = this.filled(x, y + 1) ? this.mat[(y + 1) * this.W + x] : -1;
       const rgb = belowM >= 0 ? mix(OUTLINE, this.mats[belowM].hi, 0.5) : OUTLINE;
-      for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
-        const di = ((y * scale + sy) * this.W * scale + (x * scale + sx)) * 4;
+      for (let sy = 0; sy < this.outScale; sy++) for (let sx = 0; sx < this.outScale; sx++) {
+        const di = ((y * this.outScale + sy) * this.W * this.outScale + (x * this.outScale + sx)) * 4;
         this.px[di] = rgb[0]; this.px[di + 1] = rgb[1]; this.px[di + 2] = rgb[2]; this.px[di + 3] = 255;
       }
     }
-    return encodePNG(this.W * scale, this.H * scale, this.px);
+    return encodePNG(this.W * this.outScale, this.H * this.outScale, this.px);
   }
   /** 直接写 RGB 覆盖（光效用，绕过材质） */
   writeRGB(x: number, y: number, rgb: RGB): void {
-    for (let sy = 0; sy < 2; sy++) for (let sx = 0; sx < 2; sx++) {
-      const di = ((y * 2 + sy) * this.W * 2 + (x * 2 + sx)) * 4;
-      if (x < 0 || y < 0 || x >= this.W || y >= this.H) return;
+    if (x < 0 || y < 0 || x >= this.W || y >= this.H) return;
+    for (let sy = 0; sy < this.outScale; sy++) for (let sx = 0; sx < this.outScale; sx++) {
+      const di = ((y * this.outScale + sy) * this.W * this.outScale + (x * this.outScale + sx)) * 4;
       this.px[di] = rgb[0]; this.px[di + 1] = rgb[1]; this.px[di + 2] = rgb[2]; this.px[di + 3] = 255;
     }
   }
