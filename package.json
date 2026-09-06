@@ -22,7 +22,8 @@
     "video:pag": "node dist/tools/src/bake_pag.js --video-only",
     "package:server": "node dist/tools/src/package_server.js",
     "cloudrun:readiness": "node dist/tools/src/cloudrun_readiness.js",
-    "gen:icon": "node dist/tools/src/gen_icon.js"
+    "gen:icon": "node dist/tools/src/gen_icon.js",
+    "upload:assets": "node dist/tools/src/upload_assets_wx.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

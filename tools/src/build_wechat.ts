@@ -31,9 +31,8 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
       cloudService: process.env.APP_CLOUD_SERVICE || '',
       cloudResourceAppid: process.env.APP_CLOUD_RESOURCE_APPID || '',
     };
-  if (profile === 'wechat-release' && !cloudBase && !opts.allowUnconfigured) {
-    throw new Error('[build_wechat] wechat-release requires APP_CLOUD_BASE=<HTTPS asset CDN prefix>');
-  }
+  // 资源可全量打进主包（WebP 后约 2.6MB，主包 ~3.3MB < 4MB 红线），不再强制 CDN；
+  // 最终仍由 dirSizeBytes 红线检查兜底（见下），超限直接失败而非产出不可上传的包。
   const buildRoot = path.join(root, 'build');
   const outDir = opts.outputDir ? path.resolve(root, opts.outputDir) : path.join(buildRoot, profile === 'full-clone' ? 'wechat-full-clone' : 'wechat-release');
   if (!outDir.startsWith(buildRoot + path.sep)) throw new Error('[build_wechat] outputDir must be a child of build/');
