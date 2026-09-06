@@ -7,15 +7,24 @@ import { MiniGameClientApp } from './main';
 
 export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; standalone?: boolean }): void {
   let platform: WxPlatform | null = null;
+  let app: any = null;
   try {
     initCloud(opts.cloudEnv);
     platform = new WxPlatform();
-    const app = new MiniGameClientApp(platform, opts);
-    app.boot().catch((e) => renderFailure(platform!, e));
+    app = new MiniGameClientApp(platform, opts);
+    app.boot().catch((e: unknown) => fail(platform!, app, e));
   } catch (e) {
-    if (platform) renderFailure(platform, e);
-    else throw e;
+    fail(platform, app, e);
   }
+}
+
+/** 启动失败：优先画在主画布（app.renderFatal），并输出到控制台；应用未建成时才退回离屏兜底 */
+function fail(platform: WxPlatform | null, app: any, e: unknown): void {
+  const msg = String((e as any)?.message || e);
+  console.error('[ape] fatal', e);
+  let drawn = false;
+  try { app?.renderFatal?.(msg); drawn = !!app?.ui; } catch { /* 忽略 */ }
+  if (!drawn && platform) renderFailure(platform, e);
 }
 
 /**

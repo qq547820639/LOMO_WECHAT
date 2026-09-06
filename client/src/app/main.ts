@@ -45,6 +45,56 @@ export class MiniGameClientApp {
   private telemetryBuf: any[] = [];
   private dragTrack: { id: string; startY: number } | null = null;
   skipGate = false;
+  /** 致命错误：每帧重绘错误画面（小游戏无 DOM，必须自绘才可见） */
+  fatal: string | null = null;
+
+  /**
+   * 画致命错误画面 —— **必须画在启动时创建的主 canvas 上**。
+   * 小游戏中再次调用 wx.createCanvas() 得到的是**离屏画布**，画上去用户永远看不到
+   * （这正是此前启动失败表现为「黑屏」的原因）。
+   */
+  renderFatal(msg: string): void {
+    this.fatal = msg;
+    try {
+      if (this.ui) {
+        const u = this.ui;
+        u.ctx.fillStyle = '#0f1220';
+        u.ctx.fillRect(0, 0, u.w, u.h);
+        u.ctx.fillStyle = '#f87171';
+        u.text('启动失败', 20, 110, { size: 16, bold: true });
+        u.ctx.fillStyle = '#e5e7eb';
+        const lines = String(msg).match(/.{1,26}/g) || [String(msg)];
+        lines.slice(0, 6).forEach((l, i) => u.text(l, 20, 150 + i * 20, { size: 11 }));
+        u.ctx.fillStyle = '#9ca3af';
+        u.text('请退出后重新进入；若持续出现请反馈此信息', 20, 160 + lines.slice(0, 6).length * 20, { size: 10 });
+        return;
+      }
+      // 兜底：UI 尚未建立时直接用裸 ctx 画（离屏画布不可见，但至少不抛错）
+      const ctx = this.canvas?.getContext?.('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#0f1220';
+      ctx.fillRect(0, 0, this.canvas.width || 375, this.canvas.height || 667);
+      ctx.fillStyle = '#f87171';
+      ctx.font = '16px sans-serif';
+      ctx.fillText('启动失败', 20, 110);
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = '12px sans-serif';
+      String(msg).match(/.{1,26}/g)?.slice(0, 6).forEach((l, i) => ctx.fillText(l, 20, 150 + i * 20));
+    } catch { /* 绘制失败也不再抛出 */ }
+  }
+
+  /** 启动看门狗：卡住超过 20s 直接把状态画出来 —— 杜绝「黑屏无信息」 */
+  private startBootWatchdog(): void {
+    const deadline = Date.now() + 20000;
+    const tick = (): void => {
+      if (this.booted || this.fatal) return;
+      if (Date.now() < deadline) { setTimeout(tick, 500); return; }
+      const stage = !this.api?.connected ? '连不上服务端' : (!this.player ? '登录/拉取玩家失败' : '未知');
+      const target = String((this.api as any)?.baseUrl ?? (this.api as any)?.serverUrl ?? (this.api as any)?.base ?? '未配置');
+      this.renderFatal(`启动超时（${stage}）。服务端=${target}`);
+    };
+    setTimeout(tick, 500);
+  }
 
   constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
     this.skipGate = !!opts.skipComplianceGate;
@@ -102,6 +152,8 @@ export class MiniGameClientApp {
     }) as any;
     const logicalH = Math.floor(this.canvas.height / dscale);
     this.ui = new UI(scaledCtx as any, 375, logicalH);
+    // 渲染循环尽早注册：后续任何启动步骤抛错，错误画面都能被画出来（而不是黑屏）
+    this.platform.onFrame(() => this.frame());
     this.router = new Router(this);
     registerAllScreens(this);
     this.router.switchTab('games');
@@ -129,15 +181,25 @@ export class MiniGameClientApp {
       this.ui.onTap(lx, ly);
     });
     this.platform.onHide(() => { this.audioManager.onAppHide(); this.telemetry('app_hide'); });
-    this.platform.onShow(() => { this.audioManager.onAppShow(); this.refreshPlayer(); });
+    // onShow 必须自愈：服务端重启/缩容会丢内存态，旧 token 请求必然失败，
+    // 未捕获的 rejection 会让渲染循环静默停止（表现为「退出再进黑屏」）
+    this.platform.onShow(() => {
+      try { this.audioManager.onAppShow(); } catch { /* 音频不可用时忽略 */ }
+      this.refreshPlayer().catch((e) => {
+        console.error('[ape] onShow refreshPlayer failed', e);
+        this.showToast('数据刷新失败，正在重新登录…');
+        void this.completeBoot();
+      });
+    });
 
     // 游戏资源 manifest（P0-1）：包内 assets/game/manifest.json；失败静默走占位
     this.assets = new (require('../core/assets').AssetManager)(this.platform);
     this.assets.loadManifest().then((m: unknown) => { if (m) this.telemetry('asset_manifest', { version: (m as any).version }); }).catch(() => {});
 
-    this.platform.onFrame(() => this.frame());
-
+    // 启动看门狗：卡住 20s 就把原因画出来（黑屏不再无信息）
+    this.startBootWatchdog();
     // 启动流程：合规门（健康游戏忠告+隐私授权）→ completeBoot
+    // 注意：渲染循环已在此前注册，本段任何抛错都会经由 app.renderFatal 显示在主画布上
     const { ComplianceGateScreen } = require('../features/compliance_gate');
     const gate = new ComplianceGateScreen(() => { void this.completeBoot(); });
     if (this.skipGate) {
@@ -174,10 +236,13 @@ export class MiniGameClientApp {
     } catch (e) {
       // 启动完成段失败：回退到合规门重试路径（不静默吞掉状态）
       const err: any = e;
-      this.showToast('启动失败: ' + String(err?.message || e).slice(0, 20));
+      const msg = String(err?.message || e);
+      console.error('[ape] completeBoot failed', err);
+      this.showToast('启动失败: ' + msg.slice(0, 20));
       this.booted = false;
       const gate = this.router.stack.find((screen: any) => screen.route === '/compliance-gate') as any;
       gate?.resetForRetry?.();
+      if (!gate) this.router.push(new (require('../features/compliance_gate').ComplianceGateScreen)(() => { void this.completeBoot(); }));
     }
   }
 
@@ -250,6 +315,8 @@ export class MiniGameClientApp {
     const ctx = this.ui.ctx;
     ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, this.ui.w, this.ui.h);
+    // 致命错误常驻：每帧重绘，确保用户一定看得到（而不是黑屏）
+    if (this.fatal) { this.renderFatal(this.fatal); return; }
     if (!this.booted && !this.router.stack.length) {
       this.ui.textCenter(BRAND.loadingText, this.ui.w / 2, this.ui.h / 2, { size: 15, color: THEME.textDim });
       return;
