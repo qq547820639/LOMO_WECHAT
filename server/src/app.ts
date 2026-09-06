@@ -218,9 +218,19 @@ export class GameApp {
       endpoint.searchParams.set('secret', appSecret!);
       endpoint.searchParams.set('js_code', code);
       endpoint.searchParams.set('grant_type', 'authorization_code');
-      const response = await fetch(endpoint, { signal: controller.signal });
-      if (!response.ok) throw new Error('WeChat authentication service failed');
-      return response.json();
+      // 云函数运行时是 Node 16（无内置 fetch），改用 Node 内置 https
+      const data: string = await new Promise<string>((resolve, reject) => {
+        const req = require('https').get(endpoint.toString(), (res: any) => {
+          let buf = '';
+          res.setEncoding('utf8');
+          res.on('data', (c: string) => (buf += c));
+          res.on('end', () => resolve(buf));
+        });
+        req.on('error', reject);
+        if (controller.signal.aborted) req.destroy(new Error('aborted'));
+        else controller.signal.addEventListener('abort', () => req.destroy(new Error('aborted')));
+      });
+      return JSON.parse(data);
     };
     try {
       const result = await Promise.race([
@@ -232,12 +242,17 @@ export class GameApp {
           }, 5000);
         }),
       ]) as { openid?: unknown; errcode?: unknown } | null;
-      if (!result || (result.errcode !== undefined && result.errcode !== 0)
-        || typeof result.openid !== 'string' || !result.openid.trim()
-        || result.openid !== result.openid.trim() || result.openid.length > 128) {
-        throw new Error('Invalid WeChat authentication response');
+      if (!result || typeof result !== 'object') {
+        throw new Error('WeChat returned non-object response');
       }
-      return result.openid;
+      const obj = result as any;
+      if (obj.errcode !== undefined && obj.errcode !== 0) {
+        throw new Error(`WeChat errcode=${obj.errcode} errmsg=${obj.errmsg || 'unknown'}`);
+      }
+      if (typeof obj.openid !== 'string' || !obj.openid.trim() || obj.openid !== obj.openid.trim() || obj.openid.length > 128) {
+        throw new Error(`Missing openid (keys=${Object.keys(obj).join(',')})`);
+      }
+      return obj.openid;
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
@@ -422,9 +437,11 @@ export class GameApp {
           let openId: string;
           try {
             openId = await this.exchangeWechatCode(code);
-          } catch {
+          } catch (e: any) {
+            // 诊断期：把微信 code2Session 的原始错误带出，便于定位（消息会显示在客户端启动失败画面）
+            const detail = e?.message || String(e);
             ctx.status(502);
-            ctx.json({ ok: false, code: 'WECHAT_AUTH_FAILED', message: '微信登录暂不可用，请稍后重试' });
+            ctx.json({ ok: false, code: 'WECHAT_AUTH_FAILED', message: `微信登录暂不可用（${detail}），请稍后重试` });
             return;
           }
           const nick = '玩家' + openId.slice(3, 7);
