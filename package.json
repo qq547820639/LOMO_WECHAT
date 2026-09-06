@@ -21,6 +21,7 @@
     "bake": "npm run build && node dist/tools/src/bake_pag.js",
     "video:pag": "node dist/tools/src/bake_pag.js --video-only",
     "package:server": "node dist/tools/src/package_server.js",
+    "cloudrun:readiness": "node dist/tools/src/cloudrun_readiness.js",
     "gen:icon": "node dist/tools/src/gen_icon.js"
   },
   "devDependencies": {
@@ -31,6 +32,7 @@
   },
   "dependencies": {
     "@cloudbase/js-sdk": "3.9.2",
+    "@cloudbase/node-sdk": "^3.18.3",
     "@cloudbase/signature-nodejs": "2.0.0"
   }
 }

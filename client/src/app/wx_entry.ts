@@ -5,13 +5,14 @@
 import { WxPlatform } from '../platform/platform';
 import { MiniGameClientApp } from './main';
 
-export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; cloudService?: string; standalone?: boolean }): void {
+export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; cloudService?: string; cloudResourceAppid?: string; standalone?: boolean }): void {
   let platform: WxPlatform | null = null;
   let app: any = null;
   try {
-    initCloud(opts.cloudEnv);
+    // 环境共享模式（有 resourceAppid）由 WxPlatform 负责 init，此处跳过默认 wx.cloud.init
+    if (!opts.cloudResourceAppid) initCloud(opts.cloudEnv);
     // CloudBase Run 服务名（X-WX-SERVICE 头）：小游戏必须走 wx.cloud.callContainer
-    platform = new WxPlatform({ cloudEnv: opts.cloudEnv, cloudService: opts.cloudService });
+    platform = new WxPlatform({ cloudEnv: opts.cloudEnv, cloudService: opts.cloudService, cloudResourceAppid: opts.cloudResourceAppid });
     app = new MiniGameClientApp(platform, opts);
     app.boot().catch((e: unknown) => fail(platform!, app, e));
   } catch (e) {

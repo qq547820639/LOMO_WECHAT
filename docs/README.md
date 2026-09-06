@@ -22,7 +22,7 @@ npm run gen:assets   # 资源管线（可加 --apk xx.apk --out dir 做真实提
 ## 微信开发者工具导入
 
 1. 打开微信开发者工具 → 导入项目 → 选择 `build/wechat-full-clone/`（或 `build/wechat-release/`）。
-2. AppID 使用测试号（touristappid，已在 project.config.json 中）。
+2. 研究/离线包的 AppID 使用测试号 `touristappid`；正式 `wechat-release` 包在生成时严格注入 `wxec103651e807c540`，两者不可混用。
 3. 微信包必须连接远端权威服务端；未注入 `APP_SERVER_URL` 的验收包会在启动页明确提示配置缺失，不能直接上真机。
 4. 使用自有 HTTPS 服务端构建：`APP_SERVER_URL=https://api.your-domain.com npm run build:wechat`。进程内服务端仅供 Node/验收 mock 的 `standalone` 模式。
 
@@ -62,4 +62,4 @@ build/            微信小游戏双产物（verify 生成）
 
 ## 文档索引
 
-SOURCE_OF_TRUTH / ARCHITECTURE / **DEPLOYMENT（自有域名与服务器部署指南）** / IMPLEMENTATION_STATUS / ROUTE_PARITY_680 / FEATURE_PARITY / ASSET_MIGRATION / ECONOMY_MODEL / BACKEND_API / GAMEPLAY_RULES / WECHAT_ADAPTATION / PERFORMANCE_REPORT / TEST_REPORT / COMPLIANCE_CURRENT / FINAL_LAUNCH_DECISION / KNOWN_DIFFERENCES / EXTERNAL_BLOCKERS / TECH_STACK_DECISION / PRIVACY_DATA_MAP（均在 `docs/`）。
+SOURCE_OF_TRUTH / ARCHITECTURE / **DEPLOYMENT（自有域名与服务器部署指南）** / IMPLEMENTATION_STATUS / ROUTE_PARITY_680 / FEATURE_PARITY / ASSET_MIGRATION / ECONOMY_MODEL / BACKEND_API / GAMEPLAY_RULES / **LAUNCH_REDESIGN_SPEC（砍项、广告、APK 研究与重制计划）** / **APK_RESEARCH_CONCLUSION_2026-09-07（原始 APK 证据边界与联机结论）** / WECHAT_ADAPTATION / PERFORMANCE_REPORT / TEST_REPORT / COMPLIANCE_CURRENT / FINAL_LAUNCH_DECISION / KNOWN_DIFFERENCES / EXTERNAL_BLOCKERS / TECH_STACK_DECISION / PRIVACY_DATA_MAP（均在 `docs/`）。

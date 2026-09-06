@@ -104,4 +104,4 @@ battleRoyal.join/act/peek · undertown.openBrick/probDetail · arena.fight · bo
 - 已登录请求固定窗口限制：120 次/秒/玩家（RATE_LIMITED），同样为进程内计数。
 - clientSeq 单调校验：过期回 409 SESSION_STALE；重复提交返回上次响应（幂等）。
 - 非持久化开发模式的 `/v1/admin/reset` 需 `APP_ALLOW_ADMIN=1` 和匹配的 `x-admin-token`；正式持久化 API 始终拒绝该在线重置接口。
-- 本地 QA 仍可使用内存 Store；正式进程入口强制 CloudBase，不允许退回本地 JSON。在线旧版本尚未部署该修复，其临时文件系统仍不能提供正式持久性保证。
+- 本地 QA 仍可使用内存 Store；正式进程入口强制 CloudBase，不允许退回本地 JSON。Deploy 017 已运行 CloudBase 版本，但生产数据迁移与恢复演练仍未完成。

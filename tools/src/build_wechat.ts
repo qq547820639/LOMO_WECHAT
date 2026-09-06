@@ -19,7 +19,7 @@ import { rootPath } from '../../shared/src/paths';
 
 interface GameManifest { version: string; base: string; atlases: Array<{ id: string; file?: string; frames: Array<{ name: string; x?: number; y?: number; w: number; h: number; dur?: number; file?: string }>; fps?: number; hash?: string; bytes?: number }> }
 
-export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBase?: string; bootBudget?: number; allowUnconfigured?: boolean; outputDir?: string } = {}): string {
+export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBase?: string; bootBudget?: number; allowUnconfigured?: boolean; allowOversize?: boolean; outputDir?: string } = {}): string {
   const cloudBase = opts.cloudBase ?? process.env.APP_CLOUD_BASE ?? '';
   const root = rootPath();
   const releaseConfig = profile === 'wechat-release' && !opts.allowUnconfigured
@@ -29,6 +29,7 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
       serverUrl: process.env.APP_SERVER_URL || '',
       cloudEnv: process.env.APP_CLOUD_ENV || '',
       cloudService: process.env.APP_CLOUD_SERVICE || '',
+      cloudResourceAppid: process.env.APP_CLOUD_RESOURCE_APPID || '',
     };
   if (profile === 'wechat-release' && !cloudBase && !opts.allowUnconfigured) {
     throw new Error('[build_wechat] wechat-release requires APP_CLOUD_BASE=<HTTPS asset CDN prefix>');
@@ -95,7 +96,8 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   const serverUrl = releaseConfig.serverUrl;
   const cloudEnv = releaseConfig.cloudEnv;
   const cloudService = releaseConfig.cloudService; // CloudBase Run 服务名（X-WX-SERVICE 头），必须与 wx.cloud.callContainer 一致
-  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudService/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, cloudService, standalone: false })});\n`);
+  const cloudResourceAppid = releaseConfig.cloudResourceAppid || ''; // 环境共享模式的资源方 AppID（可空）
+  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudService/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, cloudService, cloudResourceAppid, standalone: false })});\n`);
 
   // 4. README（构建产物级）
   fs.writeFileSync(path.join(outDir, 'README.txt'), [
@@ -115,25 +117,28 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   const pkgBytes = dirSizeBytes(outDir);
   const mode = cloudBase ? `cloud-assets (boot pack ${manifest ? countBootAtlases(manifest, cloudBase) : 0})` : 'packaged-assets';
   const WECHAT_MAIN_PKG_LIMIT = 4 * 1024 * 1024; // 微信小游戏主包红线
-  if (pkgBytes > WECHAT_MAIN_PKG_LIMIT) {
+  if (pkgBytes > WECHAT_MAIN_PKG_LIMIT && !opts.allowOversize) {
     // 全量打包（无 APP_CLOUD_BASE）时资源约 6.5MB，必然超限 —— 直接失败，避免产出上传必被拒的包
     throw new Error(
       `[build_wechat] ${profile} 主包 ${(pkgBytes / 1048576).toFixed(2)}MB 超过微信 ${WECHAT_MAIN_PKG_LIMIT / 1048576}MB 红线。` +
       (cloudBase ? '请减小 bootBudget 或改用分包。' : '请设置 APP_CLOUD_BASE=<资源 CDN 前缀> 走云资源形态（主包约 2.5MB）。')
     );
   }
-  console.log(`[build_wechat] ${profile} → ${outDir} (atlases: ${manifest?.atlases.length ?? 0}, ${mode}, main pkg ${(pkgBytes / 1048576).toFixed(2)}MB)`);
+  const gateNote = opts.allowOversize && pkgBytes > WECHAT_MAIN_PKG_LIMIT ? ', QA oversize allowed' : '';
+  console.log(`[build_wechat] ${profile} → ${outDir} (atlases: ${manifest?.atlases.length ?? 0}, ${mode}, main pkg ${(pkgBytes / 1048576).toFixed(2)}MB${gateNote})`);
   return outDir;
 }
 
-function requireReleaseConfig(cloudBase: string): { appId: string; serverUrl: string; cloudEnv: string; cloudService: string } {
+function requireReleaseConfig(cloudBase: string): { appId: string; serverUrl: string; cloudEnv: string; cloudService: string; cloudResourceAppid: string } {
   const values = {
     appId: process.env.APP_WX_APPID || '',
     serverUrl: process.env.APP_SERVER_URL || '',
     cloudEnv: process.env.APP_CLOUD_ENV || '',
     cloudService: process.env.APP_CLOUD_SERVICE || '',
+    // 可选：环境共享模式下的资源方 AppID（env 归属另一小程序时填写；为空=本 AppID 已关联该 env）
+    cloudResourceAppid: process.env.APP_CLOUD_RESOURCE_APPID || '',
   };
-  const missing = Object.entries(values).filter(([, value]) => !value).map(([key]) => key);
+  const missing = Object.entries(values).filter(([key, value]) => key !== 'cloudResourceAppid' && !value).map(([key]) => key);
   if (missing.length) {
     throw new Error(`[build_wechat] wechat-release requires ${missing.map((key) => ({ appId: 'APP_WX_APPID', serverUrl: 'APP_SERVER_URL', cloudEnv: 'APP_CLOUD_ENV', cloudService: 'APP_CLOUD_SERVICE' } as Record<string, string>)[key]).join(', ')}`);
   }

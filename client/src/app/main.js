@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MiniGameClientApp = void 0;
+exports.tabsForProfile = tabsForProfile;
 exports.wrapText = wrapText;
 const api_1 = require("../net/api");
 const widgets_1 = require("../ui/widgets");
@@ -8,13 +9,19 @@ const router_1 = require("../core/router");
 const theme_1 = require("../core/theme");
 const audio_1 = require("../audio/audio");
 const brand_1 = require("../../../shared/src/brand");
-const TABS = [
+const FULL_TABS = [
     { id: 'chaowan', label: '藏品', color: theme_1.THEME.accent },
     { id: 'ape', label: '猿岛', color: theme_1.THEME.purple },
     { id: 'games', label: '游戏', color: theme_1.THEME.accent2 },
     { id: 'trade', label: '交易', color: theme_1.THEME.gold },
     { id: 'mine', label: '我的', color: theme_1.THEME.green },
 ];
+const RELEASE_TAB_COLORS = { home: theme_1.THEME.accent, games: theme_1.THEME.accent2, chaowan: theme_1.THEME.purple, mine: theme_1.THEME.green };
+function tabsForProfile(profile) {
+    if (profile === 'full-clone')
+        return FULL_TABS;
+    return registry_2.RELEASE_LAUNCH_NAVIGATION.tabs.map((tab) => ({ id: tab.targetTab, label: tab.label, color: RELEASE_TAB_COLORS[tab.targetTab] || theme_1.THEME.accent }));
+}
 class MiniGameClientApp {
     constructor(platform, opts) {
         var _a;
@@ -94,7 +101,7 @@ class MiniGameClientApp {
         this.ui = new widgets_1.UI(scaledCtx, 375, logicalH);
         this.router = new router_1.Router(this);
         (0, registry_1.registerAllScreens)(this);
-        this.router.switchTab('games');
+        this.router.switchTab(this.profile === 'wechat-release' ? registry_2.RELEASE_LAUNCH_NAVIGATION.defaultTab : 'games');
         const inputScale = size.w / 375;
         this.platform.onTouchStart((x, y) => {
             var _a, _b;
@@ -157,7 +164,9 @@ class MiniGameClientApp {
             while (this.router.stack.length)
                 this.router.pop(true);
             const { SCREEN_ROUTES } = require('../features/registry');
-            if (SCREEN_ROUTES['home'])
+            if (this.profile === 'wechat-release')
+                this.router.switchTab(registry_2.RELEASE_LAUNCH_NAVIGATION.defaultTab);
+            else if (SCREEN_ROUTES['home'])
                 this.router.push(SCREEN_ROUTES['home']());
             this.audioManager.playBgm('home');
             // 邀请进游（Section 37：share query → server token）
@@ -371,8 +380,9 @@ class MiniGameClientApp {
         ctx.fillRect(0, top, ui.w, ui.h - top);
         ctx.strokeStyle = theme_1.THEME.line;
         ctx.strokeRect(0, top, ui.w, ui.h - top);
-        const tw = ui.w / TABS.length;
-        TABS.forEach((t, i) => {
+        const tabs = tabsForProfile(this.profile);
+        const tw = ui.w / tabs.length;
+        tabs.forEach((t, i) => {
             const active = this.router.currentTab === t.id && !this.router.stack.length;
             const x = i * tw;
             ui.textCenter(t.label, x + tw / 2, top + 32, { size: 14, bold: active, color: active ? t.color : theme_1.THEME.textDim });
@@ -393,3 +403,4 @@ function wrapText(text, maxChars) {
 }
 /** 全部屏幕注册（由 features/registry.ts 提供，避免循环依赖） */
 const registry_1 = require("../features/registry");
+const registry_2 = require("../../../shared/src/registry");

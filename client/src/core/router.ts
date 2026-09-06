@@ -51,6 +51,7 @@ export class Router {
   switchTab(tab: string): void {
     while (this.stack.length) this.pop(true);
     this.currentTab = tab;
+    Promise.resolve(this.current.onEnter()).catch((e) => { this.current.error = String(e?.message || e); });
     this.setupPoll();
   }
 

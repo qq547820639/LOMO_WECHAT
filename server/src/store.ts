@@ -6,6 +6,8 @@ import { Ledger } from '../../shared/src/ledger';
 import { AssetId } from '../../shared/src/assets';
 import { CardTemplate } from '../../shared/src/registry';
 import { randomId } from './util';
+import { RewardedAdReward, RewardedAdState } from '../../shared/src/protocol';
+import { RewardedAdSlot } from '../../shared/src/config';
 
 export interface InventoryEntry { qty: number; lockedQty: number; attrs?: Record<string, number | string | boolean> }
 
@@ -70,6 +72,22 @@ export interface ActionReceipt {
   response: Record<string, unknown>;
 }
 
+export interface RewardedAdRecord {
+  adId: string;
+  claimToken: string;
+  playerId: string;
+  slot: RewardedAdSlot;
+  state: RewardedAdState;
+  issuedAt: number;
+  expiresAt: number;
+  sessionId?: string;
+  settlementId?: string;
+  reward: RewardedAdReward;
+  idempotencyKey?: string;
+  issueFingerprint?: string;
+  claimResponse?: Record<string, unknown>;
+}
+
 export interface StoreData {
   players: Record<string, PlayerRecord>;
   openIdIndex: Record<string, string>;
@@ -83,13 +101,14 @@ export interface StoreData {
   audit: Array<{ at: number; playerId: string; kind: string; detail?: unknown }>;
   actionReceipts: Record<string, ActionReceipt[]>;
   actionNonces: Record<string, { seed: string; sequence: number }>;
+  rewardedAds: Record<string, RewardedAdRecord[]>;
 }
 
 export class Store {
   static readonly ACTION_RECEIPT_LIMIT = 512;
   static readonly ACTION_RECEIPT_TTL_MS = 86400000;
   data: StoreData = {
-    players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [], actionReceipts: {}, actionNonces: {},
+    players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [], actionReceipts: {}, actionNonces: {}, rewardedAds: {},
   };
   ledger: Ledger;
   cards: CardTemplate[] = [];
@@ -163,6 +182,23 @@ export class Store {
     this.data.actionNonces[playerId] = state;
     this.touch();
     return `${playerId}:${state.seed}:${state.sequence}`;
+  }
+
+  rewardedAd(playerId: string, adId: string): RewardedAdRecord | undefined {
+    return (this.data.rewardedAds[playerId] || []).find((record) => record.adId === adId);
+  }
+
+  rewardedAdsFor(playerId: string): RewardedAdRecord[] {
+    return this.data.rewardedAds[playerId] || [];
+  }
+
+  saveRewardedAd(record: RewardedAdRecord): void {
+    const records = this.data.rewardedAds[record.playerId] || [];
+    const index = records.findIndex((item) => item.adId === record.adId);
+    if (index >= 0) records[index] = record;
+    else records.push(record);
+    this.data.rewardedAds[record.playerId] = records.slice(-128);
+    this.touch();
   }
 
   // ---- ranks ----

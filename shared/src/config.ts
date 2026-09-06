@@ -7,11 +7,25 @@ import { AssetId } from './assets';
 
 export type BuildProfile = 'full-clone' | 'wechat-release';
 
+export interface LaunchNavigationTab {
+  id: string;
+  label: string;
+  targetTab: string;
+}
+
+export interface LaunchNavigation {
+  tabs: LaunchNavigationTab[];
+  defaultTab: string;
+}
+
 /** 发布安全开关（configs/*.json 同构） */
 export interface ReleaseProfile {
   profile: BuildProfile;
   purpose?: string;
   warning?: string;
+  navigation?: LaunchNavigation;
+  trainingFeatures?: string[];
+  coreFeatures?: string[];
   allowCashWallet: boolean;
   allowWithdrawal: boolean;
   allowBetting: boolean;
@@ -101,6 +115,22 @@ export interface RemoteConfig {
   featurePolicies: Record<string, FeaturePolicy>;
   numeric: Record<string, number>;
   json: Record<string, unknown>;
+  rewardedAds: RewardedAdsConfig;
+}
+
+export type RewardedAdSlot = 'revive_escape' | 'double_settlement' | 'energy_refill' | 'free_entry' | 'bonus_chest';
+export interface RewardedAdSlotConfig {
+  enabled: boolean;
+  adUnitId: string;
+  dailyCap: number;
+  minIntervalMs: number;
+}
+export interface RewardedAdsConfig {
+  enabled: boolean;
+  dailyCap: number;
+  hourlyCap: number;
+  ttlMs: number;
+  slots: Record<RewardedAdSlot, RewardedAdSlotConfig>;
 }
 
 /** 默认对现金敏感功能族的策略（与 44 族注册表一致；数据层可覆盖） */

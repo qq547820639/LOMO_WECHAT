@@ -29,6 +29,7 @@ class BattleRoyalScreen extends base_1.ApiScreen {
         this.feed = [];
         this.avatarClip = null;
     }
+    isTraining() { return this.app.profile === 'wechat-release'; }
     async fetchState() {
         var _a, _b, _c;
         const r = await this.app.api.gameState('battleRoyal');
@@ -48,14 +49,20 @@ class BattleRoyalScreen extends base_1.ApiScreen {
             return;
         const st = this.state;
         let y = top + 6;
+        if (this.isTraining()) {
+            ui.panel({ x: 12, y, w: ui.w - 24, h: 38 }, theme_1.THEME.panel2);
+            ui.text('训练场 · Bot 对手', 24, y + 17, { size: 12, bold: true, color: theme_1.THEME.gold });
+            ui.text('单人练习，不匹配真人；成绩仅计入训练榜', 24, y + 32, { size: 10, color: theme_1.THEME.textDim });
+            y += 46;
+        }
         if (!this.sessionId) {
             // 大厅：规则 + 房间选择
             ui.panel({ x: 12, y, w: ui.w - 24, h: 74 }, theme_1.THEME.panel);
-            ui.text(`门票 ${st.lobby.entryCostCoin} 金币 · ${st.lobby.roomCount} 个房间 · 门耐久 ${st.lobby.baseDoorHp}`, 24, y + 20, { size: 12 });
-            ui.text(`杀手每轮撞击门 · 门破房间淘汰 · 幸存按投入分池(手续费 ${(st.lobby.feeRate * 100).toFixed(0)}%)`, 24, y + 38, { size: 10, color: theme_1.THEME.textDim });
-            ui.text(`败方房间按 ${(st.lobby.daggerLossRatio * 100).toFixed(0)}% 铸造匕首 · 赛季积分结算`, 24, y + 56, { size: 10, color: theme_1.THEME.textDim });
+            ui.text(`${this.isTraining() ? '练习消耗' : '门票'} ${st.lobby.entryCostCoin} 金币 · ${st.lobby.roomCount} 个房间 · 门耐久 ${st.lobby.baseDoorHp}`, 24, y + 20, { size: 12 });
+            ui.text(this.isTraining() ? 'Bot 每轮撞击门 · 练习结束后记录成绩，不产生玩家间奖池' : `杀手每轮撞击门 · 门破房间淘汰 · 幸存按投入分池(手续费 ${(st.lobby.feeRate * 100).toFixed(0)}%)`, 24, y + 38, { size: 10, color: theme_1.THEME.textDim });
+            ui.text(this.isTraining() ? '选择路线并熟悉修门、换房、躲避操作' : `败方房间按 ${(st.lobby.daggerLossRatio * 100).toFixed(0)}% 铸造匕首 · 赛季积分结算`, 24, y + 56, { size: 10, color: theme_1.THEME.textDim });
             y += 82;
-            ui.text('选择你的房间（杀手来之前修门或换房）', 16, y + 14, { size: 12, color: theme_1.THEME.textDim });
+            ui.text(this.isTraining() ? '选择练习路线（Bot 会自动推进）' : '选择你的房间（杀手来之前修门或换房）', 16, y + 14, { size: 12, color: theme_1.THEME.textDim });
             y += 22;
             const bw = (ui.w - 24 - 10) / 3;
             for (let i = 1; i <= st.lobby.roomCount; i++) {
@@ -67,7 +74,7 @@ class BattleRoyalScreen extends base_1.ApiScreen {
                 });
             }
             y += Math.ceil(st.lobby.roomCount / 3) * 56 + 8;
-            ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `进入 ${this.roomId} 号房间（门票 ${st.lobby.entryCostCoin}）`, async () => {
+            ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, this.isTraining() ? `开始 Bot 训练（消耗 ${st.lobby.entryCostCoin} 金币）` : `进入 ${this.roomId} 号房间（门票 ${st.lobby.entryCostCoin}）`, async () => {
                 const s = await this.app.api.post('/v1/game/session/start', { featureId: 'battleRoyal' });
                 if (!s.ok) {
                     this.app.showToast(s.message);
@@ -92,7 +99,7 @@ class BattleRoyalScreen extends base_1.ApiScreen {
             const data = (_b = st.active) === null || _b === void 0 ? void 0 : _b.data;
             const rooms = (_c = data === null || data === void 0 ? void 0 : data.rooms) !== null && _c !== void 0 ? _c : [];
             ui.panel({ x: 12, y, w: ui.w - 24, h: 30 }, theme_1.THEME.panel2);
-            ui.text(`第 ${(_d = data === null || data === void 0 ? void 0 : data.round) !== null && _d !== void 0 ? _d : 0} 轮 · 你的房间 ${(_e = data === null || data === void 0 ? void 0 : data.playerRoom) !== null && _e !== void 0 ? _e : '-'} · 奖池 ${(0, theme_1.fmtNum)((_f = data === null || data === void 0 ? void 0 : data.pool) !== null && _f !== void 0 ? _f : 0)}`, 24, y + 20, { size: 12, bold: true, color: theme_1.THEME.gold });
+            ui.text(this.isTraining() ? `第 ${(_d = data === null || data === void 0 ? void 0 : data.round) !== null && _d !== void 0 ? _d : 0} 轮 · Bot 训练路线 ${(_e = data === null || data === void 0 ? void 0 : data.playerRoom) !== null && _e !== void 0 ? _e : '-'} · 训练分 ${(0, theme_1.fmtNum)((_f = data === null || data === void 0 ? void 0 : data.pool) !== null && _f !== void 0 ? _f : 0)}` : `第 ${(_d = data === null || data === void 0 ? void 0 : data.round) !== null && _d !== void 0 ? _d : 0} 轮 · 你的房间 ${(_e = data === null || data === void 0 ? void 0 : data.playerRoom) !== null && _e !== void 0 ? _e : '-'} · 奖池 ${(0, theme_1.fmtNum)((_f = data === null || data === void 0 ? void 0 : data.pool) !== null && _f !== void 0 ? _f : 0)}`, 24, y + 20, { size: 12, bold: true, color: theme_1.THEME.gold });
             y += 38;
             const bw = (ui.w - 24 - 10) / 3;
             const bc = this.app.ui.ctx;

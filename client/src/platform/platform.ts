@@ -23,6 +23,13 @@ export interface PrivacySetting {
   supported: boolean;
 }
 
+export interface RewardedAdCloseResult { isEnded: boolean; receipt?: string }
+export interface RewardedAdLike {
+  load(): Promise<void>;
+  show(): Promise<RewardedAdCloseResult>;
+  destroy(): void;
+}
+
 export interface PlatformAdapter {
   readonly kind: 'wx' | 'node';
   createCanvas(): any;
@@ -43,6 +50,7 @@ export interface PlatformAdapter {
   storageGet(key: string): any;
   storageSet(key: string, v: any): void;
   loginCode(): Promise<string | null>;
+  createRewardedAd(adUnitId: string): RewardedAdLike;
   httpRequest(opts: { url: string; method: string; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }>;
   /**
    * 云开发调用（仅云托管/云函数需要）：小游戏必须走 wx.cloud.callContainer，否则 wx.request 会被网关 401
@@ -67,12 +75,48 @@ export class WxPlatform implements PlatformAdapter {
   private wx: any;
   private cloudEnv: string | null;
   private cloudService: string | null;
-  constructor(opts?: { cloudEnv?: string; cloudService?: string }) {
+  /** 环境共享模式：资源方 AppID（env 归属另一个小程序时使用）；为空=本小程序已关联的 env（直连） */
+  private cloudResourceAppid: string | null;
+  private cloudInstance: any = null;
+  private cloudInitPromise: Promise<any> | null = null;
+  constructor(opts?: { cloudEnv?: string; cloudService?: string; cloudResourceAppid?: string }) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.wx = (globalThis as any).wx || (typeof GameGlobal !== 'undefined' ? (GameGlobal as any).wx : null);
     if (!this.wx) throw new Error('wx not available');
     this.cloudEnv = opts?.cloudEnv ?? null;
     this.cloudService = opts?.cloudService ?? null;
+    this.cloudResourceAppid = opts?.cloudResourceAppid ?? null;
+  }
+
+  /**
+   * 云实例获取（幂等）：
+   *  - 无 resourceAppid：wx.cloud.init({env}) 后直接用 wx.cloud（环境已与该 AppID 关联，含「环境转换」后的腾讯云环境）
+   *  - 有 resourceAppid：new wx.cloud.Cloud({resourceAppid, resourceEnv}) → init()（环境共享/跨主体资源方模式）
+   * 任一路径失败都退回 wx.cloud，由 callContainer 报错暴露，不静默。
+   */
+  private ensureCloud(): Promise<any> {
+    if (this.cloudInstance) return Promise.resolve(this.cloudInstance);
+    const wx = this.wx;
+    if (!wx?.cloud) return Promise.resolve(null);
+    if (!this.cloudInitPromise) {
+      this.cloudInitPromise = (async () => {
+        try {
+          if (this.cloudResourceAppid && wx.cloud.Cloud) {
+            const c = new wx.cloud.Cloud({ resourceAppid: this.cloudResourceAppid, resourceEnv: this.cloudEnv ?? undefined });
+            await c.init();
+            this.cloudInstance = c;
+          } else {
+            wx.cloud.init?.({ env: this.cloudEnv ?? undefined });
+            this.cloudInstance = wx.cloud;
+          }
+        } catch (e) {
+          console.error('[ape] cloud init failed (85088 多为环境未与 AppID 关联)', e);
+          this.cloudInstance = wx.cloud ?? null;
+        }
+        return this.cloudInstance;
+      })();
+    }
+    return this.cloudInitPromise;
   }
   createCanvas(): any {
     const c = this.wx.createCanvas();
@@ -153,6 +197,31 @@ export class WxPlatform implements PlatformAdapter {
       this.wx.login({ success: (r: any) => resolve(r.code || null), fail: () => resolve(null) });
     });
   }
+  createRewardedAd(adUnitId: string): RewardedAdLike {
+    const ad = this.wx.createRewardedVideoAd?.({ adUnitId });
+    if (!ad) return { load: async () => undefined, show: async () => ({ isEnded: false }), destroy: () => undefined };
+    return {
+      load: async () => { await Promise.resolve(ad.load?.()); },
+      show: () => new Promise((resolve) => {
+        let settled = false;
+        const finish = (result: any) => {
+          if (settled) return;
+          settled = true;
+          if (typeof ad.offClose === 'function') ad.offClose(finish);
+          const isEnded = !!result?.isEnded;
+          const receipt = typeof result?.receipt === 'string' && result.receipt.trim()
+            ? result.receipt.trim()
+            : typeof result?.transactionId === 'string' && result.transactionId.trim()
+              ? result.transactionId.trim()
+              : isEnded ? `wx-rewarded-complete-${Date.now()}-${Math.random().toString(36).slice(2, 10)}` : undefined;
+          resolve({ isEnded, ...(receipt ? { receipt } : {}) });
+        };
+        if (typeof ad.onClose === 'function') ad.onClose(finish);
+        Promise.resolve(ad.show?.()).then((result: any) => { if (typeof ad.onClose !== 'function') finish(result); }).catch(() => finish({ isEnded: false }));
+      }),
+      destroy: () => { try { ad.destroy?.(); } catch { /* 忽略 */ } },
+    };
+  }
   httpRequest(opts: { url: string; method: string; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }> {
     return new Promise((resolve, reject) => {
       this.wx.request({
@@ -165,21 +234,25 @@ export class WxPlatform implements PlatformAdapter {
   share(opts: { title: string; query?: string }): void {
     try { this.wx.shareAppMessage?.({ title: opts.title, query: opts.query }); } catch { /* 忽略 */ }
   }
-  callContainer(opts: { path: string; method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }> {
+  async callContainer(opts: { path: string; method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }> {
     // 有 cloudEnv+cloudService → 走 wx.cloud.callContainer（小程序/小游戏调用 CloudBase Run 的标准方式）
-    if (this.cloudEnv && this.cloudService && this.wx?.cloud?.callContainer) {
-      return new Promise((resolve, reject) => {
-        this.wx.cloud.callContainer({
-          config: { env: this.cloudEnv },
-          path: opts.path,
-          method: opts.method ?? 'GET',
-          data: opts.data,
-          header: { 'X-WX-SERVICE': this.cloudService, ...(opts.header ?? {}) },
-          timeout: opts.timeout ?? 10000,
-          success: (r: any) => resolve({ statusCode: r.statusCode, data: r.data }),
-          fail: (e: any) => reject(new Error(e?.errMsg || 'callContainer fail')),
+    if (this.cloudEnv && this.cloudService) {
+      const cloud = await this.ensureCloud();
+      if (cloud?.callContainer) {
+        return new Promise((resolve, reject) => {
+          cloud.callContainer({
+            config: { env: this.cloudEnv },
+            path: opts.path,
+            method: opts.method ?? 'GET',
+            data: opts.data,
+            header: { 'X-WX-SERVICE': this.cloudService, ...(opts.header ?? {}) },
+            timeout: opts.timeout ?? 10000,
+            success: (r: any) => resolve({ statusCode: r.statusCode, data: r.data }),
+            fail: (e: any) => reject(new Error(e?.errMsg || e?.message || 'callContainer fail')),
+          });
         });
-      });
+      }
+      console.error('[ape] wx.cloud.callContainer unavailable — 环境未与 AppID 关联（85088）时会出现');
     }
     // 兜底：无 cloud 配置时退回 wx.request（仅限非 CloudBase 的服务端 URL）
     return this.httpRequest({ url: opts.path, method: opts.method ?? 'GET', data: opts.data, header: opts.header, timeout: opts.timeout });
@@ -285,6 +358,16 @@ export class NodePlatform implements PlatformAdapter {
   storageGet(key: string): any { return this.store[key] ?? null; }
   storageSet(key: string, v: any): void { this.store[key] = v; }
   async loginCode(): Promise<string | null> { return 'test-code'; }
+  rewardedAdsShown: string[] = [];
+  private rewardedAdQueue: RewardedAdCloseResult[] = [];
+  enqueueRewardedAdResult(result: RewardedAdCloseResult): void { this.rewardedAdQueue.push(result); }
+  createRewardedAd(adUnitId: string): RewardedAdLike {
+    return {
+      load: async () => undefined,
+      show: async () => { this.rewardedAdsShown.push(adUnitId); return this.rewardedAdQueue.shift() || { isEnded: true, receipt: 'node-mock-complete' }; },
+      destroy: () => undefined,
+    };
+  }
   async httpRequest(opts: any): Promise<{ statusCode: number; data: any }> { throw new Error('NodePlatform 无网络'); }
   share(): void {}
   vibrate(): void {}

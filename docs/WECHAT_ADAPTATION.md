@@ -23,7 +23,7 @@
 
 - `build/wechat-full-clone/`：完整生态+沙盒结算；game.js → wx_entry → LomoClientApp（微信运行时连接远端服务端；Node standalone 仅用于验收）
 - `build/wechat-release/`：同一代码+release 配置；现金类 API 服务端 403（bundle-smoke 在 Node 中以 wx mock 实际启动两包，渲染帧验证通过）
-- 两包均含 game.json（portrait）/project.config.json（touristappid）/README.txt
+- 两包均含 game.json（portrait）/README.txt；研究包的 `project.config.json` 使用 `touristappid`，正式 `wechat-release` 包使用构建时注入的真实 AppID 并强制 `urlCheck=true`。
 
 ## 主循环生命周期
 

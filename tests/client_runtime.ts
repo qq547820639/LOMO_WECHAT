@@ -8,6 +8,7 @@ import { FEATURES } from '../shared/src/gen/data.gen';
 import { ComplianceGateScreen } from '../client/src/features/compliance_gate';
 import { ApiClient } from '../client/src/net/api';
 import { HomeLobbyScreen } from '../client/src/features/home_lobby';
+import { RELEASE_CORE_FEATURES } from '../shared/src/registry';
 
 export async function run(): Promise<void> {
   let homeStateRequests = 0;
@@ -106,7 +107,12 @@ export async function run(): Promise<void> {
   }
   for (const profile of ['full-clone', 'wechat-release']) {
     const reachable = new Set(['chaowan', 'ape', 'games', 'trade', 'mine'].flatMap((tab) => featuresForTab(tab, profile).map((feature) => feature.id)));
-    for (const feature of FEATURES.filter((entry) => profile === 'full-clone' || entry.release !== 'cut')) assert.ok(reachable.has(feature.id), `${profile} tab reaches ${feature.id}`);
+    if (profile === 'full-clone') {
+      for (const feature of FEATURES) assert.ok(reachable.has(feature.id), `${profile} tab reaches ${feature.id}`);
+    } else {
+      for (const featureId of RELEASE_CORE_FEATURES) assert.ok(reachable.has(featureId), `${profile} tab reaches ${featureId}`);
+      for (const feature of FEATURES.filter((entry) => entry.release === 'cut' || entry.release === 'defer')) assert.ok(!reachable.has(feature.id), `${profile} hides ${feature.id}`);
+    }
   }
 
   const originalTimeout = globalThis.setTimeout;

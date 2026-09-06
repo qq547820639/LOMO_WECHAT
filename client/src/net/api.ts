@@ -3,9 +3,9 @@
  *  - HttpTransport: wx.request → 正式参考服务端。
  *  - InProcessTransport: 直接调用 GameApp 路由（standalone 构建 / 测试），零网络。
  */
-import { PlatformAdapter } from '../platform/platform';
+import { PlatformAdapter, RewardedAdCloseResult } from '../platform/platform';
 import { ApiError } from '../../../shared/src/protocol';
-import { RELEASE_LOCKED_FLAGS } from '../../../shared/src/config';
+import { RELEASE_LOCKED_FLAGS, RewardedAdSlot } from '../../../shared/src/config';
 
 export interface Transport {
   request(path: string, method: 'GET' | 'POST', body?: any, headers?: Record<string, string>): Promise<any>;
@@ -179,6 +179,20 @@ export class ApiClient {
 
   async gameState(featureId: string): Promise<any> {
     return this.get(`/v1/game/state?featureId=${encodeURIComponent(featureId)}`);
+  }
+
+  async issueRewardedAd(slot: RewardedAdSlot, context?: { sessionId?: string; settlementId?: string }): Promise<any> {
+    return this.post('/v1/ads/rewarded/issue', { slot, ...(context || {}) });
+  }
+
+  async startRewardedAd(adId: string, claimToken: string): Promise<any> {
+    return this.post('/v1/ads/rewarded/start', { adId, claimToken });
+  }
+
+  async claimRewardedAd(adId: string, claimToken: string, result: RewardedAdCloseResult | boolean, receipt?: string): Promise<any> {
+    const completed = typeof result === 'boolean' ? result : result.isEnded;
+    const closeReceipt = typeof result === 'boolean' ? receipt : result.receipt;
+    return this.post('/v1/ads/rewarded/claim', { adId, claimToken, completed, ...(closeReceipt === undefined ? {} : { receipt: closeReceipt }) });
   }
 }
 

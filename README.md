@@ -3,7 +3,7 @@
 > 原始 APK：`lomo_4.3.7`（com.caike.lomo，versionCode 403007，SHA-256 `8e6ae674…d0cb5de`，已验证）
 > 本工程包含服务端权威参考后端、小游戏客户端、双运行配置、680 路由映射、资源管线和自动化测试。
 >
-> **2026-09-06 当前结论：本地 QA 可继续，正式运营未通过验收。** 最终本地 `npm test` **16/16**、`verify` **23/23**、原生 Canvas **6/6**，运行依赖审计发现 **0** 个已知漏洞；报告时间为 `2026-09-06T11:45:07.028Z`，见 [TEST_REPORT.md](docs/TEST_REPORT.md) 与 [递归复查记录](docs/QA_RECHECK_2026-09-06.md)。当前已加入 CloudBase 持久化实现，隔离真实云应用集成 7 组通过；正式云调用仍失败 `85088`，生产持久化迁移/部署、官方登录、真机和完整视觉及发布资质未通过验收。旧 `14/14`、`21/21` 是持久化改动前的历史轮次。操作边界见 [QA 交接手册](docs/QA_HANDOFF.md)。
+> **2026-09-06 当前结论：本地 QA 可继续，正式运营未通过验收。** 最终本地 `npm test` **17/17**、`verify` 全步骤通过、原生 Canvas **6/6**，运行依赖审计发现 **0** 个已知漏洞；最新报告见 [TEST_REPORT.md](docs/TEST_REPORT.md)。当前已加入 CloudBase 持久化实现和广告凭证持久化；正式云调用仍失败 `85088`，生产迁移/部署、官方登录、真实广告回执、真机和完整视觉及发布资质未通过验收。操作边界见 [QA 交接手册](docs/QA_HANDOFF.md)。
 
 ## 快速开始：本地自动回归
 
@@ -28,12 +28,11 @@ node tests/client_canvas_browser.mjs
 
 ```bash
 APP_WX_APPID=wxec103651e807c540 \
-APP_CLOUD_BASE=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/ \
 QA_PORT=8799 \
 npm run qa:local
 ```
 
-该命令编译并生成 QA 包，随后监听 `http://127.0.0.1:8799`，需保持终端运行；停止服务使用 `Ctrl+C`。服务重启会重置进度，资源仍依赖 CDN。手机上的 `127.0.0.1` 不指向这台 Mac。
+该命令编译并生成 QA 包，随后监听 `http://127.0.0.1:8799`，需保持终端运行；停止服务使用 `Ctrl+C`。QA 包将游戏资源全部打入本地（仅 QA 允许超过 4 MiB），服务重启会重置进度。手机上的 `127.0.0.1` 不指向这台 Mac。
 
 在微信开发者工具项目列表通过 **小游戏项目导入** 打开 `build/wechat-qa/`，AppID 使用上面的真实值。当前 Nightly 首次 GUI 导入后，应退出整个工具再重开，使已登记项目同步到 CLI 缓存。不要把 `touristappid` 或临时小程序项目作为本轮有效导入步骤。重建前关闭对应项目，构建成功后再打开。
 
@@ -42,7 +41,7 @@ npm run qa:local
 ```bash
 npm run build
 APP_WX_APPID=wxec103651e807c540 \
-APP_SERVER_URL=https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com \
+APP_SERVER_URL=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com \
 APP_CLOUD_BASE=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/ \
 APP_CLOUD_ENV=lomo-wechat-d0gcakr952f0d90b8 \
 APP_CLOUD_SERVICE=lomo-wechat \
@@ -101,4 +100,4 @@ build/            正式客户端 / 隔离 QA 包 / verify 离线验收包 / clo
 
 当前操作与验收优先查看 [QA_HANDOFF.md](docs/QA_HANDOFF.md)、[QA_RECHECK_2026-09-06.md](docs/QA_RECHECK_2026-09-06.md)、[TEST_REPORT.md](docs/TEST_REPORT.md)、[PERSISTENCE.md](docs/PERSISTENCE.md)、[DEPLOYMENT.md](docs/DEPLOYMENT.md) 和 [EXTERNAL_BLOCKERS.md](docs/EXTERNAL_BLOCKERS.md)。
 
-历史与架构材料：SOURCE_OF_TRUTH / ARCHITECTURE / IMPLEMENTATION_STATUS / ROUTE_PARITY_680 / FEATURE_PARITY / ASSET_MIGRATION / ECONOMY_MODEL / BACKEND_API / GAMEPLAY_RULES / WECHAT_ADAPTATION / PERFORMANCE_REPORT / COMPLIANCE_CURRENT / FINAL_LAUNCH_DECISION / KNOWN_DIFFERENCES / TECH_STACK_DECISION / PRIVACY_DATA_MAP（均在 `docs/`）。较早的“完成”或“通过”表述须按当前交接记录核对证明范围。
+历史与架构材料：SOURCE_OF_TRUTH / ARCHITECTURE / IMPLEMENTATION_STATUS / ROUTE_PARITY_680 / FEATURE_PARITY / ASSET_MIGRATION / ECONOMY_MODEL / BACKEND_API / GAMEPLAY_RULES / **LAUNCH_REDESIGN_SPEC（砍项、广告、APK 研究与重制计划）** / WECHAT_ADAPTATION / PERFORMANCE_REPORT / COMPLIANCE_CURRENT / FINAL_LAUNCH_DECISION / KNOWN_DIFFERENCES / TECH_STACK_DECISION / PRIVACY_DATA_MAP（均在 `docs/`）。较早的“完成”或“通过”表述须按当前交接记录核对证明范围。

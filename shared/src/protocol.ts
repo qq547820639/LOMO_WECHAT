@@ -4,7 +4,8 @@
  * 服务端权威结算，客户端只做预测展示。
  */
 import { AssetId, AssetBalance } from './assets';
-import { BuildProfile, ReleaseProfile, TuningConfig, FeaturePolicy } from './config';
+import { BuildProfile, ReleaseProfile, TuningConfig, FeaturePolicy, RewardedAdsConfig, RewardedAdSlot } from './config';
+export type { RewardedAdsConfig, RewardedAdSlot } from './config';
 
 // ---------- 基础 ----------
 export type ApiErrorCode =
@@ -51,6 +52,47 @@ export interface ConfigBootstrap {
   routesEnabled: Record<string, boolean>;
   release: ReleaseProfile;
   assetManifestVersion: string;
+  rewardedAds: RewardedAdsConfig;
+}
+
+/** 首发激励广告合同：广告只兑换固定软货币、体力或一次性玩法权益。 */
+export type RewardedAdState = 'issued' | 'playing' | 'verified' | 'granted' | 'expired';
+export interface RewardedAdGrant {
+  kind: 'grant';
+  rewards: RewardDto[];
+}
+export interface RewardedAdMultiplier {
+  kind: 'multiplier';
+  multiplier: 2;
+  settlementId: string;
+}
+export interface RewardedAdEntitlement {
+  kind: 'entitlement';
+  entitlement: 'revive_escape' | 'free_entry';
+}
+export type RewardedAdReward = RewardedAdGrant | RewardedAdMultiplier | RewardedAdEntitlement;
+export interface RewardedAdIssueRequest { slot: RewardedAdSlot; sessionId?: string; settlementId?: string; idempotencyKey?: string }
+export interface RewardedAdIssueResponse {
+  ok: true;
+  adId: string;
+  claimToken: string;
+  slot: RewardedAdSlot;
+  adUnitId: string;
+  state: 'issued';
+  issuedAt: number;
+  expiresAt: number;
+  reward: RewardedAdReward;
+}
+export interface RewardedAdStartRequest { adId: string; claimToken: string }
+export interface RewardedAdClaimRequest { adId: string; claimToken: string; completed: boolean; receipt?: string }
+export interface RewardedAdClaimResponse {
+  ok: true;
+  adId: string;
+  settlementId: string;
+  state: 'granted';
+  rewards?: RewardDto[];
+  multiplier?: 2;
+  entitlement?: 'revive_escape' | 'free_entry';
 }
 
 // ---------- Player ----------

@@ -19,6 +19,7 @@ export interface CommandSpec {
   inviteToken?: string;
   candidates?: Array<Pick<PersistedDocument, '_id' | 'owner'>>;
   views?: PersistedDocument[];
+  rewardedAds?: boolean;
 }
 
 interface LoadedPlayer { core: PlayerCore; wallet: Wallet }
@@ -102,6 +103,19 @@ export class PersistentRepository {
         if (identityDocument && (identityDocument.payload as { playerId: string }).playerId !== spec.actor) throw new PersistenceError('PERSISTENCE_CORRUPT', 'Identity mapping is inconsistent');
       }
       await loadPlayer(spec.actor, true);
+      if (spec.rewardedAds) {
+        const adState = await get(identity('adstate', spec.actor));
+        if (adState) {
+          if (adState.owner !== spec.actor || adState.kind !== 'adstate' || !Array.isArray(adState.payload)) throw new PersistenceError('PERSISTENCE_CORRUPT', 'Invalid rewarded ad state');
+          const records = clone(adState.payload) as any[];
+          const slots = new Set(['revive_escape', 'double_settlement', 'energy_refill', 'free_entry', 'bonus_chest']);
+          const states = new Set(['issued', 'playing', 'verified', 'granted', 'expired']);
+          if (records.length > 128 || records.some((record) => !record || typeof record !== 'object' || record.playerId !== spec.actor || typeof record.adId !== 'string' || typeof record.claimToken !== 'string' || !slots.has(record.slot) || !states.has(record.state) || !Number.isFinite(record.issuedAt) || !Number.isFinite(record.expiresAt) || !record.reward || typeof record.reward !== 'object')) {
+            throw new PersistenceError('PERSISTENCE_CORRUPT', 'Invalid rewarded ad record');
+          }
+          store.data.rewardedAds[spec.actor] = records as any;
+        }
+      }
       if (spec.openId && identityDocument && !players.has(spec.actor)) throw new PersistenceError('PERSISTENCE_CORRUPT', 'Identity points to a missing player');
       if (!spec.openId && !players.has(spec.actor)) return { status: 401, body: { ok: false, code: 'AUTH_REQUIRED', message: '账号不存在，请重新登录' } };
       if (spec.inviteToken) {
@@ -226,6 +240,9 @@ export class PersistentRepository {
     }
     for (const [key, active] of slots) await changed(document('slot', spec.actor, key, { sessionId: active?.sessionId || null }, spec.now));
     for (const [token, invite] of Object.entries(store.data.inviteTokens)) await changed(document('invite', invite.inviterId, token, invite, invite.createdAt));
+    if (spec.rewardedAds) {
+      await changed(document('adstate', spec.actor, spec.actor, store.data.rewardedAds[spec.actor] || [], spec.now));
+    }
     if (store.data.telemetry.length > 20 || store.data.audit.length > 10) throw new PersistenceError('PERSISTENCE_LIMIT', 'Event batch exceeds transaction limit');
     for (const event of store.data.telemetry) await transaction.set(document('telemetry', spec.actor, store.newId('event'), event, event.at));
     for (const event of store.data.audit) await transaction.set(document('audit', event.playerId, store.newId('audit'), event, event.at));

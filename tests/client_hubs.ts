@@ -26,7 +26,7 @@ export function run(): void {
     const ui = new UI(context, 375, height);
     let currentTab = '';
     const app = { ui, profile: 'wechat-release', player: { nick: '测试冒险者', level: 7, xp: 20, xpToNext: 100, balances: { COIN: 1234, ENERGY: 25, TICKET: 8 } }, router: { switchTab(tab: string) { currentTab = tab; } } };
-    for (const tab of ['games', 'ape', 'chaowan', 'mine']) {
+    for (const tab of ['games', 'chaowan', 'mine']) {
       const hub = new HomeHub(tab);
       hub.app = app;
       const visited = new Set<string>();
@@ -54,6 +54,8 @@ export function run(): void {
         assert.ok(texts.includes('猿岛 · 健康游戏，适度娱乐'), 'account footer remains visible at the end');
       }
     }
+    assert.equal(featuresForTab('ape', 'wechat-release').length, 0, 'release removes the directory-style ape tab');
+    assert.ok(texts.includes('逃生训练场') && texts.includes('BOT'), 'release labels simulated battle royale as a Bot training ground');
     const trade = new HomeHub('trade');
     trade.app = app;
     ui.beginFrame();

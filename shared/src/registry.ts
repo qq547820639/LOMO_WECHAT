@@ -4,6 +4,23 @@
  */
 import { FeaturePolicy } from './config';
 
+/** 首发微信导航契约：四个入口映射到客户端内部 tab；full-clone 不受此裁剪影响。 */
+export const RELEASE_LAUNCH_NAVIGATION = {
+  tabs: [
+    { id: 'home', label: '主城', targetTab: 'home' },
+    { id: 'games', label: '游戏', targetTab: 'games' },
+    { id: 'chaowan', label: '收藏', targetTab: 'chaowan' },
+    { id: 'mine', label: '我的', targetTab: 'mine' },
+  ],
+  defaultTab: 'home',
+} as const;
+
+/** 首发核心短局按玩家学习顺序排列，避免游戏 Tab 退化为 40+ 项目录。 */
+export const RELEASE_CORE_FEATURES = ['escapeTiger', 'marbles', 'undertown'] as const;
+
+/** 尚未接入真人房间服务的玩法必须明确呈现为 Bot 训练场。 */
+export const RELEASE_TRAINING_FEATURES = ['battleRoyal'] as const;
+
 export type CloneMode =
   | 'CLONE_1_TO_1'
   | 'CLONE_COMMERCE_FLOW_WITH_PAYMENT_ADAPTER'

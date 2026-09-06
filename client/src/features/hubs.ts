@@ -9,6 +9,7 @@ import { UI } from '../ui/widgets';
 import { THEME, fmtNum } from '../core/theme';
 import { featuresForTab, openFeature } from './registry';
 import { FEATURES } from '../../../shared/src/gen/data.gen';
+import { RELEASE_TRAINING_FEATURES } from '../../../shared/src/registry';
 
 const HUB_COPY: Record<string, { section: string; title: string; detail: string; list: string; color: string }> = {
   games: { section: '挑战地图', title: '今天，闯哪一关？', detail: '生存、对战或轻松一局，按你的节奏来', list: '选择挑战', color: THEME.accent },
@@ -56,6 +57,14 @@ const FEATURE_COPY: Record<string, string> = {
   airship: '派遣飞艇，查看探索记录', rocksMonkeyKing: '挑战猴王，积累赛季积分',
   realName: '查看健康游戏与防沉迷信息', arena: '三回合对战，选择克制对手的行动',
   boss: '迎战首领，争取更高伤害', apeMine: '安排矿坑生产，收取游戏资源',
+};
+
+const RELEASE_FEATURE_NAMES: Record<string, string> = {
+  battleRoyal: '逃生训练场',
+};
+
+const RELEASE_FEATURE_COPY: Record<string, string> = {
+  battleRoyal: 'Bot 练习 · 熟悉生存路线',
 };
 
 export class HomeHub extends Screen {
@@ -167,10 +176,12 @@ export class HomeHub extends Screen {
         context.fillStyle = THEME.line;
         context.fillRect(39, rowY, 2, rowH);
         pixelBadge(ui, 20, rowY + 13, 40, String(index + 1).padStart(2, '0'), feature.release === 'defer' ? THEME.textDim : accent);
-        const label = FEATURE_NAMES[feature.id] || String(feature.title).split('/')[0];
+        const training = this.app.profile === 'wechat-release' && RELEASE_TRAINING_FEATURES.includes(feature.id as any);
+        const label = (this.app.profile === 'wechat-release' && RELEASE_FEATURE_NAMES[feature.id]) || FEATURE_NAMES[feature.id] || String(feature.title).split('/')[0];
         ui.text(fitText(ui, label, 17, ui.w - 118, true), 76, rowY + 28, { size: 17, bold: true });
-        const description = feature.release === 'defer' ? '查看功能介绍与开放状态' : FEATURE_COPY[feature.id] || '查看详情与可用操作';
+        const description = (this.app.profile === 'wechat-release' && RELEASE_FEATURE_COPY[feature.id]) || (feature.release === 'defer' ? '查看功能介绍与开放状态' : FEATURE_COPY[feature.id] || '查看详情与可用操作');
         ui.text(fitText(ui, description, 14, ui.w - 100), 76, rowY + 51, { size: 14, color: THEME.textDim });
+        if (training) ui.text('BOT', ui.w - 66, rowY + 18, { size: 9, bold: true, color: THEME.gold });
         ui.text('›', ui.w - 32, rowY + 31, { size: 22, color: accent });
         context.fillStyle = THEME.line;
         context.fillRect(76, rowY + rowH - 7, ui.w - 96, 1);

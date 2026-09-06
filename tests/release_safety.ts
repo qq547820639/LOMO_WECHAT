@@ -9,6 +9,11 @@
 import * as assert from 'node:assert';
 import { GameApp } from '../server/src/app';
 import { RELEASE_LOCKED_FLAGS } from '../shared/src/config';
+import { featuresForTab } from '../client/src/features/registry';
+import { RELEASE_LAUNCH_NAVIGATION, RELEASE_TRAINING_FEATURES, RELEASE_CORE_FEATURES } from '../shared/src/registry';
+import { tabsForProfile } from '../client/src/app/main';
+import * as fs from 'node:fs';
+import { rootPath } from '../shared/src/paths';
 
 function makeCall(app: GameApp) {
   const routes = app.routes();
@@ -39,6 +44,21 @@ function makeCall(app: GameApp) {
 }
 
 export async function run(): Promise<void> {
+  // 0. 发布导航只暴露核心入口；full-clone 保持完整研究目录。
+  const releaseConfig = JSON.parse(fs.readFileSync(rootPath('configs', 'wechat-release.json'), 'utf8'));
+  assert.deepEqual(releaseConfig.navigation, RELEASE_LAUNCH_NAVIGATION, 'release config owns the four-entry launch navigation');
+  assert.deepEqual(releaseConfig.coreFeatures, RELEASE_CORE_FEATURES, 'release config owns the core short-session set');
+  assert.deepEqual(releaseConfig.trainingFeatures, RELEASE_TRAINING_FEATURES, 'release config identifies simulated training features');
+  assert.deepEqual(releaseConfig.navigation.tabs.map((tab: { id: string }) => tab.id), ['home', 'games', 'chaowan', 'mine']);
+  assert.equal(releaseConfig.navigation.defaultTab, 'home');
+  assert.deepEqual(tabsForProfile('wechat-release').map((tab) => tab.id), ['home', 'games', 'chaowan', 'mine']);
+  assert.deepEqual(tabsForProfile('full-clone').map((tab) => tab.id), ['chaowan', 'ape', 'games', 'trade', 'mine']);
+  assert.ok(!releaseConfig.navigation.tabs.some((tab: { id: string }) => tab.id === 'trade' || tab.id === 'ape'));
+  assert.deepEqual(featuresForTab('games', 'wechat-release').map((feature) => feature.id), [...RELEASE_CORE_FEATURES, ...RELEASE_TRAINING_FEATURES]);
+  assert.equal(featuresForTab('trade', 'wechat-release').length, 0, 'trade directory is removed from release navigation');
+  assert.equal(featuresForTab('ape', 'wechat-release').length, 0, 'ape directory is removed from release navigation');
+  assert.ok(RELEASE_TRAINING_FEATURES.includes('battleRoyal'));
+
   const app = new GameApp({ profile: 'wechat-release', bootPngSeeds: true, allowSyntheticWechatAuth: true });
   const call = makeCall(app);
   const t = await (async () => {
@@ -86,6 +106,8 @@ export async function run(): Promise<void> {
   assert.ok(RELEASE_LOCKED_FLAGS.length >= 8);
   const cfg = app.remoteConfig();
   assert.equal(cfg.profile, 'wechat-release');
+  const bootstrap = app.bootstrap();
+  assert.deepEqual(bootstrap.release.navigation, RELEASE_LAUNCH_NAVIGATION);
 
   // 5. FULL CLONE 沙盒桥永不兑付
   const full = new GameApp({ profile: 'full-clone', bootPngSeeds: false });

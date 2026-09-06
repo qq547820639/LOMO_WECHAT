@@ -1,6 +1,17 @@
 {
   "profile": "wechat-release",
   "purpose": "WECHAT RELEASE: 与 FULL CLONE 共用同一代码库，通过 Feature Flag / Server Capability / Compliance Gate 关闭全部现金类高风险能力，保留游戏性。",
+  "navigation": {
+    "tabs": [
+      { "id": "home", "label": "主城", "targetTab": "home" },
+      { "id": "games", "label": "游戏", "targetTab": "games" },
+      { "id": "chaowan", "label": "收藏", "targetTab": "chaowan" },
+      { "id": "mine", "label": "我的", "targetTab": "mine" }
+    ],
+    "defaultTab": "home"
+  },
+  "coreFeatures": ["escapeTiger", "marbles", "undertown"],
+  "trainingFeatures": ["battleRoyal"],
   "allowCashWallet": false,
   "allowWithdrawal": false,
   "allowBetting": false,

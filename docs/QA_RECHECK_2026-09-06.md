@@ -74,16 +74,16 @@
 
 本地截图位于 `build/qa-evidence/`：`formal-network-failure.png`、`local-battle-round.png`、`local-dungeon.png`、`local-daily.png`、`local-cards.png`。中间截图的 Console 包含修复前 home 404，属于发现缺陷的证据，不能用作最终零错误截图。
 
-最终首页证据：`final-home.png` 已在最终 QA 包实际进入后更新。长列表证据：`final-games-scroll.png`、`final-mine-scroll.png`；后者拍摄于删除 mine 轮询之前，只证明列表布局。新增 `final-mine-idle.png` 与同名 `.txt` 在 `2026-09-06T10:30:56.813Z` 记录最终包“我的”页连续停留 **67 秒**、Console **Errors=0 / Warnings=2**；两条警告分别为基础库 HarmonyOS 提示和隔离本地 QA 关闭域名校验提示，未清空控制台。五 Tab 均已实际切换；游戏列表末项 Boss 可滚动到达，固定说明与底部导航不被列表覆盖，交易页正确显示未开放状态。最终修改后的 `npm test` 已重新执行并确认 **14/14、退出码 0**。独立代码复核在修正历史截图误判、README 和 mine 轮询后未发现新增必修代码问题。
+最终首页证据：`final-home.png` 已在最终 QA 包实际进入后更新。长列表证据：`final-games-scroll.png`、`final-mine-scroll.png`；后者拍摄于删除 mine 轮询之前，只证明列表布局。新增 `final-mine-idle.png` 与同名 `.txt` 在 `2026-09-06T10:30:56.813Z` 记录最终包“我的”页连续停留 **67 秒**、Console **Errors=0 / Warnings=2**；两条警告分别为基础库 HarmonyOS 提示和隔离本地 QA 关闭域名校验提示，未清空控制台。五 Tab 均已实际切换；游戏列表末项 Boss 可滚动到达，固定说明与底部导航不被列表覆盖，交易页正确显示未开放状态。该阶段历史测试为 **14/14**；当前回归基线已扩展为 **17/17**。独立代码复核在修正历史截图误判、README 和 mine 轮询后未发现新增必修代码问题。
 
-用户随后提供 CloudBase 官方 Codex 配置指南。本轮已安装官方 `@cloudbase/cloudbase-mcp@2.33.0`、增加单一 MCP 配置并以 JSON-RPC 验证 38 工具，现有登录态可读目标环境与服务。环境/云托管状态正常，MINIAPP 类型已开放；AppID 与环境的具体关联/共享授权仍未取得直接证据，85088 原因尚未确定。完整处置见 [CLOUDBASE_MCP_2026-09-06.md](CLOUDBASE_MCP_2026-09-06.md)。
+用户随后提供 CloudBase 官方 Codex 配置指南。本轮已安装官方 `@cloudbase/cloudbase-mcp@2.33.0`、增加单一 MCP 配置并以 JSON-RPC 验证 38 工具，现有登录态可读目标环境与服务。环境/云托管状态正常，MINIAPP 类型已开放；MCP 确认环境 `UserInfo.WxAppId` 为空，`touristappid` 无关联环境，真实 AppID 关联/共享授权仍需控制台完成，85088 因此继续阻断。完整处置见 [CLOUDBASE_MCP_2026-09-06.md](CLOUDBASE_MCP_2026-09-06.md)。
 
 追加查询 CLS 的 17:40–17:50 窄窗口，未取得匹配失败请求的日志；6 条历史部署流程日志状态正常。截图修改时间不是准确请求时间，时区与采集覆盖也未完全确认，空日志不能证明请求未到达服务。浏览器控制台需要登录，MCP 认证没有提供 AppID 关联的直接证据。该项继续判定未通过。
 
 ## 5. 本轮最终回归
 
-- `npm test`：**16/16 通过**，包含新增持久化、客户端存储错误重试和跨 UTC 日界线测试。
-- `npm run verify`：**23/23 通过**，报告时间 **2026-09-06T11:45:07.028Z**；报告和离线构建不等价于正式微信入口验收。
+- `npm test`：**17/17 通过**，包含激励广告、持久化、客户端存储错误重试和跨 UTC 日界线测试。
+- `npm run verify`：全步骤通过，覆盖 680/680 路由、14,092 资源、6,004 帧、双包构建与包体门禁；报告和离线构建不等价于正式微信入口验收。
 - 真实 Chrome Canvas：**6/6**；运行依赖 `npm audit --omit=dev --audit-level=moderate`：**0 个已知漏洞**。
 - 正式包：**3,187,979 字节 / 3.0403 MiB**，`urlCheck=true`、默认基础库 `3.16.2`；离线验收包：**2,975,233 字节 / 2.8374 MiB**。三类小游戏产物均未包含 CloudBase Node SDK 引用。
 - CloudBase 应用集成：**7 组通过、575 个逻辑文档操作、60.032 秒、进程退出 0**，记录 `integration_42822508769a4685966f9627331a8084`；60 个自建文档删除、清理待办为空，MCP 独立回读非 owner 标识记录为 0。实际数据仍为合成身份，使用本机凭据，不能证明生产容器身份已通过。

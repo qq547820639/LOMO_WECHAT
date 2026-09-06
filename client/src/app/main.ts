@@ -11,14 +11,27 @@ import { AudioManager } from '../audio/audio';
 import { BRAND } from '../../../shared/src/brand';
 import { AssetManager } from '../core/assets';
 import { configureCanvas } from '../ui/canvas';
+import { RELEASE_LAUNCH_NAVIGATION } from '../../../shared/src/registry';
 
-const TABS: Array<{ id: string; label: string; color: string }> = [
+const FULL_TABS: Array<{ id: string; label: string; color: string }> = [
   { id: 'chaowan', label: '藏品', color: THEME.accent },
   { id: 'ape', label: '猿岛', color: THEME.purple },
   { id: 'games', label: '游戏', color: THEME.accent2 },
   { id: 'trade', label: '交易', color: THEME.gold },
   { id: 'mine', label: '我的', color: THEME.green },
 ];
+
+const RELEASE_TAB_COLORS: Record<string, string> = {
+  home: THEME.accent,
+  games: THEME.accent2,
+  chaowan: THEME.purple,
+  mine: THEME.green,
+};
+
+export function tabsForProfile(profile: 'full-clone' | 'wechat-release'): Array<{ id: string; label: string; color: string }> {
+  if (profile === 'full-clone') return FULL_TABS;
+  return RELEASE_LAUNCH_NAVIGATION.tabs.map((tab) => ({ id: tab.targetTab, label: tab.label, color: RELEASE_TAB_COLORS[tab.targetTab] ?? THEME.accent }));
+}
 
 export class MiniGameClientApp {
   platform: PlatformAdapter;
@@ -140,7 +153,7 @@ export class MiniGameClientApp {
     this.platform.onFrame(() => this.frame());
     this.router = new Router(this);
     registerAllScreens(this);
-    this.router.switchTab('games');
+    this.router.switchTab(this.profile === 'wechat-release' ? RELEASE_LAUNCH_NAVIGATION.defaultTab : 'games');
 
     const inputScale = layout.inputScale;
 
@@ -226,7 +239,8 @@ export class MiniGameClientApp {
     // 清掉合规门，回主城
     while (this.router.stack.length) this.router.pop(true);
     const { SCREEN_ROUTES } = require('../features/registry');
-    if (SCREEN_ROUTES['home']) this.router.push(SCREEN_ROUTES['home']());
+    if (this.profile === 'wechat-release') this.router.switchTab(RELEASE_LAUNCH_NAVIGATION.defaultTab);
+    else if (SCREEN_ROUTES['home']) this.router.push(SCREEN_ROUTES['home']());
     this.audioManager.playBgm('home');
     // 邀请进游（Section 37：share query → server token）
     if (launchQuery.invite) {
@@ -428,8 +442,9 @@ export class MiniGameClientApp {
     ctx.fillRect(0, top, ui.w, ui.h - top);
     ctx.strokeStyle = THEME.line;
     ctx.strokeRect(0, top, ui.w, ui.h - top);
-    const tw = ui.w / TABS.length;
-    TABS.forEach((t, i) => {
+    const tabs = tabsForProfile(this.profile);
+    const tw = ui.w / tabs.length;
+    tabs.forEach((t, i) => {
       const active = this.router.currentTab === t.id && !this.router.stack.length;
       const x = i * tw;
       ui.textCenter(t.label, x + tw / 2, top + 32, { size: 14, bold: active, color: active ? t.color : THEME.textDim });

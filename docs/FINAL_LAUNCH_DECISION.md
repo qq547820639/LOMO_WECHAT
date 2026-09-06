@@ -30,12 +30,12 @@ Rationale：以上全部为服务端权威、无现金语义、tests 全绿；�
 
 | 维度 | 评级 | 依据 |
 |---|---|---|
-| 技术完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | verify 8/8 绿：构建/包冒烟/测试全通；缺 AppID/CDN |
+| 技术完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | `npm test` 18/18、`npm run verify` 全步骤通过；CloudRun Deploy 017 已上线，正式包 1.0.1 已通过 CLI 上传；仍缺正式 AppID/环境关联、真实微信登录与广告回执验收 |
 | 玩法完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | 22 玩法族服务端权威+客户端可玩；数值采用已校验的 OWNED_LAUNCH_DEFAULTS，可按运营数据调优 |
 | 页面覆盖 | **READY**（结构） | 680/680 路由有迁移决策；354 implemented + 其余全部有明确状态 |
 | 资源覆盖 | **PARTIALLY_READY** | 14,092 全分类+3,524 提取验证；PAG/动画已完成烘焙与图集/视频桶生成，正式 CDN 接入和权利链仍待外部完成 |
 | 服务端完成度 | **READY**（参考实现） | 权威账本/会话/排行/邮件/合规拦截全链路；生产部署与压测待做 |
-| 微信适配完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | 双产物真包+wx mock 启动验证；真机矩阵待补 |
+| 微信适配完成度 | **READY_WITH_EXTERNAL_CREDENTIALS** | 双产物与 wx mock 启动验证；公网 bootstrap 已 200，但 `wx.cloud.callContainer` 仍 85088，真机矩阵待补（见 [CLOUDBASE_MCP_2026-09-06.md](CLOUDBASE_MCP_2026-09-06.md)） |
 | 测试完成度 | **READY** | 单元/玩法/发布安全/无头端到端/包冒烟，verify 一键 |
 | 性能风险 | **LOW-MEDIUM** | 包体极小；图集体积与低端机 FPS 待实测 |
 | 审核风险 | **MEDIUM**（RELEASE 版可控） | 类赌博链路已三层切断；随机抽取免费化；仍需按提审口径复核文案与表现 |

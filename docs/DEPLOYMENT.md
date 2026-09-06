@@ -1,7 +1,13 @@
 # DEPLOYMENT（微信小游戏构建、资源与服务端部署）
 
+## 当前部署事实（2026-09-07）
+
+最新线上版本为 Deploy 017（状态 `normal`、流量 100%）；Deploy 016 仅为前一轮部署记录。
+
+Deploy 017 已成功上线 CloudRun，服务状态 `normal`、流量 100%，运行期 CloudBase 凭据已生效。新 CBR 根路由已启用，公网健康检查和 bootstrap 返回 200，伪造登录 code 返回 502 且无 token。生产集合为空且未迁移旧玩家；真实微信环境关联、真实登录、广告回执和真机回归仍是发布门禁。
+
 > 本工程使用自有 AppID、云环境、服务端与资源域名。研究归档中的原 App 域名、SDK、账号及素材权利信息不能作为上线配置或授权依据。
-> 2026-09-06 的本地修复、隔离云数据库测试与云端正在运行的版本必须分开验收。当前工作区已加入持久化实现；**没有部署该修复包、迁移生产玩家数据或轮换线上密钥**。最新代码回归以 [TEST_REPORT.md](TEST_REPORT.md) 与 [QA_RECHECK_2026-09-06.md](QA_RECHECK_2026-09-06.md) 的时间和覆盖范围为准。
+> 2026-09-06 的本地修复、隔离云数据库测试与云端正在运行的版本必须分开验收。当前工作区已加入持久化实现；修复包已部署为 Deploy 017，但尚未迁移生产玩家数据或完成真实微信链路验收。
 
 ## 1. 当前环境与实测边界
 
@@ -10,18 +16,20 @@
 | 微信 AppID | `wxec103651e807c540` |
 | CloudBase 环境 | `lomo-wechat-d0gcakr952f0d90b8`，上海 |
 | CloudBase Run 服务 | `lomo-wechat` |
-| 公网 API | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
+| 公网 API（当前） | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com` |
+| 旧 CloudRun 默认域（历史/备用） | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
 | 静态资源前缀 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/` |
 | 正式客户端产物 | `build/wechat-release/` |
 | 离线验收产物 | `build/verify/wechat-full-clone/`、`build/verify/wechat-release/` |
 | 服务端部署源 | `build/cloudrun/` |
 | 真实持久化测试集合 | `ape_qa_persistence`，管理员专用、合成身份；与生产玩家分离 |
-| 生产数据库集合配置 | `APP_DB_COLLECTION`，默认 `ape_game_state`；不代表已创建、迁移或部署 |
+| 生产数据库集合配置 | `APP_DB_COLLECTION`，默认 `ape_game_state`；MCP 已创建空集合并配置索引/`ADMINONLY`，不代表已迁移或部署 |
 
 当前证据不足以认定微信联网或正式登录通过：
 
-- 公网 `curl` 请求 `/v1/config/bootstrap` 返回过 200；这仅证明相应公网探测可达。
-- 微信开发者工具通过 `wx.cloud.callContainer` 请求同一环境、服务的 `/v1/config/bootstrap` 返回错误码 **85088**；客户端启动的 bootstrap 阶段也出现同码。具体原因仍待核验，应保留完整 `errMsg`、请求环境、服务名、时间及云端日志，不根据错误码猜测权限或服务状态。
+- Deploy 017 已通过伪造 code 门禁（返回 502 且无 token），CBR 根路由已启用并回读 `Enable=true`；仍需真实登录与持久化验收。
+- 公网 `curl` 请求 `/v1/config/bootstrap` 于 2026-09-06 返回 HTTP 200（`profile=wechat-release`）；这仅证明相应公网探测可达，完整 MCP 证据见 [CLOUDBASE_MCP_2026-09-06.md](CLOUDBASE_MCP_2026-09-06.md)。
+- 微信开发者工具通过 `wx.cloud.callContainer` 请求同一环境、服务的 `/v1/config/bootstrap` 仍返回错误码 **85088**；客户端启动的 bootstrap 阶段也出现同码。MCP 只读核验显示当前环境 `UserInfo.WxAppId` 为空，且以 `touristappid` 查询关联环境返回 0；需在微信/CloudBase 控制台完成真实 AppID 关联或同主体环境共享，不能根据公网路由判定已修复。
 - 开发者工具中使用 `wx.request` 请求公网 API，被 request 合法域名校验拦截；当时 Console 列出的合法域名只有 `https://tcb-api.tencentcloudapi.com`。需要在目标 AppID 的平台配置中核对所用 API/CDN 域名，再以 `urlCheck=true` 实测。
 - 本地 `.env.cloud` 检查未发现 `APP_WX_APPSECRET`。这不证明云端没有该变量；云端运行期配置和真实 `wx.login` → `code2Session` 尚未完成验收。
 - 本地修复后的服务端会在正式启动时拒绝缺失或无效的凭据。应完成运行期配置并验证后才部署，否则新实例会启动失败。
@@ -38,13 +46,13 @@ npm run verify
 
 `npm test` 会先编译；`verify` 使用隔离的 `build/verify/` 目录和离线替身，检查路由、资源、玩法、客户端、认证、服务端打包及包体。离线通过不代表微信云调用、正式登录、后台域名、持久化或平台审核通过，`build/verify/` 产物也不能用于正式分发。
 
-本轮最终回归为 `npm test` 16/16、`verify` 23/23（[TEST_REPORT.md](TEST_REPORT.md) 时间 `2026-09-06T11:45:07.028Z`）、原生 Canvas 6/6；运行依赖 `npm audit` 为 0 个已知漏洞。正式项目模板固定基础库 `3.16.2`；新构建正式授权页 0 个错误、1 条警告，进入后仍触发 85088，因此正式联机验收没有通过。
+本轮最终回归为 `npm test` 18/18、`verify` 全步骤通过（最新结果见 [TEST_REPORT.md](TEST_REPORT.md)）、原生 Canvas 6/6。补充审计发现生产依赖 `npm audit --omit=dev` 有 5 个传递漏洞（4 high、1 moderate，涉及 CloudBase SDK/axios/lodash）；已记录为上线前依赖升级风险，未在本轮强制升级。正式项目模板固定基础库 `3.16.2`；新构建正式授权页 0 个错误、1 条警告，进入后仍触发 85088，因此正式联机验收没有通过。激励广告协议已覆盖服务端凭证和持久化，但真实广告单元、平台回执验签与资质仍未验收。
 
 正式构建必须同时提供以下五项非密钥配置，缺项、无效 AppID 或非 HTTPS URL 会失败：
 
 ```bash
 APP_WX_APPID=wxec103651e807c540 \
-APP_SERVER_URL=https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com \
+APP_SERVER_URL=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com \
 APP_CLOUD_BASE=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/ \
 APP_CLOUD_ENV=lomo-wechat-d0gcakr952f0d90b8 \
 APP_CLOUD_SERVICE=lomo-wechat \
@@ -146,6 +154,26 @@ node dist/server/src/index.js
 
 以下是完成运行期配置、目标环境权限检查、数据库准备、迁移和备份恢复验收后使用的操作命令；本轮未执行部署。控制台需先开通云托管资源，并检查目标服务的环境、AppID 关联及访问配置。
 
+### 5.1 分阶段部署门禁与回滚
+
+部署前先在受控终端执行构建和预检。预检只读取环境变量，不打印任何密钥；运行时变量必须由 CloudRun 运行期密钥注入提供：
+
+```bash
+npm run build
+npm run package:server
+APP_SERVER_URL=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com \
+APP_SECRET="$APP_SECRET" APP_WX_APPID="$APP_WX_APPID" \
+APP_WX_APPSECRET="$APP_WX_APPSECRET" APP_PERSISTENCE=cloudbase \
+APP_CLOUD_ENV=lomo-wechat-d0gcakr952f0d90b8 \
+npm run cloudrun:readiness
+```
+
+`cloudrun:readiness` 会检查 `APP_SECRET`、真实微信 AppID/AppSecret、CloudBase 持久化和环境变量，并探测 `/v1/config/bootstrap`。它还向 `/v1/auth/wechat` 发送一次随机伪造 code；只有服务返回非 2xx 且不发放 token 才能通过 `invalid-code-rejected`。此检查必须在切流前完成，不能加 `--skip-invalid-code` 作为生产门禁。
+
+通过预检后，使用 `manageCloudRun(action="updateConfig")` 写入运行期变量，再使用 `manageCloudRun(action="deploy", targetPath=".../build/cloudrun", serverName="lomo-wechat", serverType="container")` 部署。部署返回后依次用 `queryCloudRun(action="detail")`、`queryCloudRun(action="getProcessLog")` 确认版本、RunId 和实例状态，再重复上述 readiness 检查。部署请求不得携带 Docker `ARG`、客户端密钥或未审核的 `OpenAccessTypes`；已禁用的 CBR 公网默认路由不得重新开启。
+
+任一门禁失败时保持旧版本流量，不执行 promote。若新版本已经接收流量，立即调用 `manageCloudRun(action="traffic", serverName="lomo-wechat", trafficOp="rollback")` 回退灰度流量，并轮询 `queryCloudRun(action="detail")` 直到旧版本恢复 100%。回滚是异步任务，必须记录返回的任务/请求 ID；回滚完成前不得删除旧版本。伪造 code 仍能签发 token、数据库初始化失败、AppID 关联缺失或 readiness 超时均属于自动回滚条件。
+
 ```bash
 export CLOUDBASE_ENV=lomo-wechat-d0gcakr952f0d90b8
 printf '\n' | npx -p @cloudbase/cli tcb cloudrun deploy -s lomo-wechat --port 8080 \
@@ -158,7 +186,7 @@ printf '\n' | npx -p @cloudbase/cli tcb cloudrun deploy -s lomo-wechat --port 80
 
 ```bash
 curl --fail --silent --show-error --max-time 15 \
-  https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com/v1/config/bootstrap
+  https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com/v1/config/bootstrap
 ```
 
 微信开发者工具 Console 的云调用探测：
@@ -190,7 +218,7 @@ https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com
 - **玩家数据持久化**：当前工作区已实现 CloudBase 事务持久化并增加隔离真实云验收工具；线上旧版本未升级，生产集合配置、旧玩家迁移、备份恢复及实际 Cloud Run 多副本验收未完成。不能根据本地或隔离测试关闭运营/收费阻断。
 - **密钥历史暴露**：本轮清除了本地部署产物中的注入方式，不代表历史镜像、缓存或已暴露凭据已失效。运行期迁移和密钥轮换需确认云端配置、依赖与回滚，本轮未执行。
 - **登录限流范围**：当前每进程总量 300 次/分钟、每 socket peer 30 次/分钟，不信任 `X-Forwarded-For`。反向代理用户会共享 peer bucket，多副本也不共享计数；需在可信网关配置全局限流，并根据流量验证阈值。
-- **正式联网与认证**：85088、合法域名缺项及本地缺 AppSecret 的问题仍需平台配置与真实 code 验收。公网 200、离线全绿和 UI 展示均不能关闭这些风险。
+- **正式联网与认证**：85088、合法域名缺项及真实 code 验收仍需平台配置；Deploy 017 已拒绝伪造 code，公网 200、离线全绿和 UI 展示均不能替代真实微信链路。
 - **内容与合规**：`wechat-release` 的现金能力关闭不替代美术权利链、隐私、实名/防沉迷、内容安全及平台审核。相关边界见 `COMPLIANCE_CURRENT.md`、`PRIVACY_DATA_MAP.md`、`EXTERNAL_BLOCKERS.md`；不要复用研究归档中的原版基础设施。
 
 官方接口资料：<https://developers.weixin.qq.com/minigame/dev/wxcloud/>。

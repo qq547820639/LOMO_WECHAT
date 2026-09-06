@@ -17,15 +17,24 @@ import { EconomyOps } from './economy';
 import { FEATURES_GAMES } from './games';
 import { ReadCtx } from './games/types';
 import { Rng } from '../../shared/src/rng';
-import { BuildProfile, CASH_SENSITIVE_FEATURES, FeaturePolicy, RELEASE_LOCKED_FLAGS, RemoteConfig, TuningConfig, featureEnabledInProfile, validateTuningConfig, TuningConfigError } from '../../shared/src/config';
+import { BuildProfile, CASH_SENSITIVE_FEATURES, FeaturePolicy, RELEASE_LOCKED_FLAGS, RemoteConfig, TuningConfig, featureEnabledInProfile, validateTuningConfig, TuningConfigError, RewardedAdSlot, RewardedAdsConfig } from '../../shared/src/config';
 import { AssetId } from '../../shared/src/assets';
 import { LedgerError } from '../../shared/src/ledger';
-import { AntiAddictionStatus, AuthWechatResponse, ConfigBootstrap, GameActionResponse, InventoryItemDto, PlayerStateDto, RankRow } from '../../shared/src/protocol';
+import { AntiAddictionStatus, AuthWechatResponse, ConfigBootstrap, GameActionResponse, InventoryItemDto, PlayerStateDto, RankRow, RewardedAdClaimResponse, RewardedAdReward } from '../../shared/src/protocol';
+import { RewardedAdRecord } from './store';
 
 const TUNING_FALLBACK: TuningConfig = {
   progression: { levelXpBase: 100, levelXpStep: 40, levelUpEnergy: 5 },
   energy: { initial: 30, max: 120, regenMinutes: 6, battleCost: 3, mineCost: 2, exploreCost: 4, minigameCost: 1 },
   economy: { initialCoin: 500, initialTicket: 5, mineCoinRange: [3, 8], refineOreCost: 10, refineCoin: 35 },
+};
+
+const REWARDED_AD_SLOTS: Record<RewardedAdSlot, { dailyCap: number; minIntervalMs: number; adUnitId: string }> = {
+  revive_escape: { dailyCap: 3, minIntervalMs: 90000, adUnitId: 'adunit-test-revive-escape' },
+  double_settlement: { dailyCap: 5, minIntervalMs: 60000, adUnitId: 'adunit-test-double-settlement' },
+  energy_refill: { dailyCap: 2, minIntervalMs: 60000, adUnitId: 'adunit-test-energy-refill' },
+  free_entry: { dailyCap: 1, minIntervalMs: 60000, adUnitId: 'adunit-test-free-entry' },
+  bonus_chest: { dailyCap: 1, minIntervalMs: 60000, adUnitId: 'adunit-test-bonus-chest' },
 };
 
 export interface AppOptions {
@@ -129,8 +138,9 @@ export class GameApp {
       featurePolicies: policies,
       numeric: {},
       json: {},
+      rewardedAds: this.rewardedAdsConfig(),
     };
-    cfg.signature = hmac(this.secret, JSON.stringify({ v: cfg.version, t: cfg.tuning, p: policies }));
+    cfg.signature = hmac(this.secret, JSON.stringify({ v: cfg.version, t: cfg.tuning, p: policies, a: cfg.rewardedAds }));
     return cfg;
   }
 
@@ -152,6 +162,7 @@ export class GameApp {
       routesEnabled: cfg.routesEnabled,
       release,
       assetManifestVersion: 'asset-manifest-1',
+      rewardedAds: cfg.rewardedAds,
     };
   }
 
@@ -340,6 +351,52 @@ export class GameApp {
     this.store.player(playerId)!.inventory['free_box_key'] = { qty: 3, lockedQty: 0 };
   }
 
+  rewardedAdsConfig(): RewardedAdsConfig {
+    const slots = Object.fromEntries(Object.entries(REWARDED_AD_SLOTS).map(([slot, defaults]) => [slot, {
+      enabled: this.profile !== 'wechat-release' || slot !== 'double_settlement',
+      adUnitId: defaults.adUnitId,
+      dailyCap: defaults.dailyCap,
+      minIntervalMs: defaults.minIntervalMs,
+    }])) as RewardedAdsConfig['slots'];
+    return { enabled: this.releaseAllowsRewardedAds(), dailyCap: 6, hourlyCap: 3, ttlMs: 8 * 60 * 1000, slots };
+  }
+
+  private releaseAllowsRewardedAds(): boolean {
+    try {
+      const fs = require('node:fs');
+      const release = JSON.parse(fs.readFileSync(rootPath('configs', this.profile === 'full-clone' ? 'full-clone.json' : 'wechat-release.json'), 'utf8'));
+      return release.allowRewardedAds !== false;
+    } catch {
+      return true;
+    }
+  }
+
+  private sameShanghaiDay(left: number, right: number): boolean {
+    const day = (at: number) => new Date(at + 8 * 3600000).toISOString().slice(0, 10);
+    return day(left) === day(right);
+  }
+
+  private adReward(slot: RewardedAdSlot, settlementId?: string): RewardedAdReward {
+    if (slot === 'energy_refill') return { kind: 'grant', rewards: [{ assetId: 'ENERGY', delta: 5 }] };
+    if (slot === 'bonus_chest') return { kind: 'grant', rewards: [{ assetId: 'COIN', delta: 30 }] };
+    if (slot === 'double_settlement') return { kind: 'multiplier', multiplier: 2, settlementId: settlementId || '' };
+    return { kind: 'entitlement', entitlement: slot };
+  }
+
+  private adResponse(record: RewardedAdRecord): Record<string, unknown> {
+    const response: Record<string, unknown> = {
+      ok: true, adId: record.adId, settlementId: record.settlementId || record.adId, state: 'granted',
+    };
+    if (record.reward.kind === 'grant') response.rewards = record.reward.rewards.filter((reward) => reward.delta > 0);
+    if (record.reward.kind === 'multiplier') response.multiplier = 2;
+    if (record.reward.kind === 'entitlement') response.entitlement = record.reward.entitlement;
+    return response;
+  }
+
+  private adIssueResponse(record: RewardedAdRecord, adUnitId: string): Record<string, unknown> {
+    return { ok: true, adId: record.adId, claimToken: record.claimToken, slot: record.slot, adUnitId, state: record.state, issuedAt: record.issuedAt, expiresAt: record.expiresAt, reward: record.reward };
+  }
+
   routes(): RouteDef[] {
     const app = this;
     const authed = (ctx: HttpCtx): string | null => app.verifyToken(String(ctx.req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (typeof ctx.body?.token === 'string' ? ctx.body.token : undefined));
@@ -351,6 +408,9 @@ export class GameApp {
     };
 
     const routes: RouteDef[] = [
+      {
+        method: 'GET', pattern: '/health', handler: (ctx) => { ctx.json({ ok: true, service: 'lomo-wechat', profile: this.profile }); },
+      },
       // ---- auth ----
       {
         method: 'POST', pattern: '/v1/auth/wechat', handler: async (ctx) => {
@@ -422,6 +482,170 @@ export class GameApp {
             return;
           }
           ctx.json({ ok: true, recorded: true, action: 'proceed' });
+        },
+      },
+      // ---- rewarded ads（server-issued receipt + ledger grant） ----
+      {
+        method: 'POST', pattern: '/v1/ads/rewarded/issue', handler: (ctx) => {
+          const playerId = guard(ctx);
+          if (!playerId) return;
+          const body = ctx.body || {};
+          const slot = body.slot as RewardedAdSlot;
+          const idempotencyKey = body.idempotencyKey;
+          if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(idempotencyKey))) {
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告幂等键格式无效' }); return;
+          }
+          const config = this.rewardedAdsConfig();
+          if (!config.enabled) { ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: '激励广告暂不可用' }); return; }
+          if (!Object.prototype.hasOwnProperty.call(config.slots, slot) || !config.slots[slot].enabled) {
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告位无效' }); return;
+          }
+          if (this.profile === 'wechat-release' && !this.antiAddiction(playerId).playableNow) {
+            ctx.status(403); ctx.json({ ok: false, code: 'COMPLIANCE_BLOCKED', message: '当前不可观看激励广告' }); return;
+          }
+          const now = this.now();
+          const records = this.store.rewardedAdsFor(playerId);
+          for (const record of records) {
+            if ((record.state === 'issued' || record.state === 'playing') && now >= record.expiresAt) {
+              record.state = 'expired';
+              this.store.saveRewardedAd(record);
+            }
+          }
+          const issueFingerprint = hmac('rewarded-ad-issue-v1', JSON.stringify({ slot, sessionId: typeof body.sessionId === 'string' ? body.sessionId : null, settlementId: typeof body.settlementId === 'string' ? body.settlementId : null }));
+          if (idempotencyKey) {
+            const prior = records.find((record) => record.idempotencyKey === idempotencyKey);
+            if (prior) {
+              if (prior.issueFingerprint !== issueFingerprint) { ctx.status(409); ctx.json({ ok: false, code: 'IDEMPOTENCY_CONFLICT', message: '广告幂等键已用于其他请求' }); return; }
+              ctx.json(this.adIssueResponse(prior, config.slots[prior.slot].adUnitId)); return;
+            }
+          }
+          const completedToday = records.filter((record) => record.state === 'granted' && this.sameShanghaiDay(record.issuedAt, now));
+          if (completedToday.length >= config.dailyCap) {
+            ctx.status(429); ctx.json({ ok: false, code: 'RATE_LIMITED', message: '今日激励广告次数已用完' }); return;
+          }
+          const completedHour = records.filter((record) => record.state === 'granted' && now - record.issuedAt < 3600000);
+          if (completedHour.length >= config.hourlyCap) {
+            ctx.status(429); ctx.json({ ok: false, code: 'RATE_LIMITED', message: '激励广告过于频繁，请稍后再试' }); return;
+          }
+          const slotConfig = config.slots[slot];
+          if (!slotConfig.enabled) {
+            ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: '该广告位暂未开放' }); return;
+          }
+          const lastSlot = records.filter((record) => record.slot === slot && record.state === 'granted').sort((a, b) => b.issuedAt - a.issuedAt)[0];
+          const completedSlotToday = records.filter((record) => record.slot === slot && record.state === 'granted' && this.sameShanghaiDay(record.issuedAt, now)).length;
+          if (completedSlotToday >= slotConfig.dailyCap) {
+            ctx.status(429); ctx.json({ ok: false, code: 'RATE_LIMITED', message: '该广告位今日次数已用完' }); return;
+          }
+          if (lastSlot && now - lastSlot.issuedAt < slotConfig.minIntervalMs) {
+            ctx.status(429); ctx.json({ ok: false, code: 'RATE_LIMITED', message: '该广告位冷却中，请稍后再试' }); return;
+          }
+          const sameContext = records.find((record) => record.slot === slot && record.state !== 'expired' &&
+            ((slot === 'revive_escape' || slot === 'double_settlement') || record.state !== 'granted') &&
+            (record.sessionId || '') === (typeof body.sessionId === 'string' ? body.sessionId : '') &&
+            (record.settlementId || '') === (typeof body.settlementId === 'string' ? body.settlementId : ''));
+          if (sameContext) { ctx.status(409); ctx.json({ ok: false, code: 'RATE_LIMITED', message: '已有进行中的广告凭证' }); return; }
+          let sessionId: string | undefined;
+          if (slot === 'revive_escape') {
+            if (typeof body.sessionId !== 'string' || !body.sessionId) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '复活广告需要有效游戏会话' }); return; }
+            const session = this.store.session(body.sessionId);
+            const failedEscape = !!session && session.featureId === 'escapeTiger' && session.finished && (session.data as any)?.alive === false && (session.data as any)?.finished === true;
+            if (!session || session.playerId !== playerId || (session.finished && !failedEscape)) { ctx.status(400); ctx.json({ ok: false, code: 'SESSION_STALE', message: '复活广告会话无效' }); return; }
+            sessionId = body.sessionId;
+          }
+          let settlementId: string | undefined;
+          if (slot === 'double_settlement') {
+            if (typeof body.settlementId !== 'string' || !body.settlementId.trim()) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '翻倍广告需要结算凭证' }); return; }
+            settlementId = body.settlementId.trim();
+          }
+          const adId = `ad_${this.newId(18)}`;
+          const record: RewardedAdRecord = {
+            adId, claimToken: this.newId(32), playerId, slot, state: 'issued', issuedAt: now,
+            expiresAt: now + config.ttlMs, sessionId, settlementId, reward: this.adReward(slot, settlementId), idempotencyKey, issueFingerprint,
+          };
+          this.store.saveRewardedAd(record);
+          this.store.audit(playerId, 'ad.issued', { adId, slot });
+          this.store.telemetry('ad_offer_issued', { playerId, adId, slot });
+          ctx.json(this.adIssueResponse(record, slotConfig.adUnitId));
+        },
+      },
+      {
+        method: 'POST', pattern: '/v1/ads/rewarded/start', handler: (ctx) => {
+          const playerId = guard(ctx);
+          if (!playerId) return;
+          const { adId, claimToken } = ctx.body || {};
+          if (typeof adId !== 'string' || typeof claimToken !== 'string') { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告凭证格式无效' }); return; }
+          const record = this.store.rewardedAd(playerId, adId);
+          if (!record) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '广告凭证不存在' }); return; }
+          if (!safeEqual(record.claimToken, claimToken)) { ctx.status(409); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告凭证不匹配' }); return; }
+          if (record.state === 'granted') { ctx.json({ ok: true, adId, state: 'granted' }); return; }
+          if (record.state === 'expired' || this.now() >= record.expiresAt) { record.state = 'expired'; this.store.saveRewardedAd(record); ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告凭证已过期' }); return; }
+          record.state = 'playing';
+          this.store.saveRewardedAd(record);
+          this.store.telemetry('ad_started', { playerId, adId, slot: record.slot });
+          ctx.json({ ok: true, adId, state: record.state });
+        },
+      },
+      {
+        method: 'POST', pattern: '/v1/ads/rewarded/claim', handler: (ctx) => {
+          const playerId = guard(ctx);
+          if (!playerId) return;
+          const { adId, claimToken, completed, receipt } = ctx.body || {};
+          if (typeof adId !== 'string' || typeof claimToken !== 'string' || typeof completed !== 'boolean') { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告领取参数无效' }); return; }
+          const record = this.store.rewardedAd(playerId, adId);
+          if (!record) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '广告凭证不存在' }); return; }
+          if (!safeEqual(record.claimToken, claimToken)) { ctx.status(409); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告凭证不匹配' }); return; }
+          if (record.state === 'granted' && record.claimResponse) { ctx.json(JSON.parse(JSON.stringify(record.claimResponse))); return; }
+          if (record.state === 'expired' || this.now() >= record.expiresAt) { record.state = 'expired'; this.store.saveRewardedAd(record); ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告凭证已过期' }); return; }
+          if (record.state !== 'playing') {
+            this.store.telemetry('ad_failed', { playerId, adId, slot: record.slot, reason: 'invalid_state', state: record.state });
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告尚未开始或状态无效' }); return;
+          }
+          if (!completed || typeof receipt !== 'string' || !receipt.trim()) {
+            this.store.telemetry('ad_failed', { playerId, adId, slot: record.slot, reason: 'incomplete' });
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '广告未完整观看，无法领取奖励' }); return;
+          }
+          record.state = 'verified';
+          const econ = new EconomyOps(this.store, this.profile);
+          try {
+            if (record.reward.kind === 'grant') {
+              for (const reward of record.reward.rewards) {
+                const actual = reward.assetId === 'ENERGY' ? Math.max(0, Math.min(reward.delta, this.tuningNum('energy.max', 120) - econ.balance(playerId, 'ENERGY'))) : reward.delta;
+                if (actual > 0) econ.grant(playerId, reward.assetId, actual, 'ad', record.adId, `ad:${record.adId}:${reward.assetId}`);
+                reward.delta = actual;
+              }
+            } else if (record.reward.kind === 'entitlement') {
+              const player = this.store.player(playerId)!;
+              player.counters[`ad.${record.reward.entitlement}`] = (player.counters[`ad.${record.reward.entitlement}`] || 0) + 1;
+              if (record.reward.entitlement === 'revive_escape' && record.sessionId) {
+                const session = this.store.session(record.sessionId);
+                if (session && session.playerId === playerId) {
+                  const state = session.data as any;
+                  if (session.featureId === 'escapeTiger' && state.alive === false && state.finished === true) {
+                    state.step = Math.max(0, Number(state.step || 0) - 1);
+                    state.tigerDist = 3;
+                    if (Array.isArray(state.obstacles) && state.step >= 0) state.obstacles[state.step] = -1;
+                    state.alive = true;
+                    state.finished = false;
+                    session.finished = false;
+                  }
+                  state.adRevived = true;
+                  state.reviveAt = this.now();
+                }
+              }
+              this.store.touch();
+            }
+          } catch (error) {
+            record.state = 'verified';
+            this.store.saveRewardedAd(record);
+            throw error;
+          }
+          record.state = 'granted';
+          const response = this.adResponse(record) as unknown as RewardedAdClaimResponse;
+          record.claimResponse = JSON.parse(JSON.stringify(response));
+          this.store.saveRewardedAd(record);
+          this.store.audit(playerId, 'ad.granted', { adId, slot: record.slot, receipt: typeof receipt === 'string' ? receipt.slice(0, 64) : undefined });
+          this.store.telemetry('ad_reward_granted', { playerId, adId, slot: record.slot });
+          ctx.json(response);
         },
       },
       // ---- game session ----
@@ -674,7 +898,7 @@ export class GameApp {
           const configured = process.env.APP_ADMIN_TOKEN;
           const supplied = String(ctx.req.headers['x-admin-token'] || ctx.body?.adminToken || '');
           if (!configured || !safeEqual(supplied, configured)) { ctx.status(401); ctx.json({ ok: false, code: 'ADMIN_AUTH_REQUIRED', message: 'admin token required' }); return; }
-          this.store.data = { players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [], actionReceipts: {}, actionNonces: {} };
+          this.store.data = { players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [], actionReceipts: {}, actionNonces: {}, rewardedAds: {} };
           this.seedNpcPlayers();
           ctx.json({ ok: true });
         },

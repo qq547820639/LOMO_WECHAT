@@ -54,6 +54,7 @@ class Router {
         while (this.stack.length)
             this.pop(true);
         this.currentTab = tab;
+        Promise.resolve(this.current.onEnter()).catch((e) => { this.current.error = String((e === null || e === void 0 ? void 0 : e.message) || e); });
         this.setupPoll();
     }
     push(screen, params = {}) {

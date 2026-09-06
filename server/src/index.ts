@@ -46,7 +46,14 @@ if (require.main === module) {
     const port = Number(process.env.PORT || 8787);
     const persistent = process.env.APP_PERSISTENCE === 'cloudbase';
     const application = persistent
-      ? await createPersistentApp(new PersistentRepository(new CloudBaseDocumentDatabase({ env: process.env.APP_CLOUD_ENV || '', collection: process.env.APP_DB_COLLECTION || 'ape_game_state', region: process.env.APP_CLOUD_REGION || 'ap-shanghai' })), { appId: process.env.APP_WX_APPID || '', profile: 'wechat-release' })
+      ? await createPersistentApp(new PersistentRepository(new CloudBaseDocumentDatabase({
+        env: process.env.APP_CLOUD_ENV || '',
+        collection: process.env.APP_DB_COLLECTION || 'ape_game_state',
+        region: process.env.APP_CLOUD_REGION || 'ap-shanghai',
+        secretId: process.env.TENCENTCLOUD_SECRETID,
+        secretKey: process.env.TENCENTCLOUD_SECRETKEY,
+        sessionToken: process.env.TENCENTCLOUD_SESSIONTOKEN,
+      })), { appId: process.env.APP_WX_APPID || '', profile: 'wechat-release' })
       : createApp({ persistPath: process.env.APP_DATA_DIR ? path.join(process.env.APP_DATA_DIR, 'store.json') : null });
     const { app, server } = application;
     server.listen(port, () => console.log(`[game-server] profile=${app.profile} persistence=${persistent ? 'cloudbase' : 'local-development'} port=${port}`));
@@ -68,7 +75,10 @@ if (require.main === module) {
   };
   start().catch((error: unknown) => {
     const message = error instanceof Error && error.message.startsWith('Missing or invalid runtime configuration:') ? error.message : 'startup failed; verify runtime credentials, database collection and permissions';
-    console.error(`[game-server] ${message}`);
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    const detail = error instanceof Error ? error.message.replace(/[A-Za-z0-9+/=_-]{24,}/g, '[redacted]').slice(0, 160) : '';
+    const runtime = `cloudEnv=${process.env.APP_CLOUD_ENV ? 'set' : 'missing'} collection=${process.env.APP_DB_COLLECTION ? 'set' : 'default'} tencentCredentials=${process.env.TENCENTCLOUD_SECRETID && process.env.TENCENTCLOUD_SECRETKEY ? 'set' : 'missing'}`;
+    console.error(`[game-server] ${message}${code ? ` code=${code}` : ''}${detail && message === 'startup failed; verify runtime credentials, database collection and permissions' ? ` detail=${detail}` : ''} ${runtime}`);
     process.exitCode = 1;
   });
 }

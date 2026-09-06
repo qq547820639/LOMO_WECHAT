@@ -13,7 +13,7 @@ interface EtState { step: number; lane: number; tigerDist: number; buffs: string
 export const escapeTiger: FeatureGame = {
   id: 'escapeTiger',
   readState: (ctx) => {
-    const active = Object.values(ctx.store.data.sessions).find((s) => s.playerId === ctx.playerId && s.featureId === 'escapeTiger' && !s.finished);
+    const active = Object.values(ctx.store.data.sessions).find((s) => s.playerId === ctx.playerId && s.featureId === 'escapeTiger' && !s.finished && Array.isArray((s.data as any)?.obstacles));
     return {
       stepsPerRun: ctx.num('escapeTiger.stepsPerRun', 12),
       tigerSpeed: ctx.num('escapeTiger.tigerSpeed', 1.15),
@@ -30,7 +30,16 @@ export const escapeTiger: FeatureGame = {
       if (!ctx.session) return fail('需要会话');
       const cost = ctx.num('energy.minigameCost', 1);
       ctx.econ.regenEnergy(ctx.player, ctx.now, ctx.num('energy.max', 120), ctx.num('energy.regenMinutes', 6));
-      if (!ctx.econ.payFrom(ctx.player, { ENERGY: cost }, 'escapeTiger.start', 'run')) return fail('体力不足');
+      if (!ctx.econ.payFrom(ctx.player, { ENERGY: cost }, 'escapeTiger.start', 'run')) {
+        const freeEntries = ctx.player.counters['ad.free_entry'] ?? 0;
+        if (freeEntries <= 0) {
+          ctx.session!.finished = true;
+          ctx.store.touch();
+          return fail('体力不足');
+        }
+        ctx.player.counters['ad.free_entry'] = freeEntries - 1;
+        ctx.store.touch();
+      }
       const session = ctx.session!;
       const steps = ctx.num('escapeTiger.stepsPerRun', 12);
       // 预生成每步的障碍车道（服务端私密，客户端逐步揭示）
@@ -92,7 +101,10 @@ export const escapeTiger: FeatureGame = {
     },
   },
 };
-function sanitizeEt(s: EtState) { return { ...s, obstacles: s.obstacles.map((o, i) => (i < s.step ? o : -1)) }; }
+function sanitizeEt(s: EtState) {
+  const obstacles = Array.isArray(s?.obstacles) ? s.obstacles : [];
+  return { ...s, obstacles: obstacles.map((o, i) => (i < (Number(s.step) || 0) ? o : -1)) };
+}
 
 // ---------------- 今晚吃鸡（ChickenActivity/ChickenLogsActivity：鸡窝/偷鸡者/预警/防守/收获） ----------------
 export const chicken: FeatureGame = {

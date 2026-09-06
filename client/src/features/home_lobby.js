@@ -10,6 +10,7 @@ const registry_1 = require("./registry");
 const registry_2 = require("./registry");
 const data_gen_1 = require("../../../shared/src/gen/data.gen");
 const brand_1 = require("../../../shared/src/brand");
+const registry_3 = require("../../../shared/src/registry");
 class HomeLobbyScreen extends base_1.ApiScreen {
     constructor() {
         super('home', brand_1.BRAND.homeTitle);
@@ -29,6 +30,7 @@ class HomeLobbyScreen extends base_1.ApiScreen {
     render() {
         var _a, _b, _c, _d;
         const ui = this.app.ui;
+        const release = this.app.profile === 'wechat-release';
         const top = 64;
         let y = top + 6;
         // 公告
@@ -38,7 +40,11 @@ class HomeLobbyScreen extends base_1.ApiScreen {
         (_a = this.minerClip) === null || _a === void 0 ? void 0 : _a.draw(ui, ui.w - 44, y + 23, this.app.frameDt);
         y += 54;
         // 核心宫格（两行）
-        const core = [
+        const core = release ? [
+            ['escapeTiger', '虎口逃生', theme_1.THEME.accent],
+            ['marbles', '弹珠', theme_1.THEME.purple],
+            ['undertown', '地下城', theme_1.THEME.accent2],
+        ] : [
             ['battleRoyal', '大逃杀', theme_1.THEME.accent],
             ['undertown', '地下城', theme_1.THEME.purple],
             ['arena', '竞技场', theme_1.THEME.accent2],
@@ -59,7 +65,9 @@ class HomeLobbyScreen extends base_1.ApiScreen {
         // 生态入口（全部 keep/defer 族）
         ui.text('全部功能', 16, y + 12, { size: 13, bold: true });
         y += 18;
-        const list = data_gen_1.FEATURES.filter((f) => this.app.profile === 'full-clone' || f.release !== 'cut');
+        const list = release
+            ? data_gen_1.FEATURES.filter((f) => registry_3.RELEASE_CORE_FEATURES.includes(f.id))
+            : data_gen_1.FEATURES.filter((f) => this.app.profile === 'full-clone' || f.release !== 'cut');
         const rw = (ui.w - 24 - 3 * 6) / 4;
         list.forEach((f, i) => {
             const rx = 12 + (i % 4) * (rw + 6);

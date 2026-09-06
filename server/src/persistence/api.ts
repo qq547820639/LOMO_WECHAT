@@ -39,6 +39,7 @@ export class PersistentApi {
   }
 
   private async dispatch(route: RouteDef, ctx: HttpCtx): Promise<CommandResponse> {
+    if (route.pattern === '/health') { return this.capture(route, ctx); }
     if (route.pattern === '/v1/config/bootstrap') { await this.repository.ready(); return this.capture(route, ctx); }
     if (route.pattern === '/v1/admin/reset') return error(403, 'FEATURE_DISABLED', '持久化服务禁止在线重置玩家数据');
     if (/^\/v1\/(market|mall|settlement|agent)\//.test(route.pattern)) return error(403, 'FEATURE_DISABLED', '正式版本未开放该功能');
@@ -68,6 +69,7 @@ export class PersistentApi {
     if (featureId === 'arena') candidates = await this.repository.database.query({ kind: 'player', order: 'createdAt', direction: 'asc', limit: 9 });
     const entropy = createHmac('sha256', this.app.secret).update(`${actor}:${commandId || randomBytes(16).toString('hex')}`).digest('hex');
     return this.repository.execute({ actor, now, entropy, commandId, fingerprint, mutating, featureId,
+      rewardedAds: route.pattern.startsWith('/v1/ads/rewarded/'),
       sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
       mailId: route.pattern === '/v1/mail/claim' && typeof body.mailId === 'string' ? body.mailId : undefined,
       inviteToken: route.pattern === '/v1/social/invite/accept' && typeof body.token === 'string' ? body.token : undefined,

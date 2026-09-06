@@ -1,4 +1,4 @@
-import cloudbase = require('@cloudbase/js-sdk');
+import cloudbase = require('@cloudbase/node-sdk');
 import { BoundedTransaction, DocumentDatabase, DocumentQuery, DocumentTransaction, PersistedDocument, PersistenceError } from './database';
 
 function encode(value: unknown): unknown {
@@ -42,8 +42,9 @@ export class CloudBaseDocumentDatabase implements DocumentDatabase {
   private database: any;
   constructor(private options: CloudBaseDatabaseOptions) {
     if (!/^[A-Za-z][A-Za-z0-9_-]{1,63}$/.test(options.collection) || !options.env) throw new Error('Invalid CloudBase persistence configuration');
+    const accessKey = process.env.CLOUDBASE_APIKEY;
     const app = cloudbase.init({ env: options.env, region: options.region || 'ap-shanghai', endPointMode: 'CLOUD_API', timeout: 10000,
-      ...(options.secretId ? { secretId: options.secretId, secretKey: options.secretKey, sessionToken: options.sessionToken } : {}) } as any);
+      ...(accessKey ? { accessKey } : options.secretId ? { secretId: options.secretId, secretKey: options.secretKey, sessionToken: options.sessionToken } : {}) } as any);
     this.database = app.database();
   }
 

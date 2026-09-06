@@ -20,6 +20,7 @@ export class EscapeTigerScreen extends ApiScreen {
   private sessionId: string | null = null;
   private animal = 'monkey';
   private lastMsg = '';
+  private failedSessionId: string | null = null;
   private runnerClip: any = null;
   private tigerClip: any = null;
 
@@ -28,6 +29,28 @@ export class EscapeTigerScreen extends ApiScreen {
   }
 
   constructor() { super('escapeTiger', '虎口逃生'); }
+
+  private async watchRewarded(slot: 'revive_escape' | 'free_entry', context?: { sessionId?: string }): Promise<boolean> {
+    try {
+      const issue = await this.app.api.issueRewardedAd(slot, context);
+      if (!issue.ok) { this.app.showToast(issue.message || '当前暂无激励广告'); return false; }
+      const started = await this.app.api.startRewardedAd(issue.adId, issue.claimToken);
+      if (!started.ok) { this.app.showToast(started.message || '广告准备失败'); return false; }
+      const adConfig = this.app.api.bootstrap?.rewardedAds?.slots?.[slot];
+      const ad = this.app.platform.createRewardedAd(adConfig?.adUnitId || issue.adUnitId);
+      try {
+        await ad.load();
+        const result = await ad.show();
+        const claimed = await this.app.api.claimRewardedAd(issue.adId, issue.claimToken, result);
+        if (!claimed.ok) { this.app.showToast(claimed.message || '广告未完整观看'); return false; }
+        this.app.handleGameResponse(claimed);
+        return true;
+      } finally { ad.destroy(); }
+    } catch (error: any) {
+      this.app.showToast(error?.message || '广告暂不可用，请稍后重试');
+      return false;
+    }
+  }
 
   protected async fetchState(): Promise<any> {
     const r = await this.app.api.gameState('escapeTiger');
@@ -42,6 +65,19 @@ export class EscapeTigerScreen extends ApiScreen {
     const st = this.state;
     let y = top + 6;
     if (!this.sessionId) {
+      if (this.failedSessionId) {
+        ui.panel({ x: 12, y, w: ui.w - 24, h: 58 }, THEME.panel2);
+        ui.text('虎口复活机会', 24, y + 20, { size: 12, bold: true, color: THEME.gold });
+        ui.text('完整观看一条激励广告，回到上一障碍继续逃亡', 24, y + 40, { size: 10, color: THEME.textDim });
+        ui.button({ x: ui.w - 132, y: y + 10, w: 108, h: 36 }, '看广告复活', async () => {
+          const sessionId = this.failedSessionId;
+          if (sessionId && await this.watchRewarded('revive_escape', { sessionId })) {
+            this.failedSessionId = null;
+            await this.onEnter();
+          }
+        }, { color: THEME.gold, size: 11 });
+        y += 68;
+      }
       ui.panel({ x: 12, y, w: ui.w - 24, h: 56 }, THEME.panel);
       ui.text('猛虎在身后！选择一只动物开始逃亡', 24, y + 20, { size: 13, bold: true });
       ui.text(`每局 ${st.stepsPerRun} 步 · 选车道躲障碍 · 护盾/无敌/加速 · 最佳金币 ${st.best}`, 24, y + 40, { size: 10, color: THEME.textDim });
@@ -55,7 +91,17 @@ export class EscapeTigerScreen extends ApiScreen {
       this.runnerClip?.draw(ui, ui.w / 2, y + 24, this.app.frameDt);
       ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, '开始逃亡（体力 -1）', async () => {
         const s = await this.app.api.post('/v1/game/session/start', { featureId: 'escapeTiger' });
-        if (!s.ok) { this.app.showToast(s.message); return; }
+        if (!s.ok) {
+          if (s.message?.includes('体力不足') && await this.watchRewarded('free_entry')) {
+            const retry = await this.app.api.post('/v1/game/session/start', { featureId: 'escapeTiger' });
+            if (!retry.ok) { this.app.showToast(retry.message); return; }
+            const rr = await this.app.api.action('escapeTiger', 'start', { animal: this.animal }, retry.sessionId, 1);
+            if (rr.ok) { this.sessionId = retry.sessionId; this.lastMsg = rr.message; }
+            else this.app.showToast(rr.message);
+            await this.onEnter();
+          } else this.app.showToast(s.message);
+          return;
+        }
         const r = await this.app.api.action('escapeTiger', 'start', { animal: this.animal }, s.sessionId, 1);
         if (r.ok) { this.sessionId = s.sessionId; this.lastMsg = r.message; }
         else this.app.showToast(r.message);
@@ -112,6 +158,7 @@ export class EscapeTigerScreen extends ApiScreen {
     this.app.handleGameResponse(r);
     if (r.ok) {
       this.lastMsg = r.message;
+      if (r.ok && r.message.includes('绳断')) this.failedSessionId = sessionId || null;
       if (r.ok && (r.message.includes('逃离') || r.message.includes('绳断') || actionId === 'abort')) this.sessionId = null;
     }
     await this.onEnter();

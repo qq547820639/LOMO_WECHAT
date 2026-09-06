@@ -1,8 +1,14 @@
 # QA 交接手册：猿岛 ApeIsland 微信小游戏
 
+> 收尾状态（2026-09-07）：Deploy 017 已上线 CloudRun 并承载 100% 流量；公网 health/bootstrap 为 200，伪造 code 返回 502 且无 token。生产集合为空，真实微信环境关联、登录、广告回执和真机回归仍未完成。
+
+> 最新线上版本已推进至 Deploy 017，状态 `normal`、流量 100%；上条 Deploy 016 为历史记录。
+
 > 更新：2026-09-06。本手册以当前工作区修复后的代码为准；Git HEAD 为 `5bf2381`，本轮修复尚未提交。旧交接中的“已就绪、直接登录即可测试”不再作为验收结论。
 >
-> 当前结论：最终本地测试 16/16、verify 23/23、Canvas 6/6，隔离真实数据库应用集成 7 组通过。本地 QA 可继续；正式微信联网、官方登录、生产持久化迁移/部署和完整视觉验收尚未通过。本轮服务端修复未部署，不能据此认定具备正式运营条件。
+> 当前结论：最终本地测试 18/18、verify 全步骤通过、Canvas 6/6，隔离真实数据库应用集成和广告凭证重启回归通过。服务端修复已部署为 Deploy 017；正式微信环境、官方登录、真实广告回执、生产迁移和完整视觉验收尚未通过，不能据此认定具备正式运营条件。
+
+> 平台动作：2026-09-07 使用微信开发者工具 CLI 将 `build/wechat-release/` 以版本 `1.0.1` 上传成功（CLI 返回 `✔ upload`，总包 3,063,784 字节）。这代表上传请求完成，不代表平台审核、体验版真机验证或正式发布完成。
 
 ## 1. 环境与产物
 
@@ -13,12 +19,13 @@
 | 微信 AppID | `wxec103651e807c540` |
 | CloudBase 环境 | `lomo-wechat-d0gcakr952f0d90b8`，上海 |
 | CloudBase Run 服务 | `lomo-wechat` |
-| 公网 API | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
+| 公网 API（当前） | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com`（CBR 根路由 `/`，已启用路径透传） |
+| 旧 CloudRun 默认域（历史/备用） | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
 | CDN 前缀 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/` |
 | 正式客户端 | `build/wechat-release/`，`urlCheck=true`，本轮 **3,187,979 字节 / 3.0403 MiB**，门禁为 4 MiB |
 | 本地交互 QA 包 | `build/wechat-qa/`，回环服务、合成身份、内存进度、`urlCheck=false` |
 | 自动验收产物 | `build/verify/wechat-full-clone/`、`build/verify/wechat-release/`，离线替身配置，不能分发 |
-| 服务端打包目录 | `build/cloudrun/`；本轮修复包未部署 |
+| 服务端打包目录 | `build/cloudrun/`；Deploy 017 已部署，状态 `normal`、流量 100% |
 | 隔离真实数据库测试 | `ape_qa_persistence`，管理员专用、合成身份，不是生产玩家集合 |
 | 生产数据库配置 | `APP_PERSISTENCE=cloudbase`、`APP_CLOUD_ENV`；`APP_DB_COLLECTION` 默认 `ape_game_state`，`APP_CLOUD_REGION` 默认 `ap-shanghai`；不代表生产集合已就绪 |
 | 工具环境 | macOS，微信开发者工具 `2.02.2609032 Nightly`，模板固定基础库 `3.16.2`；后续测试记录实际版本 |
@@ -28,14 +35,14 @@
 
 | 检查 | 当前结果 | 证明范围 |
 |---|---|---|
-| `npm test` | **16/16 通过** | 包含新增持久化和幂等回归；具体范围见 [QA_RECHECK_2026-09-06.md](QA_RECHECK_2026-09-06.md)；旧 14/14 为历史结果 |
-| `npm run verify` | **23/23 通过** | 见 [TEST_REPORT.md](TEST_REPORT.md)，报告时间 `2026-09-06T11:45:07.028Z`；旧 21 步为历史轮次 |
+| `npm test` | **18/18 通过** | 包含广告状态机、失败复活、首页广告入口、持久化重启、幂等和客户端回归；最新细节见 [TEST_REPORT.md](TEST_REPORT.md) |
+| `npm run verify` | **全步骤通过** | 覆盖 680/680 路由、14,092 资源、6,004 帧、双包构建与冒烟；最新细节见 [TEST_REPORT.md](TEST_REPORT.md) |
 | 真实 Chrome Canvas | **6/6 场景通过** | DPR 1/2/3 × 有/无安全区，字体、路径、圆角、测量和点击对齐；不等于全面视觉验收 |
-| 运行依赖 `npm audit` | **0 个已知漏洞** | 仅覆盖当前运行依赖审计，不能证明凭据已轮换或业务无漏洞 |
+| 运行依赖 `npm audit --omit=dev` | **5 个传递漏洞（4 high、1 moderate）** | 涉及 CloudBase SDK/axios/lodash；需单独升级验证，当前未强制改动依赖 |
 | 正式客户端构建 | 通过，**3,187,979 字节 / 3.0403 MiB** | 非空配置、真实 AppID、HTTPS 校验、`urlCheck=true`、基础库 3.16.2、包体门禁 |
-| 新构建正式授权页 | **0 个错误、1 条警告** | 只覆盖进入前授权页；进入后仍发生 85088，不算正式联机通过 |
-| 公网 shell 探测 | API/CDN 曾返回 200 | 仅证明当次公网可达，不能证明微信联网或官方登录可用 |
-| `wx.cloud.callContainer` bootstrap | **失败：85088** | 需核对环境/服务访问配置及云日志；具体原因尚未确认 |
+| 新构建正式授权页 | **0 个错误、1 条基础库提示** | 正式包已导入；真实微信联机仍需在目标环境复测 |
+| 公网 shell 探测 | 新域名与 CloudRun 域名的 health/bootstrap 均 200；伪造 code 均返回 502 且无 token | 已通过公网 fail-closed 门禁；真实微信登录仍需复测 |
+| `wx.cloud.callContainer` bootstrap | **失败：85088** | MCP 已确认服务/网关正常，但环境 `UserInfo.WxAppId` 为空，`touristappid` 无关联环境；需控制台完成真实 AppID 关联/环境共享后复测 |
 | `wx.request` 公网 API | **被合法域名校验拦截** | 实测配置未包含该 API 域名，需在目标 AppID 平台配置中修正并复测 |
 | `wx.login` → `code2Session` | **未通过验收** | 本地替身登录和公网 200 不能代替该链路 |
 | 模拟器交互、截图 | 单独记录 | 见 [QA_RECHECK_2026-09-06.md](QA_RECHECK_2026-09-06.md)，按产物、地址和身份类型判断证据 |
@@ -46,7 +53,7 @@
 
 ## 3. 开始本地交互 QA
 
-本流程在模拟器检查页面、触摸与玩法，依赖现有 CDN。它不验证微信官方身份，也不保存跨服务重启的进度。
+本流程在模拟器检查页面、触摸与玩法，资源使用 QA 包内本地副本。它不验证微信官方身份，也不保存跨服务重启的进度。
 
 ### 3.1 启动回环服务并构建 QA 包
 
@@ -54,14 +61,13 @@
 
 ```bash
 APP_WX_APPID=wxec103651e807c540 \
-APP_CLOUD_BASE=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/ \
 QA_PORT=8799 \
 npm run qa:local
 ```
 
 命令先编译，生成 `build/wechat-qa/`，再监听 `http://127.0.0.1:8799`。`QA_PORT` 缺省为 8798；示例显式使用 8799，避免与已运行的临时服务冲突。端口占用时改为空闲端口重跑，并重新导入这次生成的 QA 包。
 
-- 服务只绑定本机回环地址，使用固定合成身份和内存 Store；停止/重启服务会重置进度。
+- 服务只绑定本机回环地址，使用固定合成身份和内存 Store；停止/重启服务会重置进度。QA 包将游戏资源全部打包在本地，避免测试环境依赖 CDN（仅 QA 允许超过 4 MiB）。
 - QA 包关闭域名校验，只用于本地模拟器；不能上传、预览分发或替代正式包。手机上的 `127.0.0.1` 不指向这台 Mac。
 - 停止服务用 `Ctrl+C`。重新构建前先关闭开发者工具中的对应项目。
 
@@ -126,7 +132,7 @@ npm run qa:local
 | 编号 | 状态 | 处置与剩余要求 |
 |---|---|---|
 | K1 玩家持久化 | **实现及隔离集成通过，生产验收未完成，运营阻断** | 线上未部署；旧 JSON 随机 playerId 与新确定性身份不兼容，必须先补既有 identity 兼容或全引用 ID 重写，再做迁移对账。生产集合/运行身份、备份恢复及实际 Cloud Run 重启/多副本仍需验收 |
-| K2 正式网络 | **未解决，正式登录阻断** | bootstrap 实测 85088，公网请求被合法域名拦截；需平台配置、云日志及 `urlCheck=true` 下复测，不能以 shell 200 关闭 |
+| K2 正式网络 | **部分收敛，仍阻断正式登录** | 公网 bootstrap 已 200；`callContainer` 仍 85088，需平台完成 AppID 关联/环境共享、合法域名配置，并在 `urlCheck=true` 下复测，不能以 shell 200 关闭 |
 | K3 音频缺失 | **代码/产物修复，继续运行时回归** | 15 个音频已补齐并留在包内，nav 缺失不再是接受条件 |
 | K4 错误 RAF 降级 | **已修复** | 全局 RAF、兼容分支与单次故障降级；原“wx.RAF 缺失属预期”说明废止 |
 | K5 域名校验 | **正式构建门禁已修复** | 正式包自动 `urlCheck=true`；仅本地 QA 包明确关闭。K2 的平台配置仍未解决 |
@@ -134,7 +140,7 @@ npm run qa:local
 | 服务端部署 | **本轮未部署** | 本地官方 code2Session、配置校验与凭据隔离修复不能假定在线上生效，需配置、部署和重新验收 |
 | 官方身份与真机 | **未通过验收** | 需运行期 AppSecret、真实 code、预览/真机网络、前后台及弱网验证 |
 | 发布资质与内容 | **未通过验收** | 出版/运营资质、素材权利链、隐私、实名/防沉迷、内容安全与平台审核需独立确认 |
-| 广告、支付、完整视觉 | **未交付或未完成验收** | 不能从当前 QA 成功推导广告/内购已接入，或所有页面已完成设计验收 |
+| 广告、支付、完整视觉 | **广告协议已交付，生产广告/支付和视觉未完成验收** | 不能从当前 QA 成功推导真实广告回执、资质、内购或所有页面已完成设计验收 |
 
 已有问题应关联编号并附新证据；“已知”不等于可忽略。发布边界同时参考 [EXTERNAL_BLOCKERS.md](EXTERNAL_BLOCKERS.md) 和 [COMPLIANCE_CURRENT.md](COMPLIANCE_CURRENT.md)。
 
@@ -157,7 +163,7 @@ node tests/client_canvas_browser.mjs
 ```bash
 npm run build
 APP_WX_APPID=wxec103651e807c540 \
-APP_SERVER_URL=https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com \
+APP_SERVER_URL=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com \
 APP_CLOUD_BASE=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/ \
 APP_CLOUD_ENV=lomo-wechat-d0gcakr952f0d90b8 \
 APP_CLOUD_SERVICE=lomo-wechat \
@@ -189,7 +195,7 @@ npx -p @cloudbase/cli tcb hosting deploy ./game-assets v1/assets/game \
 
 ```bash
 curl --fail --silent --show-error --max-time 15 \
-  https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com/v1/config/bootstrap
+  https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com/v1/config/bootstrap
 curl --fail --silent --show-error --max-time 15 --output /dev/null \
   https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/miner/f00.png
 ```
