@@ -5,7 +5,7 @@
 import { WxPlatform } from '../platform/platform';
 import { MiniGameClientApp } from './main';
 
-export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; cloudService?: string; cloudResourceAppid?: string; standalone?: boolean }): void {
+export function start(opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudEnv?: string; cloudService?: string; cloudResourceAppid?: string; cloudFn?: string; standalone?: boolean }): void {
   let platform: WxPlatform | null = null;
   let app: any = null;
   try {

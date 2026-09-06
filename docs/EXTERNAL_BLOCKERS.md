@@ -1,6 +1,6 @@
 # EXTERNAL_BLOCKERS
 
-> 收尾复核（2026-09-07）：Deploy 017 已成功部署并承载 100% 流量；CBR 根路由已启用，公网 health/bootstrap 为 200，伪造 code 返回 502 且无 token。以下清单仅保留尚未由外部真实证据关闭的风险。
+> 收尾复核（2026-09-07）：Deploy 017 已成功部署并承载 100% 流量；公网 health/bootstrap 为 200，伪造 code 返回 502 且无 token。原 CloudBase MCP 已由运维销毁，相关控制面查询只能作为历史证据；以下清单仅保留尚未由当前外部真实证据关闭的风险。
 
 > 更新：2026-09-06。以 [QA_HANDOFF.md](QA_HANDOFF.md)、[QA_RECHECK_2026-09-06.md](QA_RECHECK_2026-09-06.md) 和 [CLOUDBASE_MCP_2026-09-06.md](CLOUDBASE_MCP_2026-09-06.md) 的当前证据为准。旧版“均已绕行”只描述研发替代路径，不能作为正式运营验收结论。
 
@@ -11,7 +11,7 @@
 | 项目 | 当前影响与证据 | 关闭条件 |
 |---|---|---|
 | K1 外部持久化 | 工作区实现、Deploy 017 运行和隔离云集成已通过；生产 `ape_game_state` 空集合、7 个索引和 `ADMINONLY` 权限已配置；旧随机 playerId 与新确定性身份模型尚无迁移兼容，数据迁移和备份恢复未验收 | 对照 [PERSISTENCE.md](PERSISTENCE.md) 完成生产迁移对账、Cloud Run 重启/多副本和备份恢复验收；详见 [CLOUDBASE_DB_READINESS_2026-09-06.md](CLOUDBASE_DB_READINESS_2026-09-06.md) |
-| K2 正式云连接及合法域名 | MCP 复核显示公网 CBR `GET /v1/config/bootstrap` 已返回 200；但微信开发者工具 `wx.cloud.callContainer` 仍实测 `85088`，`wx.request` 仍受合法域名校验边界约束；环境 `UserInfo.WxAppId` 为空，且以真实 AppID `wxec103651e807c540` 调用 `DescribeEnvs(WxAppId)` 返回 `EnvList=[]`、`Total=0`（RequestId `72620dfc-ef98-4b8b-8e9b-dc684098a536`） | 在微信/CloudBase 控制台完成 `wxec103651e807c540` 与环境关联（或同主体环境共享），配置目标 AppID 合法域名，在正式 `urlCheck=true` 下复测；详见 [CLOUDBASE_MCP_2026-09-06.md](CLOUDBASE_MCP_2026-09-06.md) |
+| K2 正式云连接及合法域名 | 公网 CBR `GET /v1/config/bootstrap` 当前可独立探测为 200；历史微信开发者工具实测 `wx.cloud.callContainer` 为 `85088`，`wx.request` 受合法域名校验边界约束。原 CloudBase MCP 已销毁，环境关联状态无法再由该 MCP 查询 | 在现存微信/CloudBase 控制台或替代 CLI/API 中完成 `wxec103651e807c540` 与环境关联（或同主体环境共享），配置目标 AppID 合法域名，在正式 `urlCheck=true` 下复测 |
 | 官方登录及服务端部署 | **代码与 CloudRun 门禁已关闭**：Deploy 017 已运行，伪造 code 返回 502 且无 token；正式包已通过 CLI 上传 1.0.1；真实 `wx.login` → `code2Session` → 玩家状态仍未完成 | 在真实微信环境完成一次性 code、玩家状态读写和重启恢复验收，并在后台确认上传版本 |
 | K6 历史凭据暴露 | CAM 凭据轮换尚未执行；本地忽略文件、权限 600 和本轮零泄漏不会使旧凭据失效 | 轮换并验证运行期依赖，处理历史镜像、缓存及其他凭据副本 |
 | 真机及基础库兼容 | 已有开发者工具模拟器和真实 Chrome Canvas 证据，没有真实手机网络、前后台、弱网或性能矩阵验收；基础库 3.17.2 曾出现内部初始化错误，当前验证版本为 3.16.2 | 在目标手机、微信和正式基础库版本上完成网络、触摸、安全区、前后台及性能回归 |

@@ -59,6 +59,11 @@ export interface PlatformAdapter {
    *  基础库 ≥ 2.13.1
    */
   callContainer(opts: { path: string; method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; data?: any; header?: Record<string, string>; timeout?: number }): Promise<{ statusCode: number; data: any }>;
+  /**
+   * 云函数调用：服务端以云函数形态承载时（微信侧云开发环境无法用云托管容器），
+   * 客户端通过 wx.cloud.callFunction 走微信私有链路 —— 无需配置服务器域名。
+   */
+  callFunction(name: string, args: Record<string, any>): Promise<any>;
   showShareMenu?(): void;
   share(opts: { title: string; query?: string }): void;
   vibrate(short: boolean): void;
@@ -257,6 +262,17 @@ export class WxPlatform implements PlatformAdapter {
     // 兜底：无 cloud 配置时退回 wx.request（仅限非 CloudBase 的服务端 URL）
     return this.httpRequest({ url: opts.path, method: opts.method ?? 'GET', data: opts.data, header: opts.header, timeout: opts.timeout });
   }
+  callFunction(name: string, args: Record<string, any>): Promise<any> {
+    if (!this.wx?.cloud?.callFunction) return Promise.reject(new Error('wx.cloud.callFunction unavailable'));
+    return new Promise((resolve, reject) => {
+      this.wx.cloud.callFunction({
+        name,
+        data: args,
+        success: (r: any) => resolve(r?.result),
+        fail: (e: any) => reject(new Error(e?.errMsg || 'callFunction fail')),
+      });
+    });
+  }
   vibrate(short: boolean): void { try { short ? this.wx.vibrateShort?.() : this.wx.vibrateLong?.(); } catch { /* 忽略 */ } }
   audio(src: string, loop: boolean, volume: number) {
     try {
@@ -372,6 +388,7 @@ export class NodePlatform implements PlatformAdapter {
   share(): void {}
   vibrate(): void {}
   callContainer(): Promise<any> { throw new Error('NodePlatform.callContainer: tests 应使用 InProcessTransport 或直接 HttpTransport.callContainer 兜底'); }
+  callFunction(): Promise<any> { throw new Error('NodePlatform.callFunction: tests 应使用 InProcessTransport（云函数形态仅在微信运行时可用）'); }
   audio() { return { play() {}, stop() {}, destroy() {}, setVolume() {} }; }
   systemInfo(): Record<string, any> { return { platform: 'node-test' }; }
   onHide(): void {}

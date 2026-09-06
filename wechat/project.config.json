@@ -10,5 +10,6 @@
     "urlCheck": false,
     "postcss": false,
     "uglifyFileName": false
-  }
+  },
+  "cloudfunctionRoot": "cloudfunctions/"
 }

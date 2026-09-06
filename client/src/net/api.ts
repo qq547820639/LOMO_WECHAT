@@ -43,6 +43,35 @@ export class HttpTransport implements Transport {
   }
 }
 
+/**
+ * 云函数 Transport：服务端跑在微信侧云开发环境的云函数里（该类环境无法用云托管容器）。
+ * 通过 wx.cloud.callFunction 走微信私有链路 —— 不需要在 MP 后台配置服务器域名。
+ */
+export class CloudFunctionTransport implements Transport {
+  constructor(private platform: PlatformAdapter, private fnName: string) {}
+  async request(path: string, method: 'GET' | 'POST', body?: any, headers?: Record<string, string>): Promise<any> {
+    let lastErr: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await this.platform.callFunction(this.fnName, {
+          path, method, body, headers: headers || {},
+          idempotencyKey: (body && (body as any).idempotencyKey) || undefined,
+        });
+        // 云函数统一返回 { ok, statusCode, data }
+        if (res && typeof res === 'object' && 'ok' in res) {
+          if (res.statusCode >= 500 && attempt < 2) { await sleep(300 * (attempt + 1)); continue; }
+          return res.data;
+        }
+        return res;
+      } catch (err) {
+        lastErr = err;
+        await sleep(300 * (attempt + 1));
+      }
+    }
+    throw lastErr ?? new Error('cloud function fail');
+  }
+}
+
 /** 进程内 Transport：require 编译产物 server/src/app.js（仅 standalone/测试用，微信真机固定使用 HTTP） */
 export class InProcessTransport implements Transport {
   private app: any;

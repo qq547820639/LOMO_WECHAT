@@ -92,12 +92,34 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   fs.writeFileSync(path.join(outDir, 'project.config.json'), JSON.stringify(projCfg, null, 2));
   fs.copyFileSync(path.join(root, 'configs', profile === 'full-clone' ? 'full-clone.json' : 'wechat-release.json'), path.join(outDir, 'config.json'));
 
+  const cloudFn = (releaseConfig as { cloudFn?: string }).cloudFn || process.env.APP_CLOUD_FN || ''; // 云函数形态的服务端入口函数名
+  // 2b. 云开发环境（微信侧环境，天然绑定 AppID）：复制 cloudfunctions（project.config.json 已声明 cloudfunctionRoot）
+  //     云函数形态下把编译后的服务端塞进函数目录，供 `cli cloud functions deploy` 直接打包
+  const cfSrc = path.join(root, 'wechat', 'cloudfunctions');
+  if (fs.existsSync(cfSrc)) {
+    execFileSync('cp', ['-R', cfSrc, path.join(outDir, 'cloudfunctions')]);
+    if (cloudFn) {
+      const fnDir = path.join(outDir, 'cloudfunctions', cloudFn);
+      if (fs.existsSync(fnDir)) {
+        // 放进 node_modules/@ape/server：既随函数包部署（云函数只打包自身目录），
+        // 又被 DevTools 排除在 cloudfunctionRoot 扫描之外（消除"非小程序结构"警告）。
+        const modDir = path.join(fnDir, 'node_modules', '@ape', 'server');
+        fs.mkdirSync(path.join(modDir, 'src'), { recursive: true });
+        execFileSync('cp', ['-R', path.join(outDir, 'dist', 'server', 'src'), path.join(modDir, 'src', 'server')]);
+        execFileSync('cp', ['-R', path.join(outDir, 'dist', 'shared', 'src'), path.join(modDir, 'src', 'shared')]);
+        fs.writeFileSync(path.join(modDir, 'package.json'), JSON.stringify({
+          name: '@ape/server', version: '1.0.0', main: 'src/server/app.js',
+        }, null, 2));
+      }
+    }
+  }
+
   // 3. 入口 game.js
   const serverUrl = releaseConfig.serverUrl;
   const cloudEnv = releaseConfig.cloudEnv;
   const cloudService = releaseConfig.cloudService; // CloudBase Run 服务名（X-WX-SERVICE 头），必须与 wx.cloud.callContainer 一致
   const cloudResourceAppid = releaseConfig.cloudResourceAppid || ''; // 环境共享模式的资源方 AppID（可空）
-  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudService/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, cloudService, cloudResourceAppid, standalone: false })});\n`);
+  fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime: ${cloudFn ? 'cloud function transport (wx.cloud.callFunction)' : 'remote HTTPS server'}; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudFn/cloudService/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, cloudService, cloudResourceAppid, cloudFn, standalone: false })});\n`);
 
   // 4. README（构建产物级）
   fs.writeFileSync(path.join(outDir, 'README.txt'), [
@@ -129,7 +151,7 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   return outDir;
 }
 
-function requireReleaseConfig(cloudBase: string): { appId: string; serverUrl: string; cloudEnv: string; cloudService: string; cloudResourceAppid: string } {
+function requireReleaseConfig(cloudBase: string): { appId: string; serverUrl: string; cloudEnv: string; cloudService: string; cloudResourceAppid: string; cloudFn: string } {
   const values = {
     appId: process.env.APP_WX_APPID || '',
     serverUrl: process.env.APP_SERVER_URL || '',
@@ -137,19 +159,35 @@ function requireReleaseConfig(cloudBase: string): { appId: string; serverUrl: st
     cloudService: process.env.APP_CLOUD_SERVICE || '',
     // 可选：环境共享模式下的资源方 AppID（env 归属另一小程序时填写；为空=本 AppID 已关联该 env）
     cloudResourceAppid: process.env.APP_CLOUD_RESOURCE_APPID || '',
+    // 云函数形态：服务端跑在云函数里（微信侧环境无法用云托管容器），此时无需 serverUrl/cloudService
+    cloudFn: process.env.APP_CLOUD_FN || '',
   };
-  const missing = Object.entries(values).filter(([key, value]) => key !== 'cloudResourceAppid' && !value).map(([key]) => key);
+  // 两种服务端形态二选一：云函数（cloudFn）或 HTTP 服务（serverUrl + cloudService）
+  const required = values.cloudFn
+    ? ['appId', 'cloudEnv', 'cloudFn']
+    : ['appId', 'serverUrl', 'cloudEnv', 'cloudService'];
+  const missing = required.filter((key) => !(values as Record<string, string>)[key]);
   if (missing.length) {
-    throw new Error(`[build_wechat] wechat-release requires ${missing.map((key) => ({ appId: 'APP_WX_APPID', serverUrl: 'APP_SERVER_URL', cloudEnv: 'APP_CLOUD_ENV', cloudService: 'APP_CLOUD_SERVICE' } as Record<string, string>)[key]).join(', ')}`);
+    throw new Error(`[build_wechat] wechat-release requires ${missing.map((key) => ({ appId: 'APP_WX_APPID', serverUrl: 'APP_SERVER_URL', cloudEnv: 'APP_CLOUD_ENV', cloudService: 'APP_CLOUD_SERVICE', cloudFn: 'APP_CLOUD_FN' } as Record<string, string>)[key]).join(', ')}（云函数形态只需 APP_WX_APPID + APP_CLOUD_ENV + APP_CLOUD_FN）`);
   }
   if (!/^wx[a-fA-F0-9]{16}$/.test(values.appId)) throw new Error('[build_wechat] APP_WX_APPID must be wx followed by 16 hexadecimal characters');
-  for (const [name, value] of [['APP_SERVER_URL', values.serverUrl], ['APP_CLOUD_BASE', cloudBase]]) {
+  if (!values.cloudFn) {
+    for (const [name, value] of [['APP_SERVER_URL', values.serverUrl], ['APP_CLOUD_BASE', cloudBase]]) {
+      let valid = false;
+      try {
+        const url = new URL(value);
+        valid = /^https:\/\/[^/?#\s]+(?:[/?#]|$)/.test(value) && !/[\\\s]/.test(value) && url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password && !url.search && !url.hash;
+      } catch {}
+      if (!valid) throw new Error(`[build_wechat] ${name} must be a valid HTTPS URL without credentials, query, or fragment`);
+    }
+  } else if (cloudBase) {
+    // 云函数形态下资源 CDN 仍须是合法 HTTPS 前缀（若提供）
     let valid = false;
     try {
-      const url = new URL(value);
-      valid = /^https:\/\/[^/?#\s]+(?:[/?#]|$)/.test(value) && !/[\\\s]/.test(value) && url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password && !url.search && !url.hash;
+      const url = new URL(cloudBase);
+      valid = url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
     } catch {}
-    if (!valid) throw new Error(`[build_wechat] ${name} must be a valid HTTPS URL without credentials, query, or fragment`);
+    if (!valid) throw new Error('[build_wechat] APP_CLOUD_BASE must be a valid HTTPS URL without credentials');
   }
   return values;
 }

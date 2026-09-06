@@ -131,15 +131,20 @@ export class MiniGameClientApp {
     ]);
   }
 
-  constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudService?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
+  constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudService?: string; cloudFn?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
     this.skipGate = !!opts.skipComplianceGate;
     this.platform = platform;
     this.profile = opts.profile;
     const standalone = opts.standalone ?? platform.kind === 'node';
-    if (!opts.serverUrl && platform.kind === 'wx' && !standalone) {
-      throw new Error('APP_SERVER_URL is required for WeChat runtime; standalone is Node/test only');
+    if (!opts.serverUrl && !opts.cloudFn && platform.kind === 'wx' && !standalone) {
+      throw new Error('APP_SERVER_URL or APP_CLOUD_FN is required for WeChat runtime; standalone is Node/test only');
     }
-    const transport = opts.serverUrl ? new HttpTransport(platform, opts.serverUrl, { cloudService: opts.cloudService }) : new InProcessTransport(opts.profile);
+    // 传输层优先级：云函数形态（微信侧环境）> HTTP 服务 > 进程内（仅测试）
+    const transport = opts.cloudFn
+      ? new (require('../net/api').CloudFunctionTransport)(platform, opts.cloudFn)
+      : opts.serverUrl
+        ? new HttpTransport(platform, opts.serverUrl, { cloudService: opts.cloudService })
+        : new InProcessTransport(opts.profile);
     this.api = new ApiClient(transport);
     this.audioManager = new AudioManager(platform);
   }

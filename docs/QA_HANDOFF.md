@@ -1,6 +1,6 @@
 # QA 交接手册：猿岛 ApeIsland 微信小游戏
 
-> 收尾状态（2026-09-07）：Deploy 017 已上线 CloudRun 并承载 100% 流量；公网 health/bootstrap 为 200，伪造 code 返回 502 且无 token。生产集合为空，真实微信环境关联、登录、广告回执和真机回归仍未完成。
+> 收尾状态（2026-09-07）：Deploy 017 已上线 CloudRun 并承载 100% 流量；公网 health/bootstrap 为 200，伪造 code 返回 502 且无 token。生产集合为空，真实微信环境关联、登录、广告回执和真机回归仍未完成。原 CloudBase MCP 已由运维销毁，本文中的 MCP 查询结果均为历史快照，不代表当前控制面仍可访问。
 
 > 最新线上版本已推进至 Deploy 017，状态 `normal`、流量 100%；上条 Deploy 016 为历史记录。
 
@@ -42,7 +42,7 @@
 | 正式客户端构建 | 通过，**3,187,979 字节 / 3.0403 MiB** | 非空配置、真实 AppID、HTTPS 校验、`urlCheck=true`、基础库 3.16.2、包体门禁 |
 | 新构建正式授权页 | **0 个错误、1 条基础库提示** | 正式包已导入；真实微信联机仍需在目标环境复测 |
 | 公网 shell 探测 | 新域名与 CloudRun 域名的 health/bootstrap 均 200；伪造 code 均返回 502 且无 token | 已通过公网 fail-closed 门禁；真实微信登录仍需复测 |
-| `wx.cloud.callContainer` bootstrap | **失败：85088** | MCP 已确认服务/网关正常，但环境 `UserInfo.WxAppId` 为空，`touristappid` 无关联环境；需控制台完成真实 AppID 关联/环境共享后复测 |
+| `wx.cloud.callContainer` bootstrap | **历史实测失败：85088** | 原 CloudBase MCP 已销毁，无法再通过 MCP 读取环境关联状态；需在现存 CloudBase/微信控制台或替代 CLI/API 上确认真实 AppID 关联、合法域名与当前服务状态 |
 | `wx.request` 公网 API | **被合法域名校验拦截** | 实测配置未包含该 API 域名，需在目标 AppID 平台配置中修正并复测 |
 | `wx.login` → `code2Session` | **未通过验收** | 本地替身登录和公网 200 不能代替该链路 |
 | 模拟器交互、截图 | 单独记录 | 见 [QA_RECHECK_2026-09-06.md](QA_RECHECK_2026-09-06.md)，按产物、地址和身份类型判断证据 |
