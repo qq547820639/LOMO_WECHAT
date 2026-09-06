@@ -31,7 +31,9 @@ export async function run(): Promise<void> {
 
   let passes = 0;
   const gate = new ComplianceGateScreen(() => { passes++; });
-  (gate as any).app = { platform: { storageSet() {} }, telemetry() {} };
+  (gate as any).app = { platform: node, telemetry() {}, showToast() {}, showModal() {} };
+  gate.onEnter();
+  await Promise.resolve();
   (gate as any).pass();
   assert.equal(passes, 1);
   (gate as any).resetForRetry();

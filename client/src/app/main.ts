@@ -10,6 +10,7 @@ import { THEME, fmtNum } from '../core/theme';
 import { AudioManager } from '../audio/audio';
 import { BRAND } from '../../../shared/src/brand';
 import { AssetManager } from '../core/assets';
+import { configureCanvas } from '../ui/canvas';
 
 const TABS: Array<{ id: string; label: string; color: string }> = [
   { id: 'chaowan', label: '藏品', color: THEME.accent },
@@ -31,10 +32,13 @@ export class MiniGameClientApp {
   antiAddiction: any = null;
   toast: { text: string; until: number } | null = null;
   overlay: { clip: any; until: number } | null = null;
-  ambience: any = null;
   private lastLevel = 0;
   modal: { title: string; lines: string[]; actions: { label: string; onTap: () => void; color?: string }[] } | null = null;
   booted = false;
+  private booting = false;
+  private bootAttemptId = 0;
+  private bootWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private privacySyncing = false;
   assets!: import('../core/assets').AssetManager;
   frameDt = 16.7;
   private lastFrameAt = Date.now();
@@ -85,15 +89,33 @@ export class MiniGameClientApp {
 
   /** 启动看门狗：卡住超过 20s 直接把状态画出来 —— 杜绝「黑屏无信息」 */
   private startBootWatchdog(): void {
-    const deadline = Date.now() + 20000;
-    const tick = (): void => {
-      if (this.booted || this.fatal) return;
-      if (Date.now() < deadline) { setTimeout(tick, 500); return; }
-      const stage = !this.api?.connected ? '连不上服务端' : (!this.player ? '登录/拉取玩家失败' : '未知');
-      const target = String((this.api as any)?.baseUrl ?? (this.api as any)?.serverUrl ?? (this.api as any)?.base ?? '未配置');
-      this.renderFatal(`启动超时（${stage}）。服务端=${target}`);
-    };
-    setTimeout(tick, 500);
+    this.stopBootWatchdog();
+    this.bootWatchdog = setTimeout(() => {
+      this.bootWatchdog = null;
+      if (!this.booting || this.booted) return;
+      this.bootAttemptId++;
+      this.api.invalidateSession();
+      this.booting = false;
+      this.recoverBoot('连接超时，请检查网络后重试');
+    }, 20000);
+  }
+
+  private stopBootWatchdog(): void {
+    if (this.bootWatchdog) clearTimeout(this.bootWatchdog);
+    this.bootWatchdog = null;
+  }
+
+  private recoverBoot(message: string): void {
+    this.booted = false;
+    this.fatal = null;
+    const gate = this.router.stack.find((screen) => screen.route === '/compliance-gate') as any;
+    if (gate) gate.resetForRetry();
+    else this.router.push(new (require('../features/compliance_gate').ComplianceGateScreen)(() => { void this.completeBoot(); }));
+    const notice = /超时|timeout/i.test(message) ? '连接超时，请稍后重试。' : '暂时无法连接游戏服务，请稍后重试。';
+    this.showModal('暂时无法进入游戏', [notice, '请检查网络连接。'], [
+      { label: '重试', onTap: () => { void this.completeBoot(); }, color: THEME.accent2 },
+      { label: '稍后再试', onTap: () => {} },
+    ]);
   }
 
   constructor(platform: PlatformAdapter, opts: { profile: 'full-clone' | 'wechat-release'; serverUrl?: string; cloudService?: string; standalone?: boolean; skipComplianceGate?: boolean }) {
@@ -112,56 +134,19 @@ export class MiniGameClientApp {
   async boot(): Promise<void> {
     const size = this.platform.getWindowSize();
     this.canvas = this.platform.createCanvas();
-    const scale = size.w / 375;
-    this.canvas.width = 375 * scale * (size.dpr > 2 ? 2 : size.dpr);
-    this.canvas.height = size.h / size.w * this.canvas.width;
-    const ctx = this.canvas.getContext('2d');
-    const dscale = this.canvas.width / 375;
-    // 统一逻辑坐标缩放
-    const scaledCtx = new Proxy(ctx, {
-      get(target: any, prop: string) {
-        if (prop === 'fillRect' || prop === 'strokeRect' || prop === 'clearRect') {
-          return (x: number, y: number, w: number, h: number) => target[prop].call(target, x * dscale, y * dscale, w * dscale, h * dscale);
-        }
-        if (prop === 'fillText') {
-          return (t: string, x: number, y: number) => target.fillText.call(target, t, x * dscale, y * dscale);
-        }
-        if (prop === 'drawImage') {
-          // 目标坐标缩放；源矩形（前 4 参）保持图像像素原值
-          return (img: any, ...rest: any[]) => {
-            if (rest.length === 8) {
-              const [sx, sy, sw, sh, dx, dy, dw, dh] = rest;
-              return target.drawImage.call(target, img, sx, sy, sw, sh, dx * dscale, dy * dscale, dw * dscale, dh * dscale);
-            }
-            if (rest.length === 4) {
-              const [dx, dy, dw, dh] = rest;
-              return target.drawImage.call(target, img, dx * dscale, dy * dscale, dw * dscale, dh * dscale);
-            }
-            if (rest.length === 2) {
-              const [dx, dy] = rest;
-              return target.drawImage.call(target, img, dx * dscale, dy * dscale);
-            }
-            return target.drawImage.call(target, img, ...rest);
-          };
-        }
-        if (prop === 'measureText') return (t: string) => target.measureText.call(target, t);
-        const v = target[prop];
-        return typeof v === 'function' ? v.bind(target) : v;
-      },
-      set(target: any, prop: string, value: any) { target[prop] = value; return true; },
-    }) as any;
-    const logicalH = Math.floor(this.canvas.height / dscale);
-    this.ui = new UI(scaledCtx as any, 375, logicalH);
+    const layout = configureCanvas(this.canvas, size);
+    this.ui = new UI(layout.ctx, layout.w, layout.h);
     // 渲染循环尽早注册：后续任何启动步骤抛错，错误画面都能被画出来（而不是黑屏）
     this.platform.onFrame(() => this.frame());
     this.router = new Router(this);
     registerAllScreens(this);
     this.router.switchTab('games');
 
-    const inputScale = size.w / 375;
+    const inputScale = layout.inputScale;
 
     this.platform.onTouchStart((x, y) => {
-      const logicalY = y / inputScale;
+      const logicalY = (y - layout.inputOffsetY) / inputScale;
+      if (logicalY < 0 || logicalY > this.ui.h) { this.lastTouchStart = null; return; }
       this.lastTouchStart = [x / inputScale, logicalY];
       const currentRoute = this.router.current?.route ?? '';
       this.dragTrack = currentRoute.startsWith('/') && !this.router.stack.length
@@ -169,13 +154,18 @@ export class MiniGameClientApp {
         : null;
     });
     this.platform.onTouchMove((x, y) => {
-      if (this.lastTouchStart && this.dragTrack) this.ui.handleDrag(this.dragTrack.id, this.dragTrack.startY, y / inputScale);
+      if (this.lastTouchStart && this.dragTrack) {
+        const logicalY = (y - layout.inputOffsetY) / inputScale;
+        this.ui.handleDrag(this.dragTrack.id, this.dragTrack.startY, logicalY);
+        this.dragTrack.startY = logicalY;
+      }
     });
     this.platform.onTouchEnd((x, y) => {
-      const lx = x / inputScale, ly = y / inputScale;
+      const lx = x / inputScale, ly = (y - layout.inputOffsetY) / inputScale;
       const start = this.lastTouchStart;
       this.lastTouchStart = null;
       this.dragTrack = null;
+      if (!start || ly < 0 || ly > this.ui.h) return;
       if (start && Math.abs(start[1] - ly) > 24) return; // 视为滚动
       this.audioManager.playSfx('click');
       this.ui.onTap(lx, ly);
@@ -185,9 +175,11 @@ export class MiniGameClientApp {
     // 未捕获的 rejection 会让渲染循环静默停止（表现为「退出再进黑屏」）
     this.platform.onShow(() => {
       try { this.audioManager.onAppShow(); } catch { /* 音频不可用时忽略 */ }
-      this.refreshPlayer().catch((e) => {
+      if (!this.booted) return;
+      this.refreshPlayer().then(() => this.syncPrivacyConsent()).catch((e) => {
         console.error('[ape] onShow refreshPlayer failed', e);
         this.showToast('数据刷新失败，正在重新登录…');
+        this.booted = false;
         void this.completeBoot();
       });
     });
@@ -196,8 +188,6 @@ export class MiniGameClientApp {
     this.assets = new (require('../core/assets').AssetManager)(this.platform);
     this.assets.loadManifest().then((m: unknown) => { if (m) this.telemetry('asset_manifest', { version: (m as any).version }); }).catch(() => {});
 
-    // 启动看门狗：卡住 20s 就把原因画出来（黑屏不再无信息）
-    this.startBootWatchdog();
     // 启动流程：合规门（健康游戏忠告+隐私授权）→ completeBoot
     // 注意：渲染循环已在此前注册，本段任何抛错都会经由 app.renderFatal 显示在主画布上
     const { ComplianceGateScreen } = require('../features/compliance_gate');
@@ -206,22 +196,32 @@ export class MiniGameClientApp {
       void this.completeBoot();
     } else {
       this.router.push(gate);
-      gate.onEnter();
     }
   }
 
   /** 合规门通过后的正式启动：登录 → bootstrap → 首页 */
   private async completeBoot(): Promise<void> {
-    if (this.booted) return;
+    if (this.booted || this.booting) return;
+    this.booting = true;
+    this.fatal = null;
+    const attemptId = ++this.bootAttemptId;
+    const sessionGeneration = this.api.beginSession();
+    this.startBootWatchdog();
     try {
-    await this.api.connect(this.profile);
+    await this.api.connect(this.profile, sessionGeneration);
+    if (attemptId !== this.bootAttemptId) return;
     const launchQuery = this.platform.getLaunchQuery();
     const code = await this.platform.loginCode();
+    if (attemptId !== this.bootAttemptId) return;
     if (!code) throw new Error('微信登录失败，请重试');
-    const auth = await this.api.login(code);
+    const auth = await this.api.login(code, sessionGeneration);
+    if (attemptId !== this.bootAttemptId) return;
     this.antiAddiction = auth.antiAddiction;
-    await this.refreshPlayer();
+    await this.refreshPlayer(attemptId);
+    if (attemptId !== this.bootAttemptId) return;
     this.booted = true;
+    this.stopBootWatchdog();
+    void this.syncPrivacyConsent();
     this.telemetry('launch', { profile: this.profile, isNew: auth.isNew });
     // 清掉合规门，回主城
     while (this.router.stack.length) this.router.pop(true);
@@ -234,20 +234,36 @@ export class MiniGameClientApp {
       if (r.ok) this.showToast('邀请奖励到账：金币 +30');
     }
     } catch (e) {
+      if (attemptId !== this.bootAttemptId) return;
       // 启动完成段失败：回退到合规门重试路径（不静默吞掉状态）
       const err: any = e;
       const msg = String(err?.message || e);
       console.error('[ape] completeBoot failed', err);
-      this.showToast('启动失败: ' + msg.slice(0, 20));
-      this.booted = false;
-      const gate = this.router.stack.find((screen: any) => screen.route === '/compliance-gate') as any;
-      gate?.resetForRetry?.();
-      if (!gate) this.router.push(new (require('../features/compliance_gate').ComplianceGateScreen)(() => { void this.completeBoot(); }));
+      this.recoverBoot(msg);
+    } finally {
+      if (attemptId === this.bootAttemptId) {
+        this.booting = false;
+        this.stopBootWatchdog();
+      }
     }
   }
 
-  async refreshPlayer(): Promise<void> {
+  private async syncPrivacyConsent(): Promise<void> {
+    if (!this.booted || !this.api.token || this.privacySyncing) return;
+    const consent = this.platform.storageGet('app.privacy.consent.pending');
+    if (!consent?.agree) return;
+    const attemptId = this.bootAttemptId;
+    this.privacySyncing = true;
+    try {
+      const result = await this.api.post('/v1/compliance/privacy-consent', consent);
+      if (result.ok && attemptId === this.bootAttemptId) this.platform.storageSet('app.privacy.consent.pending', null);
+    } finally { this.privacySyncing = false; }
+  }
+
+  async refreshPlayer(attemptId = this.bootAttemptId): Promise<void> {
     const res = await this.api.get('/v1/player/state');
+    if (attemptId !== this.bootAttemptId) return;
+    if (!res.ok || !res.player) throw new Error(res.message || '玩家数据加载失败');
     if (res.ok) {
       if (this.lastLevel && res.player.level > this.lastLevel) {
         this.audioManager.playSfx('levelup');
@@ -300,7 +316,7 @@ export class MiniGameClientApp {
     if (r.fx?.includes('win')) { this.platform.vibrate(true); this.audioManager.playSfx('win'); }
     if (r.fx?.includes('lose')) { this.platform.vibrate(false); this.audioManager.playSfx('lose'); }
     if (r.fx?.includes('levelup')) this.audioManager.playSfx('levelup');
-    this.refreshPlayer();
+    void this.refreshPlayer().catch(() => this.showToast('奖励已结算，余额刷新失败，请稍后重试'));
     return true;
   }
 
@@ -322,36 +338,33 @@ export class MiniGameClientApp {
       return;
     }
     const screen = this.router.current;
+    const gateVisible = screen.route === '/compliance-gate';
     // 屏幕内容区（HUD 之下、Tab 之上）
     const top = 64;
-    const bottom = this.ui.h - 54;
+    const bottom = this.ui.h - (gateVisible ? 0 : 54);
     ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, top, this.ui.w, bottom - top);
     this.ui.hits.length = 0;
-    // HUD
-    this.renderHud();
-    // Tab 栏（先画，屏幕可覆盖注册自己的命中）
-    this.renderTabBar(bottom);
     this.syncBgm();
     // 屏幕渲染（内部自行避开 top/bottom）
     try { screen.render(); } catch (e: any) {
       this.ui.textCenter('页面异常: ' + String(e?.message || e).slice(0, 30), this.ui.w / 2, this.ui.h / 2, { size: 12, color: THEME.red });
     }
-    // 屏幕返回按钮（非 tab 根）
-    if (this.router.stack.length) {
+    this.ui.hits = this.ui.hits.filter((hit) => hit.y >= top && hit.y + hit.h <= bottom);
+    if (!gateVisible) {
+      this.renderHud();
+      this.renderTabBar(bottom);
+    }
+    if (this.router.stack.length && !gateVisible) {
       this.ui.button({ x: 10, y: 8, w: 52, h: 26 }, '← 返回', () => this.router.pop(), { size: 12 });
     }
     // 屏幕标题
-    this.ui.textCenter(screen.title, this.ui.w / 2, 26, { size: 15, bold: true, color: THEME.text });
+    if (!gateVisible) this.ui.textCenter(screen.title.length > 13 ? screen.title.slice(0, 12) + '…' : screen.title, this.ui.w / 2, 26, { size: 15, bold: true, color: THEME.text });
     // modal / toast 层
     if (this.modal) {
       const actions = this.modal.actions.length ? this.modal.actions : [{ label: '知道了', onTap: () => { this.modal = null; } }];
       this.ui.modal(this.modal.title, this.modal.lines, () => { this.modal = null; }, actions.map((a) => ({ ...a, onTap: () => { this.modal = null; a.onTap(); } })));
     }
-    // 氛围窗：当前玩法家族的自制动画轮播（屏幕层之上、半透明，不挡命中）
-    if (!this.ambience) this.ambience = new (require('../ui/ambience').AmbienceWindow)();
-    this.ambience.setFamily(this.router.current?.route ?? '/home');
-    this.ambience.draw(this, this.ui, this.ui.w - 70, bottom - 66, 62, this.frameDt, 0.62);
     if (this.overlay) {
       const c2 = this.ui.ctx;
       c2.fillStyle = 'rgba(6,8,16,0.72)';
@@ -391,23 +404,20 @@ export class MiniGameClientApp {
     ctx.strokeRect(0, 0, ui.w, 64);
     const p = this.player;
     if (!p) return;
-    ui.text(`Lv.${p.level}`, 10, 22, { size: 13, bold: true, color: THEME.gold });
-    ui.progress(8, 28, 60, 4, p.xp / Math.max(1, p.xpToNext), THEME.purple);
+    const limited = this.antiAddiction && !this.antiAddiction.playableNow;
+    ui.text(limited ? '休息中' : `Lv.${p.level}`, ui.w - 55, 23, { size: 12, bold: true, color: limited ? THEME.red : THEME.gold });
+    ui.progress(ui.w - 55, 29, 42, 3, p.xp / Math.max(1, p.xpToNext), THEME.purple);
     const b = p.balances || {};
     const chips: string[] = [`金币 ${fmtNum(b.COIN)}`, `体力 ${fmtNum(b.ENERGY)}`, `宝石 ${fmtNum(b.GEMSTONE)}`, `奖券 ${fmtNum(b.TICKET)}`];
     if (this.profile === 'full-clone' && b.TEST_CREDIT != null) chips.push(`沙盒币 ${fmtNum(b.TEST_CREDIT)}`);
-    let x = 78;
+    let x = 12;
     for (const chip of chips) {
       const w = ui.measure(chip, 11) + 12;
       if (x + w > ui.w) break;
       ctx.fillStyle = THEME.panel;
-      ctx.fillRect(x, 8, w, 18);
-      ui.text(chip, x + 6, 21, { size: 11, color: THEME.textDim });
+      ctx.fillRect(x, 39, w, 18);
+      ui.text(chip, x + 6, 52, { size: 11, color: THEME.textDim });
       x += w + 6;
-    }
-    ui.text(`${BRAND.appName} · ${this.profile === 'full-clone' ? '研究沙盒' : '正式版'} · ${p.nick} · FPS ${this.fps}`, 78, 42, { size: 10, color: THEME.textDim });
-    if (this.antiAddiction && !this.antiAddiction.playableNow) {
-      ui.text('⏸ 防沉迷限制中', ui.w - 90, 42, { size: 10, color: THEME.red });
     }
   }
 

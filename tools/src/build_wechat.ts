@@ -19,11 +19,36 @@ import { rootPath } from '../../shared/src/paths';
 
 interface GameManifest { version: string; base: string; atlases: Array<{ id: string; file?: string; frames: Array<{ name: string; x?: number; y?: number; w: number; h: number; dur?: number; file?: string }>; fps?: number; hash?: string; bytes?: number }> }
 
-export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBase?: string; bootBudget?: number } = {}): string {
-  const cloudBase = process.env.APP_CLOUD_BASE ?? opts.cloudBase ?? '';
+export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBase?: string; bootBudget?: number; allowUnconfigured?: boolean; outputDir?: string } = {}): string {
+  const cloudBase = opts.cloudBase ?? process.env.APP_CLOUD_BASE ?? '';
   const root = rootPath();
-  const outDir = path.join(root, 'build', profile === 'full-clone' ? 'wechat-full-clone' : 'wechat-release');
-  fs.rmSync(outDir, { recursive: true, force: true });
+  const releaseConfig = profile === 'wechat-release' && !opts.allowUnconfigured
+    ? requireReleaseConfig(cloudBase)
+    : {
+      appId: process.env.APP_WX_APPID || '',
+      serverUrl: process.env.APP_SERVER_URL || '',
+      cloudEnv: process.env.APP_CLOUD_ENV || '',
+      cloudService: process.env.APP_CLOUD_SERVICE || '',
+    };
+  if (profile === 'wechat-release' && !cloudBase && !opts.allowUnconfigured) {
+    throw new Error('[build_wechat] wechat-release requires APP_CLOUD_BASE=<HTTPS asset CDN prefix>');
+  }
+  const buildRoot = path.join(root, 'build');
+  const outDir = opts.outputDir ? path.resolve(root, opts.outputDir) : path.join(buildRoot, profile === 'full-clone' ? 'wechat-full-clone' : 'wechat-release');
+  if (!outDir.startsWith(buildRoot + path.sep)) throw new Error('[build_wechat] outputDir must be a child of build/');
+  fs.mkdirSync(outDir, { recursive: true });
+  const privateConfigName = 'project.private.config.json';
+  const privateConfigPath = path.join(outDir, privateConfigName);
+  if (profile === 'wechat-release' && !opts.allowUnconfigured && fs.existsSync(privateConfigPath)) {
+    const privateConfig = JSON.parse(fs.readFileSync(privateConfigPath, 'utf8'));
+    if (!privateConfig || typeof privateConfig !== 'object' || Array.isArray(privateConfig)) throw new Error('[build_wechat] project.private.config.json must contain an object');
+    if (privateConfig.setting !== undefined && (!privateConfig.setting || typeof privateConfig.setting !== 'object' || Array.isArray(privateConfig.setting))) throw new Error('[build_wechat] project.private.config.json setting must contain an object');
+    privateConfig.setting = { ...privateConfig.setting, urlCheck: true };
+    fs.writeFileSync(privateConfigPath, JSON.stringify(privateConfig, null, 2));
+  }
+  for (const name of fs.readdirSync(outDir)) {
+    if (name !== privateConfigName) fs.rmSync(path.join(outDir, name), { recursive: true, force: true });
+  }
   fs.mkdirSync(path.join(outDir, 'dist'), { recursive: true });
 
   // 1. 编译 TypeScript（共享+客户端+服务端 app；排除 tools/tests/node 专用入口）
@@ -46,10 +71,14 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
       path.join(root, 'server/src/commerce.ts'),
     ],
   };
-  const tmpCfg = path.join(root, 'build', `tsconfig.wechat-${profile}.json`);
-  fs.mkdirSync(path.dirname(tmpCfg), { recursive: true });
-  fs.writeFileSync(tmpCfg, JSON.stringify(tsconfig, null, 1));
-  execFileSync(path.join(root, 'node_modules/.bin/tsc'), ['-p', tmpCfg], { stdio: 'inherit' });
+  const compilerDirectory = fs.mkdtempSync(path.join(buildRoot, 'wechat-compiler-'));
+  const tmpCfg = path.join(compilerDirectory, 'tsconfig.json');
+  try {
+    fs.writeFileSync(tmpCfg, JSON.stringify(tsconfig, null, 1));
+    execFileSync(path.join(root, 'node_modules/.bin/tsc'), ['-p', tmpCfg], { stdio: 'inherit' });
+  } finally {
+    fs.rmSync(compilerDirectory, { recursive: true, force: true });
+  }
 
   // 2. 复制 game.json / project.config.json / config
   fs.copyFileSync(path.join(root, 'wechat', 'game.json'), path.join(outDir, 'game.json'));
@@ -57,21 +86,25 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   projCfg.projectname = `ape-island-${profile}`;
   // AppID：CLI（cli open/preview/upload）只接受**真实 AppID**，touristappid 与空值均报 code 10；
   // 未配置 APP_WX_APPID 时保留 touristappid，仅供 GUI 手动以“测试号/无 AppID”方式导入。
-  projCfg.appid = process.env.APP_WX_APPID || projCfg.appid;
+  projCfg.appid = releaseConfig.appId || process.env.APP_WX_APPID || projCfg.appid;
+  if (profile === 'wechat-release' && !opts.allowUnconfigured) projCfg.setting.urlCheck = true;
   fs.writeFileSync(path.join(outDir, 'project.config.json'), JSON.stringify(projCfg, null, 2));
   fs.copyFileSync(path.join(root, 'configs', profile === 'full-clone' ? 'full-clone.json' : 'wechat-release.json'), path.join(outDir, 'config.json'));
 
   // 3. 入口 game.js
-  const serverUrl = process.env.APP_SERVER_URL ?? '';
-  const cloudEnv = process.env.APP_CLOUD_ENV ?? '';
-  const cloudService = process.env.APP_CLOUD_SERVICE ?? ''; // CloudBase Run 服务名（X-WX-SERVICE 头），必须与 wx.cloud.callContainer 一致
+  const serverUrl = releaseConfig.serverUrl;
+  const cloudEnv = releaseConfig.cloudEnv;
+  const cloudService = releaseConfig.cloudService; // CloudBase Run 服务名（X-WX-SERVICE 头），必须与 wx.cloud.callContainer 一致
   fs.writeFileSync(path.join(outDir, 'game.js'), `// ApeIsland (猿岛) mini game entry — profile: ${profile}\n// WeChat runtime uses the remote server; standalone is reserved for Node/test smoke runs.\n// cloudEnv/cloudService/cloudBase 仅注入环境标识，不含任何密钥。\nrequire('./dist/client/src/app/wx_entry.js').start(${JSON.stringify({ profile, serverUrl, cloudEnv, cloudService, standalone: false })});\n`);
 
   // 4. README（构建产物级）
   fs.writeFileSync(path.join(outDir, 'README.txt'), [
     `猿岛 ApeIsland · ${profile === 'full-clone' ? '研究沙盒构建（FULL CLONE）' : '发布构建（WECHAT RELEASE）'}`,
     '',
-    '导入方式: 微信开发者工具 → 导入项目 → 选择本目录 → AppID 使用测试号（touristappid）。',
+    `导入方式: 微信开发者工具 → 项目列表 → 小游戏 → 导入本目录，AppID: ${projCfg.appid}。`,
+    '首次正式导入后退出整个工具再重开，以便 CLI 载入新登记的项目；确认 projectid 非空且没有 isTemp。',
+    `域名校验: ${projCfg.setting.urlCheck ? '已开启；需要完成对应 AppID 的合法域名与云访问配置。' : '仅供开发/隔离验收；不能作为正式联网验收证据。'}`,
+    `默认调试基础库: ${projCfg.libVersion}；本地私人配置可覆盖，升级后须重新进行运行时验收。`,
     '微信运行时必须连接远端权威服务端；构建时通过 APP_SERVER_URL 注入自有 HTTPS 域名。',
     '进程内服务端仅供 Node/验收 mock 的 standalone 模式使用，不支持微信真机运行。',
     profile === 'wechat-release' ? 'RELEASE: 现金钱包/提现/下注/竞拍/P2P 交易/代理/现金红包已被客户端+服务端+配置三层关闭。' : 'FULL CLONE: 研究沙盒构建，仅限内部研究环境，禁止对外分发或提审。含沙盒结算桥（TEST_CREDIT），任何界面都不会实际兑付。',
@@ -91,6 +124,29 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   }
   console.log(`[build_wechat] ${profile} → ${outDir} (atlases: ${manifest?.atlases.length ?? 0}, ${mode}, main pkg ${(pkgBytes / 1048576).toFixed(2)}MB)`);
   return outDir;
+}
+
+function requireReleaseConfig(cloudBase: string): { appId: string; serverUrl: string; cloudEnv: string; cloudService: string } {
+  const values = {
+    appId: process.env.APP_WX_APPID || '',
+    serverUrl: process.env.APP_SERVER_URL || '',
+    cloudEnv: process.env.APP_CLOUD_ENV || '',
+    cloudService: process.env.APP_CLOUD_SERVICE || '',
+  };
+  const missing = Object.entries(values).filter(([, value]) => !value).map(([key]) => key);
+  if (missing.length) {
+    throw new Error(`[build_wechat] wechat-release requires ${missing.map((key) => ({ appId: 'APP_WX_APPID', serverUrl: 'APP_SERVER_URL', cloudEnv: 'APP_CLOUD_ENV', cloudService: 'APP_CLOUD_SERVICE' } as Record<string, string>)[key]).join(', ')}`);
+  }
+  if (!/^wx[a-fA-F0-9]{16}$/.test(values.appId)) throw new Error('[build_wechat] APP_WX_APPID must be wx followed by 16 hexadecimal characters');
+  for (const [name, value] of [['APP_SERVER_URL', values.serverUrl], ['APP_CLOUD_BASE', cloudBase]]) {
+    let valid = false;
+    try {
+      const url = new URL(value);
+      valid = /^https:\/\/[^/?#\s]+(?:[/?#]|$)/.test(value) && !/[\\\s]/.test(value) && url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password && !url.search && !url.hash;
+    } catch {}
+    if (!valid) throw new Error(`[build_wechat] ${name} must be a valid HTTPS URL without credentials, query, or fragment`);
+  }
+  return values;
 }
 
 /** 统计仍指向包内的图集数（boot pack 规模，云模式下用于日志核对） */
@@ -148,6 +204,7 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
   const dstBase = path.join(outDir, 'assets', 'game');
   fs.mkdirSync(dstBase, { recursive: true });
   const manifest: GameManifest = { version: `game-assets-${Date.now()}`, base: 'assets/game/', atlases: [] };
+  const safeAssetPath = (relPath: string): string => relPath.split('/').map((part) => part.replace(/__+/g, '_')).join('/');
   // atlas id → 该图集涉及的源文件相对路径（用于 boot pack 精确复制）
   const atlasFiles = new Map<string, Set<string>>();
   const register = (id: string, relPath: string): void => {
@@ -187,11 +244,11 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
       // 目录即图集： miner/f00.webp... → id=miner
       const parent = relPath.split('/').slice(0, -1).join('/');
       if (!parent) continue;
-      let atlas = manifest.atlases.find((a) => a.id === parent);
-      if (!atlas) { atlas = { id: parent, frames: [], fps: 12 }; manifest.atlases.push(atlas); }
       const buf = fs.readFileSync(fp);
       const size = (name.endsWith('.png') ? pngSize(buf) : webpSize(buf)) || (name.endsWith('.png') ? { w: 64, h: 64 } : null);
       if (!size) continue;
+      let atlas = manifest.atlases.find((a) => a.id === parent);
+      if (!atlas) { atlas = { id: parent, frames: [], fps: 12 }; manifest.atlases.push(atlas); }
       atlas.frames.push({
         name: path.basename(name, path.extname(name)),
         file: relPath,
@@ -227,20 +284,47 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
     }
   }
 
-  // 复制：云模式仅 boot pack；否则全量（保留原有 cp -R 语义）
-  if (opts.cloudBase) {
-    const copyRel = (relPath: string): void => {
-      const dst = path.join(dstBase, relPath);
-      fs.mkdirSync(path.dirname(dst), { recursive: true });
-      fs.copyFileSync(path.join(srcDir, relPath), dst);
-    };
-    for (const id of bootIds) for (const rel of atlasFiles.get(id) ?? []) copyRel(rel);
-  } else {
-    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
-    for (const name of fs.readdirSync(srcDir)) {
-      if (name === 'manifest.json') continue;
-      execFileSync('cp', ['-R', path.join(srcDir, name), path.join(dstBase, name)]);
+  for (const atlas of manifest.atlases) {
+    if (atlas.file && !/^https?:\/\//.test(atlas.file)) atlas.file = safeAssetPath(atlas.file);
+    for (const frame of atlas.frames) {
+      if (frame.file && !/^https?:\/\//.test(frame.file)) frame.file = safeAssetPath(frame.file);
     }
+  }
+  const copiedPaths = new Map<string, string>();
+  const copyRel = (relPath: string): void => {
+    const safePath = safeAssetPath(relPath);
+    const prior = copiedPaths.get(safePath);
+    if (prior && prior !== relPath) throw new Error(`[build_wechat] asset path collision: ${prior} and ${relPath}`);
+    copiedPaths.set(safePath, relPath);
+    const dst = path.join(dstBase, safePath);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.copyFileSync(path.join(srcDir, relPath), dst);
+  };
+  if (opts.cloudBase) {
+    for (const id of bootIds) for (const rel of atlasFiles.get(id) ?? []) copyRel(rel);
+    const audioDir = path.join(srcDir, 'audio');
+    if (fs.existsSync(audioDir)) {
+      const copyAudio = (dir: string, rel: string): void => {
+        for (const name of fs.readdirSync(dir)) {
+          const fp = path.join(dir, name);
+          const child = rel ? `${rel}/${name}` : name;
+          if (fs.statSync(fp).isDirectory()) copyAudio(fp, child);
+          else copyRel(`audio/${child}`);
+        }
+      };
+      copyAudio(audioDir, '');
+    }
+  } else {
+    const copyTree = (dir: string, rel: string): void => {
+      for (const name of fs.readdirSync(dir)) {
+        if (!rel && name === 'manifest.json') continue;
+        const fp = path.join(dir, name);
+        const child = rel ? `${rel}/${name}` : name;
+        if (fs.statSync(fp).isDirectory()) copyTree(fp, child);
+        else copyRel(child);
+      }
+    };
+    copyTree(srcDir, '');
   }
   fs.writeFileSync(path.join(dstBase, 'manifest.json'), JSON.stringify(manifest));
   return manifest;

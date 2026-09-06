@@ -29,8 +29,18 @@ export class Ledger {
   private entries: LedgerEntry[] = [];
   private balances: Map<string, Map<AssetId, number>> = new Map();
   private idemKeys: Map<string, LedgerEntry> = new Map();
+  private openingBalances: Record<string, Record<string, number>> = {};
 
-  constructor(private txnIdGen: () => string) {}
+  constructor(private txnIdGen: () => string, private now: () => number = () => Date.now()) {}
+
+  loadWallets(balances: Record<string, Record<string, number>>): void {
+    for (const wallet of Object.values(balances)) {
+      for (const [asset, balance] of Object.entries(wallet)) {
+        if (!Object.prototype.hasOwnProperty.call(ASSET_CATALOG, asset) || !Number.isFinite(balance) || balance < 0) throw new LedgerError('INVALID_DELTA', 'Invalid persisted wallet');
+      }
+    }
+    this.restore({ entries: [], balances, openingBalances: balances });
+  }
 
   balanceOf(playerId: string, assetId: AssetId): number {
     return this.balances.get(playerId)?.get(assetId) ?? 0;
@@ -83,7 +93,7 @@ export class Ledger {
       sourceType,
       sourceId,
       idempotencyKey: params.idempotencyKey ?? null,
-      createdAt: params.createdAt ?? Date.now(),
+      createdAt: params.createdAt ?? this.now(),
       metadata: params.metadata,
     };
     if (!this.balances.has(playerId)) this.balances.set(playerId, new Map());
@@ -116,7 +126,7 @@ export class Ledger {
   /** 经济不变量校验：每条 entry 的 balanceAfter == balanceBefore + delta，且与最终余额链一致。 */
   validateInvariants(playerId: string): { ok: boolean; errors: string[] } {
     const errors: string[] = [];
-    const running = new Map<AssetId, number>();
+    const running = new Map<AssetId, number>(Object.entries(this.openingBalances[playerId] || {}).map(([asset, balance]) => [asset as AssetId, balance]));
     for (const e of this.entries.filter((x) => x.playerId === playerId)) {
       const base = running.get(e.assetType) ?? 0;
       if (Math.abs(e.balanceBefore - base) > 1e-9) errors.push(`continuity break at ${e.txnId}: before=${e.balanceBefore} expected=${base}`);
@@ -132,17 +142,18 @@ export class Ledger {
   }
 
   /** 序列化（持久化/测试断言用） */
-  dump(): { entries: LedgerEntry[]; balances: Record<string, Record<string, number>> } {
+  dump(): { entries: LedgerEntry[]; balances: Record<string, Record<string, number>>; openingBalances: Record<string, Record<string, number>> } {
     const balances: Record<string, Record<string, number>> = {};
     for (const [pid, m] of this.balances) {
       balances[pid] = {};
       for (const [k, v] of m) balances[pid][k] = v;
     }
-    return { entries: this.entries, balances };
+    return { entries: this.entries, balances, openingBalances: this.openingBalances };
   }
 
-  restore(dump: { entries: LedgerEntry[]; balances: Record<string, Record<string, number>> }): void {
+  restore(dump: { entries: LedgerEntry[]; balances: Record<string, Record<string, number>>; openingBalances?: Record<string, Record<string, number>> }): void {
     this.entries = dump.entries;
+    this.openingBalances = JSON.parse(JSON.stringify(dump.openingBalances || {}));
     this.balances = new Map();
     this.idemKeys = new Map();
     for (const [pid, m] of Object.entries(dump.balances)) {

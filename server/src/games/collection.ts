@@ -188,7 +188,7 @@ export const daily: FeatureGame = {
   actions: {
     checkin: (ctx) => {
       const day = Math.floor(ctx.now / 86400000);
-      if (ctx.player.counters['daily.day'] === day) return fail('今天已签到');
+      if ((ctx.player.counters['daily.day'] ?? -1) >= day) return fail('今天已签到');
       const yesterday = ctx.player.counters['daily.lastDay'] === day - 1;
       const streak = yesterday ? (ctx.player.counters['daily.streak'] ?? 0) + 1 : 1;
       ctx.player.counters['daily.day'] = day;
@@ -217,7 +217,7 @@ export const daily: FeatureGame = {
 };
 
 /** 各玩法调用：写入每日任务完成标记 */
-export function markDailyTask(ctx: { player: { counters: Record<string, number> } }, task: 'mine' | 'game' | 'card'): void {
-  const day = Math.floor(Date.now() / 86400000);
+export function markDailyTask(ctx: { now: number; player: { counters: Record<string, number> } }, task: 'mine' | 'game' | 'card'): void {
+  const day = Math.floor(ctx.now / 86400000);
   if (!ctx.player.counters[`daily.task.${task}.${day}`]) ctx.player.counters[`daily.task.${task}.${day}`] = 1;
 }

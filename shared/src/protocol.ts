@@ -7,11 +7,18 @@ import { AssetId, AssetBalance } from './assets';
 import { BuildProfile, ReleaseProfile, TuningConfig, FeaturePolicy } from './config';
 
 // ---------- 基础 ----------
+export type ApiErrorCode =
+  | 'FEATURE_DISABLED' | 'AUTH_REQUIRED' | 'BAD_REQUEST' | 'NOT_FOUND'
+  | 'SESSION_STALE' | 'RATE_LIMITED' | 'INSUFFICIENT' | 'SERVER_ERROR' | 'COMPLIANCE_BLOCKED'
+  | 'WECHAT_AUTH_FAILED' | 'INVITE_EXPIRED' | 'ADMIN_AUTH_REQUIRED'
+  | 'IDEMPOTENCY_REQUIRED' | 'IDEMPOTENCY_CONFLICT' | 'COMMAND_EXPIRED' | 'COMMAND_SUPERSEDED'
+  | 'PERSISTENCE_UNAVAILABLE' | 'PERSISTENCE_LIMIT' | 'PERSISTENCE_CORRUPT';
 export interface ApiError {
   ok: false;
-  code: 'FEATURE_DISABLED' | 'AUTH_REQUIRED' | 'BAD_REQUEST' | 'NOT_FOUND' | 'SESSION_STALE' | 'RATE_LIMITED' | 'INSUFFICIENT' | 'SERVER_ERROR' | 'COMPLIANCE_BLOCKED';
+  code: ApiErrorCode;
   message: string;
   detail?: unknown;
+  retryable?: boolean;
 }
 export type ApiResult<T> = ({ ok: true } & T) | ApiError;
 
@@ -69,7 +76,7 @@ export interface InventoryItemDto {
 }
 
 // ---------- Game sessions ----------
-export interface SessionStartRequest { featureId: string; mechanicId?: string }
+export interface SessionStartRequest { featureId: string; mechanicId?: string; idempotencyKey?: string }
 export interface SessionStartResponse { sessionId: string; seed: string; serverTime: number; state?: unknown }
 
 export interface GameActionRequest {

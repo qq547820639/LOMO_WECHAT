@@ -145,7 +145,7 @@ export async function run(): Promise<void> {
 
   // ---------- 合规门：门页渲染 + 隐私同意 + 上报 ----------
   {
-    const app = new GameApp({ profile: 'wechat-release', bootPngSeeds: false });
+    const app = new GameApp({ profile: 'wechat-release', bootPngSeeds: false, allowSyntheticWechatAuth: true });
     const privacyPlayer = app.store.ensurePlayer('privacy-test-openid', 'privacy-test', Date.now()).player;
     const platform = new NodePlatform();
     platform.privacyNeedAuth = true;

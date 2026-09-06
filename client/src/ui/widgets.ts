@@ -94,8 +94,6 @@ export class UI {
     const c = this.ctx;
     const color = opts.disabled ? THEME.disabled : opts.color ?? THEME.panel2;
     this.panel(r, color);
-    c.strokeStyle = opts.disabled ? THEME.line : color === THEME.panel2 ? THEME.line : color;
-    c.strokeRect(r.x, r.y, r.w, r.h);
     const size = opts.size ?? 13;
     this.textCenter(label, r.x + r.w / 2, r.y + r.h / 2 + size * 0.36, { size, color: opts.disabled ? THEME.textDim : opts.textColor ?? THEME.text, bold: true });
     if (!opts.disabled) this.hits.push({ ...r, onTap, id: opts.id ?? label });
@@ -133,6 +131,7 @@ export class UI {
 
   // ---------- 弹窗 / Toast（由 App 管理） ----------
   modal(title: string, lines: string[], onClose: () => void, actions: { label: string; onTap: () => void; color?: string }[] = []): void {
+    this.hits = [];
     const c = this.ctx;
     c.fillStyle = 'rgba(0,0,0,0.62)';
     c.fillRect(0, 0, this.w, this.h);

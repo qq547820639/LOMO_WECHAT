@@ -34,6 +34,8 @@ export interface AppOptions {
   persistPath?: string | null;
   cards?: import('../../shared/src/registry').CardTemplate[];
   bootPngSeeds?: boolean;
+  allowSyntheticWechatAuth?: boolean;
+  wechatCodeExchange?: (code: string, signal: AbortSignal) => Promise<{ openid: string; errcode?: number }>;
 }
 
 export class GameApp {
@@ -46,7 +48,10 @@ export class GameApp {
   configVersion: string;
   private tokenSecret: string;
   private rateBuckets: Map<string, { windowStart: number; count: number }> = new Map();
-  private playerSeedCounter: Map<string, number> = new Map();
+  private allowSyntheticWechatAuth: boolean;
+  private wechatCodeExchange?: AppOptions['wechatCodeExchange'];
+  private loginRateBuckets: Map<string, { windowStart: number; count: number }> = new Map();
+  private loginWindow = { windowStart: 0, count: 0 };
 
   constructor(opts: AppOptions = {}) {
     const profile = opts.profile ?? (process.env.APP_PROFILE as BuildProfile) ?? 'full-clone';
@@ -54,11 +59,26 @@ export class GameApp {
     this.profile = profile;
     this.secret = opts.secret ?? process.env.APP_SECRET ?? 'dev-only-secret-DO-NOT-USE-IN-PROD';
     this.tokenSecret = this.secret + ':token';
+    this.allowSyntheticWechatAuth = opts.allowSyntheticWechatAuth ?? (profile === 'full-clone' && process.env.NODE_ENV !== 'production');
+    if (this.allowSyntheticWechatAuth && process.env.NODE_ENV === 'production') throw new Error('Synthetic WeChat authentication is disabled in production');
+    this.wechatCodeExchange = opts.wechatCodeExchange;
     this.tuning = this.loadTuning();
     this.configVersion = `tuning-${this.profile}-1`;
     this.store = new Store(() => randomId(18), opts.persistPath ?? undefined);
     if (opts.cards) this.store.setCards(opts.cards);
     if (opts.bootPngSeeds !== false) this.seedNpcPlayers();
+  }
+
+  now(): number { return Date.now(); }
+  newId(length = 18): string { return randomId(length); }
+
+  withStore(store: Store, now: number, newId: () => string): GameApp {
+    const scoped = Object.assign(Object.create(Object.getPrototypeOf(this)), this) as GameApp;
+    scoped.store = store;
+    scoped.now = () => now;
+    scoped.newId = newId;
+    scoped.rateLimited = () => false;
+    return scoped;
   }
 
   private loadTuning(): TuningConfig {
@@ -80,7 +100,7 @@ export class GameApp {
   private seedNpcPlayers(): void {
     const names = ['猿大圣', '矿工老王', '收藏酱', '宇宙飞侠', '地下城主', '吃鸡达人', '弹珠高手', '拔河队长'];
     names.forEach((n, i) => {
-      const { player } = this.store.ensurePlayer(`npc-${i}`, n, Date.now() - i * 86400000);
+      const { player } = this.store.ensurePlayer(`npc-${i}`, n, this.now() - i * 86400000);
       player.level = 3 + ((i * 7) % 20);
       this.store.rankAdd('seasonScore', player.playerId, 120 + ((i * 53) % 400));
       this.store.rankAdd('undertownDepth', player.playerId, 3 + ((i * 5) % 18));
@@ -101,7 +121,7 @@ export class GameApp {
     } catch { /* data.gen 未生成时使用默认策略 */ }
     const cfg: RemoteConfig = {
       version: this.configVersion,
-      signedAt: Date.now(),
+      signedAt: this.now(),
       signature: null,
       profile: this.profile,
       tuning: this.tuning,
@@ -126,7 +146,7 @@ export class GameApp {
     return {
       configVersion: cfg.version,
       profile: this.profile,
-      serverTime: Date.now(),
+      serverTime: this.now(),
       tuning: cfg.tuning,
       featurePolicies: cfg.featurePolicies,
       routesEnabled: cfg.routesEnabled,
@@ -137,21 +157,25 @@ export class GameApp {
 
   // ---------- auth ----------
   issueToken(playerId: string): string {
-    const expiresAt = Date.now() + GameApp.TOKEN_TTL_MS;
+    const expiresAt = this.now() + GameApp.TOKEN_TTL_MS;
     const payload = `${playerId}.${expiresAt}`;
     return `t1.${payload}.${hmac(this.tokenSecret, payload)}`;
   }
 
   verifyToken(token: string | undefined | null): string | null {
+    const playerId = this.verifyTokenSignature(token);
+    return playerId && this.store.player(playerId) ? playerId : null;
+  }
+
+  verifyTokenSignature(token: string | undefined | null): string | null {
     if (!token || !token.startsWith('t1.')) return null;
     const parts = token.split('.');
     if (parts.length !== 4) return null;
     const playerId = parts[1];
     const expiresAt = Number(parts[2]);
-    if (!playerId || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) return null;
+    if (!playerId || !Number.isSafeInteger(expiresAt) || expiresAt <= this.now()) return null;
     const payload = `${playerId}.${expiresAt}`;
     if (!safeEqual(hmac(this.tokenSecret, payload), parts[3])) return null;
-    if (!this.store.player(playerId)) return null;
     return playerId;
   }
 
@@ -169,6 +193,66 @@ export class GameApp {
     };
   }
 
+  private async exchangeWechatCode(code: string): Promise<string> {
+    if (!this.wechatCodeExchange && this.allowSyntheticWechatAuth) return 'wx_' + hmac(this.secret, code).slice(0, 16);
+    const appId = process.env.APP_WX_APPID;
+    const appSecret = process.env.APP_WX_APPSECRET;
+    if (!this.wechatCodeExchange && (!appId || !appSecret)) throw new Error('WeChat authentication is not configured');
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const exchange = async (): Promise<unknown> => {
+      if (this.wechatCodeExchange) return this.wechatCodeExchange(code, controller.signal);
+      const endpoint = new URL('https://api.weixin.qq.com/sns/jscode2session');
+      endpoint.searchParams.set('appid', appId!);
+      endpoint.searchParams.set('secret', appSecret!);
+      endpoint.searchParams.set('js_code', code);
+      endpoint.searchParams.set('grant_type', 'authorization_code');
+      const response = await fetch(endpoint, { signal: controller.signal });
+      if (!response.ok) throw new Error('WeChat authentication service failed');
+      return response.json();
+    };
+    try {
+      const result = await Promise.race([
+        exchange(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error('WeChat authentication timed out'));
+          }, 5000);
+        }),
+      ]) as { openid?: unknown; errcode?: unknown } | null;
+      if (!result || (result.errcode !== undefined && result.errcode !== 0)
+        || typeof result.openid !== 'string' || !result.openid.trim()
+        || result.openid !== result.openid.trim() || result.openid.length > 128) {
+        throw new Error('Invalid WeChat authentication response');
+      }
+      return result.openid;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
+  authenticateWechatCode(code: string): Promise<string> { return this.exchangeWechatCode(code); }
+  loginAllowed(ctx: HttpCtx): boolean { return !this.loginRateLimited(ctx); }
+  playerRequestAllowed(playerId: string): boolean { return !this.rateLimited(playerId); }
+
+  private loginRateLimited(ctx: HttpCtx): boolean {
+    const now = this.now();
+    if (now - this.loginWindow.windowStart >= 60000) this.loginWindow = { windowStart: now, count: 0 };
+    if (++this.loginWindow.count > 300) return true;
+    for (const [address, bucket] of this.loginRateBuckets) {
+      if (now - bucket.windowStart >= 60000) this.loginRateBuckets.delete(address);
+    }
+    const address = ctx.req.socket?.remoteAddress || 'in-process';
+    let bucket = this.loginRateBuckets.get(address);
+    if (!bucket) {
+      if (this.loginRateBuckets.size >= 1024) return true;
+      bucket = { windowStart: now, count: 0 };
+      this.loginRateBuckets.set(address, bucket);
+    }
+    return ++bucket.count > 30;
+  }
+
   // ---------- gating ----------
   policyOf(featureId: string): FeaturePolicy {
     return this.remoteConfig().featurePolicies[featureId] ?? 'keep';
@@ -179,7 +263,7 @@ export class GameApp {
   }
 
   private rateLimited(playerId: string): boolean {
-    const now = Date.now();
+    const now = this.now();
     const b = this.rateBuckets.get(playerId);
     if (!b || now - b.windowStart > 1000) {
       this.rateBuckets.set(playerId, { windowStart: now, count: 1 });
@@ -269,13 +353,22 @@ export class GameApp {
     const routes: RouteDef[] = [
       // ---- auth ----
       {
-        method: 'POST', pattern: '/v1/auth/wechat', handler: (ctx) => {
-          const code = String(ctx.body?.code || '');
-          if (!code) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'code required' }); return; }
-          // 正式环境: wx.login code → 微信接口换 openid。参考实现按 code 派生稳定 openId。
-          const openId = 'wx_' + hmac(this.secret, code).slice(0, 16);
+        method: 'POST', pattern: '/v1/auth/wechat', handler: async (ctx) => {
+          if (this.loginRateLimited(ctx)) { ctx.status(429); ctx.json({ ok: false, code: 'RATE_LIMITED', message: '登录请求过于频繁，请稍后重试' }); return; }
+          const code = ctx.body?.code;
+          if (typeof code !== 'string' || !code.trim() || code !== code.trim() || code.length > 256) {
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '无效的微信登录凭证' }); return;
+          }
+          let openId: string;
+          try {
+            openId = await this.exchangeWechatCode(code);
+          } catch {
+            ctx.status(502);
+            ctx.json({ ok: false, code: 'WECHAT_AUTH_FAILED', message: '微信登录暂不可用，请稍后重试' });
+            return;
+          }
           const nick = '玩家' + openId.slice(3, 7);
-          const { player, isNew } = this.store.ensurePlayer(openId, nick, Date.now());
+          const { player, isNew } = this.store.ensurePlayer(openId, nick, this.now());
           if (isNew) {
             this.initPlayerAssets(player.playerId);
             this.store.sendMail({ playerId: player.playerId, title: BRAND.welcomeMailTitle, body: BRAND.welcomeMailBody, rewards: [{ assetId: 'COIN', delta: 100 }] });
@@ -339,14 +432,14 @@ export class GameApp {
           const { featureId, mechanicId } = ctx.body || {};
           if (!featureId || !FEATURES_GAMES[featureId]) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: `unknown feature ${featureId}` }); return; }
           if (!this.featureAllowed(featureId)) { ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: `${featureId} 在 ${this.profile} 配置下不可用`, detail: { policy: this.policyOf(featureId) } }); return; }
-          const seed = `${playerId}:${Date.now()}:${Math.floor(Math.random() * 1e9)}`;
+          const seed = this.store.nextActionNonce(playerId);
           const s = this.store.createSession(playerId, featureId, seed, mechanicId);
           const game = FEATURES_GAMES[featureId];
           let state: unknown = undefined;
           if (game.readState) {
             try { state = game.readState(this.readCtx(playerId)); } catch { /* 状态读取失败不阻塞会话创建 */ }
           }
-          ctx.json({ ok: true, sessionId: s.sessionId, seed, serverTime: Date.now(), state });
+          ctx.json({ ok: true, sessionId: s.sessionId, seed: s.seed, serverTime: this.now(), state });
         },
       },
       // ---- game action（统一玩法入口） ----
@@ -356,12 +449,30 @@ export class GameApp {
           if (!playerId) return;
           const { featureId, actionId, sessionId, clientSeq, payload, idempotencyKey } = ctx.body || {};
           if (typeof featureId !== 'string' || typeof actionId !== 'string' ||
+            (sessionId !== undefined && (typeof sessionId !== 'string' || !sessionId)) ||
+            (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(idempotencyKey))) ||
             (clientSeq !== undefined && (!Number.isSafeInteger(clientSeq) || clientSeq < 0)) ||
             (payload !== undefined && (payload === null || typeof payload !== 'object' || Array.isArray(payload)))) {
-            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: 'featureId/actionId/clientSeq/payload 格式无效' }); return;
+            ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '玩法动作参数格式无效' }); return;
           }
-          const game = FEATURES_GAMES[featureId];
-          if (!game || typeof game.actions[actionId] !== 'function') { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: `unknown action ${featureId}.${actionId}` }); return; }
+          const fingerprint = hmac('action-request-v1', JSON.stringify({ featureId, actionId, sessionId: sessionId ?? null, clientSeq: clientSeq ?? null, payload: payload ?? {} }, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+            ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value));
+          const now = this.now();
+          const receipt = idempotencyKey ? this.store.actionReceipt(playerId, idempotencyKey, now) : undefined;
+          if (receipt) {
+            if (receipt.fingerprint !== fingerprint) { ctx.status(409); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '幂等键已用于其他请求' }); return; }
+            ctx.status(receipt.status);
+            ctx.json(JSON.parse(JSON.stringify(receipt.response)));
+            return;
+          }
+          const finishAction = (response: any, status = 200): void => {
+            if (idempotencyKey) this.store.recordAction(playerId, { key: idempotencyKey, fingerprint, createdAt: now, status, response });
+            this.store.touch();
+            ctx.status(status);
+            ctx.json(response);
+          };
+          const game = Object.prototype.hasOwnProperty.call(FEATURES_GAMES, featureId) ? FEATURES_GAMES[featureId] : undefined;
+          if (!game || !Object.prototype.hasOwnProperty.call(game.actions, actionId) || typeof game.actions[actionId] !== 'function') { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: `unknown action ${featureId}.${actionId}` }); return; }
           if (!this.featureAllowed(featureId)) { ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: `${featureId} 在 ${this.profile} 配置下不可用`, detail: { policy: this.policyOf(featureId) } }); return; }
           const compliance = this.antiAddiction(playerId);
           if (!compliance.playableNow) { ctx.status(403); ctx.json({ ok: false, code: 'COMPLIANCE_BLOCKED', message: compliance.message || '防沉迷限制' }); return; }
@@ -369,20 +480,18 @@ export class GameApp {
           if (sessionId) {
             session = this.store.session(sessionId);
             if (!session || session.playerId !== playerId || session.featureId !== featureId) { ctx.status(400); ctx.json({ ok: false, code: 'SESSION_STALE', message: '会话无效' }); return; }
-            if (session.finished) { ctx.status(400); ctx.json({ ok: false, code: 'SESSION_STALE', message: '会话已结束' }); return; }
             if (typeof clientSeq === 'number') {
-              if (clientSeq <= session.clientSeq && (session.data as any).__lastResult?.clientSeq === clientSeq) {
-                ctx.json((session.data as any).__lastResult.response);
+              const lastResult = (session.data as any).__lastResult;
+              if (clientSeq <= session.clientSeq && lastResult?.clientSeq === clientSeq && lastResult.fingerprint === fingerprint) {
+                finishAction(JSON.parse(JSON.stringify(lastResult.response)));
                 return;
               }
               if (clientSeq <= session.clientSeq) { ctx.status(409); ctx.json({ ok: false, code: 'SESSION_STALE', message: `clientSeq ${clientSeq} 已处理（serverSeq=${session.serverSeq}）` }); return; }
-              session.clientSeq = clientSeq;
             }
+            if (session.finished) { ctx.status(400); ctx.json({ ok: false, code: 'SESSION_STALE', message: '会话已结束' }); return; }
           }
           const player = this.store.player(playerId)!;
-          const now = Date.now();
-          const nonce = session ? `${session.seed}#${session.serverSeq + 1}` : `${playerId}:${this.playerSeedCounter.get(playerId) ?? 0}`;
-          if (!session) this.playerSeedCounter.set(playerId, (this.playerSeedCounter.get(playerId) ?? 0) + 1);
+          const nonce = session ? `${session.seed}#${session.serverSeq + 1}` : this.store.nextActionNonce(playerId);
           const rng = session ? new Rng(session.seed).fork(session.serverSeq + 1) : new Rng(nonce);
           const econ = new EconomyOps(this.store, this.profile);
           const gctx = {
@@ -396,7 +505,7 @@ export class GameApp {
             if (!result.ok) {
               // 玩法层失败（资源不足/状态错误）→ 统一错误响应
               this.store.telemetry('game_reject', { playerId, featureId, actionId, message: result.message });
-              ctx.json({ ok: false, code: 'BAD_REQUEST', message: result.message });
+              finishAction({ ok: false, code: 'BAD_REQUEST', message: result.message });
               return;
             }
             const rewards = econ.drainCollected();
@@ -405,6 +514,7 @@ export class GameApp {
             const serverSeq = session ? ++session.serverSeq : 0;
             if (session) {
               session.updatedAt = now;
+              if (typeof clientSeq === 'number') session.clientSeq = clientSeq;
               // 注意：result.state 是面向客户端的脱敏视图；权威状态由 handler 直接写在 session.data，
               // 这里绝不回写，避免客户端视图污染服务端状态。
             }
@@ -414,21 +524,21 @@ export class GameApp {
               rewards: (result.rewards as any) ?? rewards,
               items: result.items, state: result.state, counters: result.counters, replayToken: result.replayToken ?? (session ? hmac(this.secret, `${sessionId}:${serverSeq}`).slice(0, 12) : undefined),
             };
-            if (session) (session.data as any).__lastResult = { clientSeq: session.clientSeq, response: resp };
             // XP：非失败动作默认给少量经验（玩法可在 result 里自行给）
             if (result.ok) {
               const xp = this.xpForAction(featureId, actionId);
               if (xp > 0) this.grantXp(playerId, xp);
             }
             this.store.telemetry('game_finish', { playerId, featureId, actionId, ok: result.ok });
-            ctx.json(resp);
+            if (session) (session.data as any).__lastResult = { clientSeq: session.clientSeq, fingerprint, response: JSON.parse(JSON.stringify(resp)) };
+            finishAction(resp);
           } catch (err: any) {
             if (err instanceof LedgerError) {
-              ctx.status(409);
-              ctx.json({ ok: false, code: err.code === 'INSUFFICIENT_BALANCE' ? 'INSUFFICIENT' : 'BAD_REQUEST', message: err.message });
+              finishAction({ ok: false, code: err.code === 'INSUFFICIENT_BALANCE' ? 'INSUFFICIENT' : 'BAD_REQUEST', message: err.message }, 409);
               return;
             }
-            throw err;
+            this.store.telemetry('game_error', { playerId, featureId, actionId });
+            finishAction({ ok: false, code: 'SERVER_ERROR', message: '服务暂时不可用，请稍后重试', retryable: false }, 500);
           }
         },
       },
@@ -441,7 +551,7 @@ export class GameApp {
           const game = FEATURES_GAMES[featureId];
           if (!game?.readState) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: `feature ${featureId} 无状态读取` }); return; }
           if (!this.featureAllowed(featureId)) { ctx.status(403); ctx.json({ ok: false, code: 'FEATURE_DISABLED', message: `${featureId} 不可用` }); return; }
-          ctx.json({ ok: true, state: game.readState(this.readCtx(playerId)), serverTime: Date.now() });
+          ctx.json({ ok: true, state: game.readState(this.readCtx(playerId)), serverTime: this.now() });
         },
       },
       // ---- session finish ----
@@ -514,8 +624,8 @@ export class GameApp {
         method: 'POST', pattern: '/v1/social/invite/token', handler: (ctx) => {
           const playerId = guard(ctx);
           if (!playerId) return;
-          const token = randomId(10);
-          this.store.data.inviteTokens[token] = { inviterId: playerId, createdAt: Date.now() };
+          const token = this.newId(10);
+          this.store.data.inviteTokens[token] = { inviterId: playerId, createdAt: this.now() };
           ctx.json({ ok: true, token, shareQuery: `invite=${token}` });
         },
       },
@@ -526,7 +636,7 @@ export class GameApp {
           const token = String(ctx.body?.token || '');
           const rec = Object.prototype.hasOwnProperty.call(this.store.data.inviteTokens, token) ? this.store.data.inviteTokens[token] : undefined;
           if (!rec) { ctx.status(404); ctx.json({ ok: false, code: 'NOT_FOUND', message: '邀请码无效' }); return; }
-          if (Date.now() - rec.createdAt > GameApp.INVITE_TTL_MS) { delete this.store.data.inviteTokens[token]; ctx.status(410); ctx.json({ ok: false, code: 'INVITE_EXPIRED', message: '邀请码已过期' }); return; }
+          if (this.now() - rec.createdAt > GameApp.INVITE_TTL_MS) { delete this.store.data.inviteTokens[token]; ctx.status(410); ctx.json({ ok: false, code: 'INVITE_EXPIRED', message: '邀请码已过期' }); return; }
           if (rec.usedBy) { ctx.status(409); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '邀请码已被使用' }); return; }
           if (rec.inviterId === playerId) { ctx.status(400); ctx.json({ ok: false, code: 'BAD_REQUEST', message: '不能接受自己的邀请' }); return; }
           rec.usedBy = playerId;
@@ -564,7 +674,7 @@ export class GameApp {
           const configured = process.env.APP_ADMIN_TOKEN;
           const supplied = String(ctx.req.headers['x-admin-token'] || ctx.body?.adminToken || '');
           if (!configured || !safeEqual(supplied, configured)) { ctx.status(401); ctx.json({ ok: false, code: 'ADMIN_AUTH_REQUIRED', message: 'admin token required' }); return; }
-          this.store.data = { players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [] };
+          this.store.data = { players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [], actionReceipts: {}, actionNonces: {} };
           this.seedNpcPlayers();
           ctx.json({ ok: true });
         },
@@ -588,7 +698,7 @@ export class GameApp {
 
   readCtx(playerId: string): ReadCtx {
     return {
-      playerId, player: this.store.player(playerId)!, now: Date.now(), tuning: this.tuning, profile: this.profile,
+      playerId, player: this.store.player(playerId)!, now: this.now(), tuning: this.tuning, profile: this.profile,
       store: this.store, econ: new EconomyOps(this.store, this.profile),
       num: (p, f) => this.tuningNum(p, f),
     };

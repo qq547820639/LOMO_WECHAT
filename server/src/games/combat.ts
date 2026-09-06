@@ -54,9 +54,7 @@ function enemyPick(rng: import('../../../shared/src/rng').Rng, skill: number, ro
 export const arena: FeatureGame = {
   id: 'arena',
   readState: (ctx) => {
-    const opponents = Object.values(ctx.store.data.players)
-      .filter((p) => p.playerId !== ctx.playerId)
-      .slice(0, 8)
+    const opponents = ctx.store.opponents(ctx.playerId)
       .map((p, i) => ({ idx: i, playerId: p.playerId, nick: p.nick, level: p.level, power: p.level * ctx.num('arena.powerBase', 5) + 8 }));
     return {
       power: powerOf(ctx),
@@ -71,7 +69,7 @@ export const arena: FeatureGame = {
       const cost = ctx.num('energy.battleCost', 3);
       ctx.econ.regenEnergy(ctx.player, ctx.now, ctx.num('energy.max', 120), ctx.num('energy.regenMinutes', 6));
       const oppIdx = Math.max(0, Math.floor(Number(ctx.payload.opponentIdx ?? 0)));
-      const opponents = Object.values(ctx.store.data.players).filter((p) => p.playerId !== ctx.playerId);
+      const opponents = ctx.store.opponents(ctx.playerId);
       const opp = opponents[oppIdx] ?? opponents[0];
       if (!opp) return fail('没有可挑战的对手');
       if (!ctx.econ.payFrom(ctx.player, { ENERGY: cost }, 'arena.fight', opp.playerId)) return fail(`体力不足（需要 ${cost}）`);

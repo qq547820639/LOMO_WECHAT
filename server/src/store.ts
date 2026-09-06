@@ -5,6 +5,7 @@
 import { Ledger } from '../../shared/src/ledger';
 import { AssetId } from '../../shared/src/assets';
 import { CardTemplate } from '../../shared/src/registry';
+import { randomId } from './util';
 
 export interface InventoryEntry { qty: number; lockedQty: number; attrs?: Record<string, number | string | boolean> }
 
@@ -61,6 +62,14 @@ export interface ListingRecord {
   closed?: boolean;
 }
 
+export interface ActionReceipt {
+  key: string;
+  fingerprint: string;
+  createdAt: number;
+  status: number;
+  response: Record<string, unknown>;
+}
+
 export interface StoreData {
   players: Record<string, PlayerRecord>;
   openIdIndex: Record<string, string>;
@@ -72,11 +81,15 @@ export interface StoreData {
   telemetry: { name: string; at: number; props?: Record<string, unknown> }[];
   inviteTokens: Record<string, { inviterId: string; createdAt: number; usedBy?: string }>;
   audit: Array<{ at: number; playerId: string; kind: string; detail?: unknown }>;
+  actionReceipts: Record<string, ActionReceipt[]>;
+  actionNonces: Record<string, { seed: string; sequence: number }>;
 }
 
 export class Store {
+  static readonly ACTION_RECEIPT_LIMIT = 512;
+  static readonly ACTION_RECEIPT_TTL_MS = 86400000;
   data: StoreData = {
-    players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [],
+    players: {}, openIdIndex: {}, sessions: {}, mails: [], listings: {}, ranks: {}, history: {}, telemetry: [], inviteTokens: {}, audit: [], actionReceipts: {}, actionNonces: {},
   };
   ledger: Ledger;
   cards: CardTemplate[] = [];
@@ -100,6 +113,8 @@ export class Store {
 
   // ---- players ----
   player(playerId: string): PlayerRecord | undefined { return this.data.players[playerId]; }
+
+  opponents(playerId: string): PlayerRecord[] { return Object.values(this.data.players).filter((player) => player.playerId !== playerId).slice(0, 8); }
 
   ensurePlayer(openId: string, nick: string, now: number): { player: PlayerRecord; isNew: boolean } {
     const existing = this.data.openIdIndex[openId];
@@ -125,6 +140,30 @@ export class Store {
   }
 
   session(id: string): SessionRecord | undefined { return this.data.sessions[id]; }
+
+  actionReceipt(playerId: string, key: string, now: number): ActionReceipt | undefined {
+    const receipts = this.data.actionReceipts[playerId] || [];
+    return receipts.find((receipt) => receipt.key === key && now - receipt.createdAt < Store.ACTION_RECEIPT_TTL_MS);
+  }
+
+  recordAction(playerId: string, receipt: ActionReceipt): void {
+    const receipts = (this.data.actionReceipts[playerId] || []).filter((entry) => entry.key !== receipt.key && receipt.createdAt - entry.createdAt < Store.ACTION_RECEIPT_TTL_MS);
+    receipts.push(JSON.parse(JSON.stringify(receipt)));
+    this.data.actionReceipts[playerId] = receipts.slice(-Store.ACTION_RECEIPT_LIMIT);
+    this.touch();
+  }
+
+  nextActionNonce(playerId: string): string {
+    const state = this.data.actionNonces[playerId] ?? { seed: randomId(24), sequence: 0 };
+    if (!Number.isSafeInteger(state.sequence) || state.sequence >= Number.MAX_SAFE_INTEGER) {
+      state.seed = randomId(24);
+      state.sequence = 0;
+    }
+    state.sequence++;
+    this.data.actionNonces[playerId] = state;
+    this.touch();
+    return `${playerId}:${state.seed}:${state.sequence}`;
+  }
 
   // ---- ranks ----
   rankScore(board: string, playerId: string): number {

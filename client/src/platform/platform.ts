@@ -35,7 +35,7 @@ export interface PlatformAdapter {
   /** 隐私授权弹窗（官方 requirePrivacyAuthorize）；resolve=同意 */
   requirePrivacyAuthorize(): Promise<boolean>;
   exitMiniProgram(): void;
-  getWindowSize(): { w: number; h: number; dpr: number };
+  getWindowSize(): { w: number; h: number; dpr: number; topInset?: number; bottomInset?: number };
   onFrame(cb: () => void): void;
   onTouchStart(cb: (x: number, y: number) => void): void;
   onTouchEnd(cb: (x: number, y: number) => void): void;
@@ -91,11 +91,11 @@ export class WxPlatform implements PlatformAdapter {
     }
   }
   async getPrivacySetting(): Promise<PrivacySetting> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       if (!this.wx.getPrivacySetting) return resolve({ needAuthorization: false, privacyContractName: '', supported: false });
       this.wx.getPrivacySetting({
         success: (r: any) => resolve({ needAuthorization: !!r.needAuthorization, privacyContractName: r.privacyContractName || '《隐私保护指引》', supported: true }),
-        fail: () => resolve({ needAuthorization: false, privacyContractName: '', supported: false }),
+        fail: () => reject(new Error('隐私设置获取失败')),
       });
     });
   }
@@ -108,22 +108,39 @@ export class WxPlatform implements PlatformAdapter {
   exitMiniProgram(): void {
     try { this.wx.exitMiniProgram?.(); } catch { /* 忽略 */ }
   }
-  getWindowSize(): { w: number; h: number; dpr: number } {
+  getWindowSize(): { w: number; h: number; dpr: number; topInset?: number; bottomInset?: number } {
     try {
-      const s = this.wx.getSystemInfoSync();
-      return { w: s.windowWidth, h: s.windowHeight, dpr: s.pixelRatio || 2 };
+      const windowInfo = this.wx.getWindowInfo?.() ?? this.wx.getSystemInfoSync();
+      let menuBottom = 0;
+      try { menuBottom = this.wx.getMenuButtonBoundingClientRect?.()?.bottom ?? 0; } catch {}
+      const safeTop = Math.max(windowInfo.safeArea?.top ?? 0, windowInfo.statusBarHeight ?? 0);
+      const topInset = Number.isFinite(menuBottom) && menuBottom > safeTop ? menuBottom + 8 : safeTop + 40;
+      return {
+        w: windowInfo.windowWidth,
+        h: windowInfo.windowHeight,
+        dpr: windowInfo.pixelRatio || 2,
+        topInset,
+        bottomInset: Math.max(0, windowInfo.windowHeight - (windowInfo.safeArea?.bottom ?? windowInfo.windowHeight)),
+      };
     } catch { return { w: 375, h: 667, dpr: 2 }; }
   }
   onFrame(cb: () => void): void {
-    const raf = (this.wx && typeof this.wx.requestAnimationFrame === 'function') ? this.wx.requestAnimationFrame.bind(this.wx) : null;
-    const tick = (): void => { try { cb(); } catch (e) { console.error('[ape] frame error', e); } if (raf) raf(tick); else setTimeout(tick, 16); };
-    if (raf) {
-      try { raf(tick); } catch (e) { console.error('[ape] requestAnimationFrame init failed, falling back to setTimeout', e); setTimeout(tick, 16); }
-    } else {
-      // 兜底：低基础库版本或 DevTools 旧版无 requestAnimationFrame → setTimeout 16ms
-      console.warn('[ape] wx.requestAnimationFrame missing, using setTimeout fallback');
+    const runtime = globalThis as any;
+    const gameRuntime = typeof GameGlobal !== 'undefined' ? GameGlobal : null;
+    const owner = [runtime, gameRuntime, this.wx].find((candidate) => typeof candidate?.requestAnimationFrame === 'function');
+    let raf: ((callback: () => void) => void) | null = owner ? owner.requestAnimationFrame.bind(owner) : null;
+    const schedule = (): void => {
+      if (raf) {
+        try { raf(tick); return; }
+        catch (error) { raf = null; console.warn('[ape] requestAnimationFrame unavailable, using timer', error); }
+      }
       setTimeout(tick, 16);
-    }
+    };
+    const tick = (): void => {
+      try { cb(); } catch (error) { console.error('[ape] frame error', error); }
+      schedule();
+    };
+    schedule();
   }
   onTouchStart(cb: (x: number, y: number) => void): void { this.wx.onTouchStart((e: any) => { const t = e.touches?.[0]; if (t) cb(t.clientX, t.clientY); }); }
   onTouchEnd(cb: (x: number, y: number) => void): void { this.wx.onTouchEnd((e: any) => { const t = e.changedTouches?.[0]; if (t) cb(t.clientX, t.clientY); }); }

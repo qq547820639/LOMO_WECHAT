@@ -12,6 +12,9 @@ export class BattleRoyalScreen extends ApiScreen {
   readonly route = '/battleRoyal';
   private roomId = 2;
   private sessionId: string | null = null;
+  private pendingSessionId: string | null = null;
+  private joinSequence = 1;
+  private joining = false;
   private feed: string[] = [];
   private avatarClip: any = null;
 
@@ -24,12 +27,48 @@ export class BattleRoyalScreen extends ApiScreen {
 
   protected async fetchState(): Promise<any> {
     const r = await this.app.api.gameState('battleRoyal');
-    if (r.ok && r.state?.active?.sessionId) {
-      this.sessionId = r.state.active.sessionId;
-    } else if (r.ok && !r.state?.active) {
-      this.sessionId = null;
+    if (r.ok) {
+      const active = r.state?.active;
+      this.sessionId = active?.data?.rooms?.length ? active.sessionId : null;
+      const pendingSessionId = active && !this.sessionId ? active.sessionId : null;
+      if (this.pendingSessionId !== pendingSessionId) this.joinSequence = 1;
+      this.pendingSessionId = pendingSessionId;
     }
     return r;
+  }
+
+  private async joinRoom(): Promise<void> {
+    if (this.joining || this.sessionId) return;
+    this.joining = true;
+    const roomId = this.roomId;
+    try {
+      const latest = await this.fetchState();
+      if (!latest.ok) { this.app.showToast(latest.message || '房间状态读取失败，请重试'); return; }
+      this.state = latest.state;
+      if (this.sessionId) { await this.app.refreshPlayer(); return; }
+      if (!this.pendingSessionId) {
+        const session = await this.app.api.post('/v1/game/session/start', { featureId: 'battleRoyal' });
+        if (!session.ok) { this.app.showToast(session.message || '创建房间失败，请重试'); return; }
+        this.pendingSessionId = session.sessionId;
+        this.joinSequence = 1;
+      }
+      const response = await this.app.api.action('battleRoyal', 'join', { roomId }, this.pendingSessionId, this.joinSequence);
+      this.app.handleGameResponse(response);
+      if (response.ok) {
+        this.sessionId = this.pendingSessionId;
+        this.pendingSessionId = null;
+        this.feed = [response.message];
+        this.state = { ...this.state, active: { sessionId: this.sessionId, data: response.state }, lastMsg: response.message };
+      } else if (response.code !== 'SERVER_ERROR') {
+        this.joinSequence++;
+      }
+      await this.onEnter();
+      if (!response.ok && this.sessionId) await this.app.refreshPlayer();
+    } catch (error: any) {
+      this.app.showToast(error?.message || '进入房间失败，请重试');
+    } finally {
+      this.joining = false;
+    }
   }
 
   render(): void {
@@ -53,19 +92,12 @@ export class BattleRoyalScreen extends ApiScreen {
         const bx = 12 + ((i - 1) % 3) * (bw + 5);
         const by = y + Math.floor((i - 1) / 3) * 56;
         const active = this.roomId === i;
-        ui.button({ x: bx, y: by, w: bw, h: 48 }, `${i} 号房`, () => { this.roomId = i; }, {
-          color: active ? THEME.accent : THEME.panel2, size: 13,
+        ui.button({ x: bx, y: by, w: bw, h: 48 }, `${i} 号房`, () => { if (!this.joining) this.roomId = i; }, {
+          color: active ? THEME.accent : THEME.panel2, size: 13, disabled: this.joining,
         });
       }
       y += Math.ceil(st.lobby.roomCount / 3) * 56 + 8;
-      ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `进入 ${this.roomId} 号房间（门票 ${st.lobby.entryCostCoin}）`, async () => {
-        const s = await this.app.api.post('/v1/game/session/start', { featureId: 'battleRoyal' });
-        if (!s.ok) { this.app.showToast(s.message); return; }
-        const r = await this.app.api.action('battleRoyal', 'join', { roomId: this.roomId }, s.sessionId, 1);
-        if (r.ok) { this.sessionId = s.sessionId; this.feed = [r.message]; }
-        else this.app.showToast(r.message);
-        await this.onEnter();
-      }, { color: THEME.accent });
+      ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, this.joining ? '正在进入房间…' : `进入 ${this.roomId} 号房间（门票 ${st.lobby.entryCostCoin}）`, () => this.joinRoom(), { color: THEME.accent, disabled: this.joining, id: 'br-join' });
       y += 56;
     } else {
       if (!this.avatarClip) this.avatarClip = this.avatarFor();
@@ -201,6 +233,7 @@ class DuelArenaScreen extends ApiScreen {
   private selIdx = 0;
   private moveSeq: string[] = [];
   private cine: { startAt: number; me: any; foe: any } | null = null;
+  private fighting = false;
 
   /** v3 对战场景：对峙→三回合突进（每次命中音）→ 结果 overlay */
   private startCinematic(): void {
@@ -288,14 +321,24 @@ class DuelArenaScreen extends ApiScreen {
     y += 44;
     ui.text('已选: ' + (this.moveSeq.map(moveLabel).join('→') || '（自动）'), 16, y + 12, { size: 11, color: THEME.gold });
     y += 20;
-    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, `挑战 ${this.opponents[this.selIdx]?.nick ?? '对手'}！`, () => {
-      if (this.featureId === 'monkeyFight') this.app.playOverlay(this.app.assets.resolveSlotId('monkeyfighting__'), 1200);
-      void this.app.api.action('arena', 'fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() }).then((r: any) => {
-        this.app.playOverlay(r.ok && r.message.includes('胜') ? 'arena__result_success' : 'pag__pag_levelup_fail', 1500);
-        this.moveSeq = [];
-        this.onEnter();
-      });
-    }, { color: THEME.accent });
+    ui.button({ x: 12, y, w: ui.w - 24, h: 46 }, this.fighting ? '挑战中…' : `挑战 ${this.opponents[this.selIdx]?.nick ?? '对手'}！`, async () => {
+      if (this.fighting) return;
+      this.fighting = true;
+      try {
+        if (this.featureId === 'monkeyFight') this.app.playOverlay(this.app.assets.resolveSlotId('monkeyfighting__'), 1200);
+        const response = await this.app.api.action(this.featureId, 'fight', { opponentIdx: this.selIdx, moves: this.moveSeq.slice() });
+        this.app.handleGameResponse(response);
+        if (response.ok) {
+          this.app.playOverlay(response.message?.includes('胜') ? 'arena__result_success' : 'pag__pag_levelup_fail', 1500);
+          this.moveSeq = [];
+          await this.onEnter();
+        }
+      } catch (error: any) {
+        this.app.showToast(error?.message || '挑战失败，请重试');
+      } finally {
+        this.fighting = false;
+      }
+    }, { color: THEME.accent, disabled: this.fighting, id: 'duel-fight' });
     y += 56;
     ui.text('记录: ' + (st.history?.[0]?.summary ?? '暂无'), 16, y + 8, { size: 10, color: THEME.textDim });
     y += 22;

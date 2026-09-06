@@ -1,6 +1,7 @@
 {
   "description": "ApeIsland mini game",
   "compileType": "game",
+  "libVersion": "3.16.2",
   "appid": "touristappid",
   "projectname": "ape-island",
   "setting": {

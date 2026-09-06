@@ -13,6 +13,7 @@
     "gen:assets": "node dist/tools/src/asset_pipeline.js",
     "test": "npm run build && node --test dist/tests/*.js",
     "verify": "node dist/tools/src/verify.js",
+    "qa:local": "npm run build && node dist/tools/src/qa_local.js",
     "server": "node dist/server/src/index.js",
     "parity": "node dist/tools/src/route_parity.js",
     "bake:pag": "node dist/tools/src/bake_pag.js",
@@ -27,5 +28,9 @@
     "libpag": "^4.5.85",
     "puppeteer-core": "^25.10.0",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@cloudbase/js-sdk": "3.9.2",
+    "@cloudbase/signature-nodejs": "2.0.0"
   }
 }

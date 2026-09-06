@@ -51,7 +51,7 @@ export class InProcessTransport implements Transport {
     // 延迟 require：仅在 standalone 模式加载（app.ts 不依赖 node:http/fs 顶层）
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { GameApp } = require('../../../server/src/app');
-    this.app = new GameApp({ profile });
+    this.app = new GameApp({ profile, allowSyntheticWechatAuth: true });
     this.routes = this.app.routes();
   }
   get appInstance(): any { return this.app; }
@@ -89,32 +89,50 @@ export class InProcessTransport implements Transport {
 
 export type ApiHandler = (path: string, method: 'GET' | 'POST', body?: any) => Promise<any>;
 
+function isFinalResponse(response: any): boolean {
+  if (typeof response?.ok !== 'boolean') return false;
+  if (response.ok || response.retryable === false) return true;
+  return response.retryable !== true && !['SERVER_ERROR', 'PERSISTENCE_UNAVAILABLE', 'PERSISTENCE_LIMIT', 'PERSISTENCE_CORRUPT'].includes(response.code);
+}
+
 export class ApiClient {
   token: string | null = null;
   playerId: string | null = null;
   bootstrap: any = null;
   connected = false;
+  private sessionGeneration = 0;
+  private actionSequence = 0;
+  private actionPrefix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  private pendingActions = new Map<string, { idempotencyKey: string; body: Record<string, unknown> }>();
+  private pendingPosts = new Map<string, { idempotencyKey: string; body: Record<string, unknown> }>();
   constructor(private transport: Transport) {}
 
   private headers(): Record<string, string> {
     return this.token ? { authorization: `Bearer ${this.token}` } : {};
   }
 
-  async connect(profile: 'full-clone' | 'wechat-release'): Promise<void> {
-    this.bootstrap = await this.request('/v1/config/bootstrap', 'GET') as any;
-    if (!this.bootstrap || this.bootstrap.ok === false) throw new Error(this.bootstrap?.message || 'bootstrap failed');
-    if (this.bootstrap.profile !== profile || this.bootstrap.release?.profile !== profile) {
+  beginSession(): number { return ++this.sessionGeneration; }
+
+  invalidateSession(): void { this.sessionGeneration++; }
+
+  async connect(profile: 'full-clone' | 'wechat-release', generation = this.sessionGeneration): Promise<void> {
+    const bootstrap = await this.request('/v1/config/bootstrap', 'GET') as any;
+    if (generation !== this.sessionGeneration) throw new Error('STALE_SESSION');
+    if (!bootstrap || bootstrap.ok === false) throw new Error(bootstrap?.message || 'bootstrap failed');
+    if (bootstrap.profile !== profile || bootstrap.release?.profile !== profile) {
       throw new Error(`server profile mismatch: expected ${profile}`);
     }
     if (profile === 'wechat-release') {
-      const unsafe = RELEASE_LOCKED_FLAGS.filter((key) => this.bootstrap.release?.[key] === true);
+      const unsafe = RELEASE_LOCKED_FLAGS.filter((key) => bootstrap.release?.[key] === true);
       if (unsafe.length) throw new Error(`release server enables locked capabilities: ${unsafe.join(',')}`);
     }
+    this.bootstrap = bootstrap;
     this.connected = true;
   }
 
-  async login(code: string): Promise<{ playerId: string; isNew: boolean; antiAddiction: any }> {
+  async login(code: string, generation = this.sessionGeneration): Promise<{ playerId: string; isNew: boolean; antiAddiction: any }> {
     const res = await this.request('/v1/auth/wechat', 'POST', { code }) as any;
+    if (generation !== this.sessionGeneration) throw new Error('STALE_SESSION');
     if (!res.ok) throw new Error(res.message || 'login failed');
     this.token = res.token;
     this.playerId = res.playerId;
@@ -122,7 +140,19 @@ export class ApiClient {
   }
 
   get(path: string): Promise<any> { return this.request(path, 'GET', undefined, this.headers()); }
-  post(path: string, body?: any): Promise<any> { return this.request(path, 'POST', body, this.headers()); }
+  async post(path: string, body?: any): Promise<any> {
+    if (body?.idempotencyKey !== undefined) return this.request(path, 'POST', body, this.headers());
+    const fingerprint = JSON.stringify([this.playerId || this.token, path, body ?? {}], (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value);
+    const pending = this.pendingPosts.get(fingerprint) ?? {
+      idempotencyKey: `request-${this.actionPrefix}-${++this.actionSequence}`,
+      body: JSON.parse(JSON.stringify(body ?? {})),
+    };
+    this.pendingPosts.set(fingerprint, pending);
+    const response = await this.request(path, 'POST', { ...pending.body, idempotencyKey: pending.idempotencyKey }, this.headers());
+    if (isFinalResponse(response) && this.pendingPosts.get(fingerprint) === pending) this.pendingPosts.delete(fingerprint);
+    return response;
+  }
 
   private async request(path: string, method: 'GET' | 'POST', body?: any, headers?: Record<string, string>): Promise<any> {
     try {
@@ -135,7 +165,16 @@ export class ApiClient {
 
   /** 玩法动作便捷封装 */
   async action(featureId: string, actionId: string, payload?: Record<string, unknown>, sessionId?: string, clientSeq?: number): Promise<any> {
-    return this.post('/v1/game/action', { featureId, actionId, payload, sessionId, clientSeq });
+    const fingerprint = JSON.stringify([this.playerId || this.token, { featureId, actionId, payload: payload ?? {}, sessionId }], (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value);
+    const pending = this.pendingActions.get(fingerprint) ?? {
+      idempotencyKey: `action-${this.actionPrefix}-${++this.actionSequence}`,
+      body: JSON.parse(JSON.stringify({ featureId, actionId, payload, sessionId, clientSeq })),
+    };
+    this.pendingActions.set(fingerprint, pending);
+    const response = await this.post('/v1/game/action', { ...pending.body, idempotencyKey: pending.idempotencyKey });
+    if (isFinalResponse(response) && this.pendingActions.get(fingerprint) === pending) this.pendingActions.delete(fingerprint);
+    return response;
   }
 
   async gameState(featureId: string): Promise<any> {

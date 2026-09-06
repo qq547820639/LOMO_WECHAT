@@ -70,8 +70,8 @@ export function makeServer(routes: RouteDef[], opts: { log?: (msg: string) => vo
       await found.handler(ctx);
       if (!res.writableEnded) send(res.statusCode || 200, (ctx as any).__body ?? { ok: true });
     } catch (err: any) {
-      opts.log?.(`[error] ${req.method} ${path}: ${err?.message || err}`);
-      send(500, { ok: false, code: 'SERVER_ERROR', message: String(err?.message || err) });
+      opts.log?.(`[error] ${req.method} ${path}: ${err?.name || 'Error'}`);
+      send(500, { ok: false, code: 'SERVER_ERROR', message: '服务暂不可用，请稍后重试' });
     }
   });
 }

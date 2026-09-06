@@ -39,7 +39,7 @@ function makeCall(app: GameApp) {
 }
 
 export async function run(): Promise<void> {
-  const app = new GameApp({ profile: 'wechat-release', bootPngSeeds: true });
+  const app = new GameApp({ profile: 'wechat-release', bootPngSeeds: true, allowSyntheticWechatAuth: true });
   const call = makeCall(app);
   const t = await (async () => {
     const r = await call('/v1/auth/wechat', 'POST', { code: 'release-safety' });

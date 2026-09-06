@@ -1,208 +1,196 @@
-# DEPLOYMENT（自有域名与服务器部署指南）
+# DEPLOYMENT（微信小游戏构建、资源与服务端部署）
 
-> 定位声明：本工程是对用户提供的 APK 的**逆向研究**产物（clean-room 重写，未复制原版代码/美术/品牌）。
-> 后续部署使用**自己的域名与服务器**，不接触、不复用原 App 的任何基础设施
-> （已确证的原版基础设施——网易云信 IM/七鱼客服域名等——仅作研究证据记录，见 RUNTIME_EVIDENCE.md §3）。
+> 本工程使用自有 AppID、云环境、服务端与资源域名。研究归档中的原 App 域名、SDK、账号及素材权利信息不能作为上线配置或授权依据。
+> 2026-09-06 的本地修复、隔离云数据库测试与云端正在运行的版本必须分开验收。当前工作区已加入持久化实现；**没有部署该修复包、迁移生产玩家数据或轮换线上密钥**。最新代码回归以 [TEST_REPORT.md](TEST_REPORT.md) 与 [QA_RECHECK_2026-09-06.md](QA_RECHECK_2026-09-06.md) 的时间和覆盖范围为准。
 
-## 1. 架构对应关系
+## 1. 当前环境与实测边界
 
-| 层 | 本工程交付物 | 部署动作 |
-|---|---|---|
-| 小游戏客户端 | `build/wechat-release/`（或 full-clone） | 导入微信开发者工具，替换 `project.config.json` 的 appid 为**自有 AppID** |
-| 参考服务端 | `server/`（node:http，零运行时依赖） | 部署到自有服务器，客户端经 `APP_SERVER_URL` 指向自有域名 |
-| 通信协议 | `docs/BACKEND_API.md`（全部 /v1/* 路由） | 协议即文档；自有实现只需兼容同一路由 |
-| 数值配置 | `configs/tuning-baseline.json` + RemoteConfig | `OWNED_LAUNCH_DEFAULTS` 已校验并版本化；运营通过签名配置灰度调优，与原服数值无关 |
-| 资源 | 478 张图集 sheet（tools/bake/out/atlas/） | 上传**自有 CDN/OSS**，manifest.base 指向自有域名 |
-
-## 2. 服务端部署（最小步骤）
-
-```bash
-# 服务器上（Node ≥ 18）
-npm install && npm run build
-APP_PROFILE=wechat-release APP_SECRET=<自生成随机密钥> APP_DATA_DIR=/data/lomo PORT=8787 \
-  node dist/server/src/index.js
-```
-
-- `APP_SECRET`：RemoteConfig 签名与 token HMAC 的根密钥，**必须换成自己的随机值**（默认 dev 密钥仅本地）。令牌有效期为 7 天。
-- `APP_ALLOW_ADMIN=1` 仅开启管理接口路由；执行 `/v1/admin/reset` 还必须设置 `APP_ADMIN_TOKEN`，并通过 `x-admin-token` 请求头传入，避免仅凭环境开关即可清空数据。
-- `APP_DATA_DIR`：JSON 快照持久化目录。生产建议换数据库（Ledger/Store 接口边界清晰，见 ARCHITECTURE.md）。
-- `APP_PROFILE=wechat-release`：正式发布档；full-clone 档仅内网研究环境使用。
-- 反向代理加 TLS（微信要求 HTTPS/WSS 域名白名单）+ 进程守护（pm2/systemd）。
-
-## 3. 客户端指向自有域名
-
-```bash
-APP_SERVER_URL=https://api.your-domain.com npm run build:wechat
-# 构建器把 serverUrl 注入 game.js → 客户端 HttpTransport(wx.request) 走自有域名；
-# 微信产物未注入 APP_SERVER_URL 会在启动页明确报错；进程内模式仅供 Node/验收 mock。
-```
-
-微信 mp 后台 → 开发管理 → 服务器域名，将自有域名加入 request/socket 合法域名白名单。
-
-## 4. 资源策略（全部自有，已入库）
-
-包内美术全部为**自制资产**（`game-assets/`：矿工 8 帧 + fx_launch 6 帧 + 209 槽位动画 1672 帧，均由 `tools/src/gen_placeholder_art.ts` 与 `gen_slot_animations.ts` 生成，已提交仓库）。重建：`npm run gen:art && npm run build:wechat`。
-如单包超微信主包限制，将 `assets/game/` 按组上自有 CDN（manifest.base 切换）；209 槽位动画为自制内容，上 CDN 无权利障碍。
-
-## 5. 资源上自有 CDN
-
-```bash
-# 478 张 sheet（tools/bake/out/atlas/<group>/sheet_NNN.webp + *.meta.partNN.json）
-# 按内容哈希上传自有 CDN/OSS，保持 <group>/ 目录结构
-# 然后二选一：
-#  A. 包内 assets/game/manifest.json 的 base 改为 https://cdn.your-domain.com/atlas/
-#  B. AssetManager.loadManifest('https://cdn.your-domain.com/atlas/manifest.json') 走远端 manifest
-```
-
-209 个超大件（视频桶）需 ffmpeg 转 mp4 后同路径上 CDN（RUNTIME_REQUIRED，见 EXTERNAL_BLOCKERS）。
-
-## 5. 隔离与合规红线（部署必读）
-
-1. **品牌隔离（已执行，2026-09-06 脱敏审计 BRAND_AUDIT.md）**：包内原版品牌字符串已全部替换为自有占位品牌
-   **《猿岛 ApeIsland》**（检索确认无同名小游戏）；**正式部署换牌只改 `shared/src/brand.ts` 一个文件**
-   （appName/标题/分享/邮件/公告集中于此），改后 `npm run build:wechat` 重出双包。原版品牌信息仅存于
-   研究归档层（RUNTIME_EVIDENCE.md 等，带隔离声明），不进任何产物。
-2. **基础设施隔离**：网易云信 IM/七鱼客服等域名与 SDK 不复用（微信小游戏侧本就不可用）；
-   IM/客服用微信官方能力替代（WECHAT_ADAPTATION.md）。
-3. **资产版权**：APK 提取素材仅存映射与样本（evidence/）；正式包内当前为程序化占位与自有烘焙图集，
-   上线前需确认美术资产的合法权利链（COMPLIANCE_CURRENT.md 规范 1.3 抄袭/侵权红线）。
-4. **现金合规**：wechat-release 档已四层关闭现金类能力（tests/release_safety.ts 断言）；
-   如后续自有业务需要虚拟支付，按 COMPLIANCE_CURRENT.md 的支付规则流程另行评估。
-5. **数据合规**：自有服务器收集的数据按 PRIVACY_DATA_MAP.md 最小必要口径执行。
-
-## 云开发（CloudBase）资源分载 —— 2026-09-06 已实测打通
-
-**背景**：主包曾达 25MB（其中 23MB 为自制动画帧），远超微信小游戏 **主包 ≤4MB** 红线，上传必被拒。
-现已改为「包内 boot pack + 云开发静态托管 CDN」的资源分载形态。
-
-### 环境
-
-| 项 | 值 |
+| 项 | 当前配置 |
 |---|---|
-| 环境 ID | `lomo-wechat-d0gcakr952f0d90b8`（个人版 / ap-shanghai） |
-| 静态托管（资源 CDN）域 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com` |
-| 云托管（服务端容器）域 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com` |
-| 资源路径前缀 | `v1/assets/game/`（版本号前缀，便于整版回滚） |
+| 微信 AppID | `wxec103651e807c540` |
+| CloudBase 环境 | `lomo-wechat-d0gcakr952f0d90b8`，上海 |
+| CloudBase Run 服务 | `lomo-wechat` |
+| 公网 API | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
+| 静态资源前缀 | `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/` |
+| 正式客户端产物 | `build/wechat-release/` |
+| 离线验收产物 | `build/verify/wechat-full-clone/`、`build/verify/wechat-release/` |
+| 服务端部署源 | `build/cloudrun/` |
+| 真实持久化测试集合 | `ape_qa_persistence`，管理员专用、合成身份；与生产玩家分离 |
+| 生产数据库集合配置 | `APP_DB_COLLECTION`，默认 `ape_game_state`；不代表已创建、迁移或部署 |
 
-### 上传命令（凭据放本地 `.env.cloud`，绝不入库）
+当前证据不足以认定微信联网或正式登录通过：
+
+- 公网 `curl` 请求 `/v1/config/bootstrap` 返回过 200；这仅证明相应公网探测可达。
+- 微信开发者工具通过 `wx.cloud.callContainer` 请求同一环境、服务的 `/v1/config/bootstrap` 返回错误码 **85088**；客户端启动的 bootstrap 阶段也出现同码。具体原因仍待核验，应保留完整 `errMsg`、请求环境、服务名、时间及云端日志，不根据错误码猜测权限或服务状态。
+- 开发者工具中使用 `wx.request` 请求公网 API，被 request 合法域名校验拦截；当时 Console 列出的合法域名只有 `https://tcb-api.tencentcloudapi.com`。需要在目标 AppID 的平台配置中核对所用 API/CDN 域名，再以 `urlCheck=true` 实测。
+- 本地 `.env.cloud` 检查未发现 `APP_WX_APPSECRET`。这不证明云端没有该变量；云端运行期配置和真实 `wx.login` → `code2Session` 尚未完成验收。
+- 本地修复后的服务端会在正式启动时拒绝缺失或无效的凭据。应完成运行期配置并验证后才部署，否则新实例会启动失败。
+
+## 2. 本地验证与正式客户端构建
+
+使用 Node.js 22。仓库根目录安装依赖后执行：
 
 ```bash
-set -a; . ./.env.cloud; set +a
-npx -p @cloudbase/cli tcb login --apiKeyId "$TENCENTCLOUD_SECRET_ID" --apiKey "$TENCENTCLOUD_SECRET_KEY"
-npx -p @cloudbase/cli tcb hosting deploy "build/wechat-release/assets/game" "v1/assets/game" -e "$CLOUDBASE_ENV"
+npm ci
+npm test
+npm run verify
 ```
 
-### 构建接入
+`npm test` 会先编译；`verify` 使用隔离的 `build/verify/` 目录和离线替身，检查路由、资源、玩法、客户端、认证、服务端打包及包体。离线通过不代表微信云调用、正式登录、后台域名、持久化或平台审核通过，`build/verify/` 产物也不能用于正式分发。
+
+本轮最终回归为 `npm test` 16/16、`verify` 23/23（[TEST_REPORT.md](TEST_REPORT.md) 时间 `2026-09-06T11:45:07.028Z`）、原生 Canvas 6/6；运行依赖 `npm audit` 为 0 个已知漏洞。正式项目模板固定基础库 `3.16.2`；新构建正式授权页 0 个错误、1 条警告，进入后仍触发 85088，因此正式联机验收没有通过。
+
+正式构建必须同时提供以下五项非密钥配置，缺项、无效 AppID 或非 HTTPS URL 会失败：
 
 ```bash
-APP_CLOUD_BASE="https://<静态托管域>/v1/assets/game/" \
-APP_CLOUD_ENV="lomo-wechat-d0gcakr952f0d90b8" \
-node dist/tools/src/build_wechat.js --profile wechat-release
+APP_WX_APPID=wxec103651e807c540 \
+APP_SERVER_URL=https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com \
+APP_CLOUD_BASE=https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com/v1/assets/game/ \
+APP_CLOUD_ENV=lomo-wechat-d0gcakr952f0d90b8 \
+APP_CLOUD_SERVICE=lomo-wechat \
+npm run build:release
 ```
 
-- 主包保留 **boot pack**（默认 miner + 按 id 序填充至 1.5MB 预算，可用 `bootBudget` 调整），首屏即时可见；
-- 其余图集帧 `file` 改写为远端绝对 URL（`AssetManager.url()` 对 http(s) 直连，不拼本地 base）；
-- 仓库内 `game-assets/manifest.json` 始终写**本地形态**，Node 验收不依赖网络；
-- `verify` 新增 **`bundle-size-gate`** 步骤：主包 >4MB 直接判失败（防回归）。验收时未配置 `APP_CLOUD_BASE` 则用占位域名，同样按云形态构建。
+输出 `build/wechat-release/`，正式 `project.config.json` 自动设置真实 AppID 和 `setting.urlCheck=true`。AppSecret、CAM 密钥、签名密钥和管理员令牌均不得注入客户端。不要只提供 AppID 重建，也不要手改生成文件充当配置修复。
 
-### MP 后台白名单（上线前必填）
+当前 CloudBase 配置下，客户端初始化 `wx.cloud.init({ env })`，通过 `wx.cloud.callContainer` 请求相对 API 路径，并携带 `X-WX-SERVICE: lomo-wechat`。公网 API 探测、微信云调用和 CDN 下载是不同链路，需分别验收。
 
-开发管理 → 开发设置 → 服务器域名，三处都加：
+开发者工具导入已有项目（需要已登录、真实 AppID 和开启服务端口）：
 
-```
-https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com
+```bash
+/Applications/wechatwebdevtools.app/Contents/MacOS/cli open --project "$PWD/build/wechat-release"
 ```
 
-（后续若接入云托管服务端，同样把 `https://lomo-wechat-d0gcakr952f0d90b8-1301149345.ap-shanghai.app.tcloudbase.com` 加入。）
+如果工具出现历史 `uv_cwd`、`ENOENT` 或 `game.js is not defined`，先关闭该项目，再执行构建并重新打开；同时检查当前构建日志，不能只清 Console 后认定修复。
 
-### 成本提示
-
-静态托管**不占用**对象存储的 5GB/3GB 免费额度，按 `容量 0.0043 元/(GB·天)` + `流量 0.21 元/GB` 计费：24MB 存储约 ¥0.0001/天，单用户全量下载 24MB 约 ¥0.005。小规模可忽略，放量后按实际流量评估。
-
-### 客户端云初始化
-
-```js
-wx.cloud.init({ env: 'lomo-wechat-d0gcakr952f0d90b8' });
+```bash
+/Applications/wechatwebdevtools.app/Contents/MacOS/cli close --project "$PWD/build/wechat-release"
 ```
 
-已由 `client/src/app/wx_entry.ts` 的 `initCloud()` 在**微信运行时**调用（env 由构建期 `APP_CLOUD_ENV` 注入，仅环境标识、无密钥）；Node 验收/mock 环境自动跳过。
+预览与真机验收应保持 `urlCheck=true`。不要通过关闭域名校验把联网失败改记为通过。
 
-## 云托管服务端（CloudBase Run）—— 2026-09-06 已上线
+## 3. 完整资源上传与包体
 
-| 项 | 值 |
+资源上传源是仓库内完整的 **`game-assets/`**，远端前缀与 `APP_CLOUD_BASE` 一致。正式包的 `build/wechat-release/assets/game/` 只包含 boot pack 和本地音频；上传该子集会造成其余图集的远端 URL 缺文件。
+
+在现有 CloudBase CLI 已认证且具有目标环境部署权限时执行：
+
+```bash
+export CLOUDBASE_ENV=lomo-wechat-d0gcakr952f0d90b8
+npx -p @cloudbase/cli tcb hosting deploy "./game-assets" "v1/assets/game" -e "$CLOUDBASE_ENV"
+```
+
+完整上传保留 `game-assets/` 内相对路径，包含原始动画目录名中的双下划线。构建器仅将**包内**资源路径规范化，远端 URL 保持源目录结构；不要把生成的包内目录或包内 manifest 覆盖到 CDN 的完整源目录。
+
+构建器维护两种 manifest：仓库 `game-assets/manifest.json` 保持本地源路径；包内 manifest 对 boot pack 使用规范化本地路径，对其余资源使用远端绝对 URL。当前客户端读取包内 manifest。
+
+默认图像 boot pack 预算为 1,500,000 字节，优先保留 miner，再按剩余预算选取图集；音频另行保留。最终主包还包括代码、配置和 manifest，因此以构建日志与 `bundle-size-gate` 的实际文件字节总量为准，项目门禁为 4 MiB。`du -sh` 的磁盘块分配大小不能替代该口径。
+
+本轮最终正式包为 3,187,979 字节（约 3.0403 MiB）；隔离离线包为 2,975,233 字节（约 2.8374 MiB）。两者使用的网络配置不同，不能将离线包体或离线冒烟结果混记为正式包运行结果。
+
+上传后至少验证一个 boot pack 以外的图集和代表帧的远端 URL、状态码、媒体内容，并在微信运行时验证下载/渲染。历史 CDN 200 记录不证明完整资源已覆盖。
+
+## 4. 服务端打包与运行期配置
+
+```bash
+npm run build
+npm run package:server
+```
+
+`package:server` 把 Dockerfile、运行期 `package.json` / `package-lock.json`、`dist/server`、`dist/shared` 和 `configs` 组装为 `build/cloudrun/`。镜像通过 `npm ci --omit=dev --ignore-scripts` 安装锁定的 CloudBase 等运行依赖。**构建机不需要运行期凭据**；打包器不读取、生成或修改 `.env.cloud`，不把 `APP_SECRET`、`APP_ADMIN_TOKEN`、`APP_WX_APPSECRET` 写入 Dockerfile 或镜像。不要通过 Docker `ARG`、`ENV` 或源代码补回密钥。
+
+在云托管控制台配置目标服务的运行期环境变量，或使用平台提供的受控密钥注入能力：
+
+| 变量 | 要求 |
 |---|---|
-| 服务名 | `lomo-wechat`（容器服务，ap-shanghai） |
-| 公网域名 | `https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com` |
-| 容器端口 | 8080（`APP_PROFILE=wechat-release`、`APP_ALLOW_ADMIN=0`） |
-| 镜像来源 | `build/cloudrun/`（Dockerfile 云端构建，源 304KB） |
+| `APP_SECRET` | 签名根密钥，至少 32 个字符，使用安全随机值；签发的 token 有效期为 7 天。轮换会使已有 token 失效，应制定迁移与回滚安排。 |
+| `APP_WX_APPID` | 与小游戏一致的真实 AppID，格式为 `wx` 后接 16 位十六进制字符。 |
+| `APP_WX_APPSECRET` | 从该 AppID 的微信后台取得，启动检查要求至少 32 个字符；不得用 CAM SecretKey 替代。 |
+| `APP_ALLOW_ADMIN` | 默认 `0`。只有确需管理接口时设为 `1`。 |
+| `APP_ADMIN_TOKEN` | `APP_ALLOW_ADMIN=1` 时必填，至少 32 个字符；调用管理接口通过 `x-admin-token` 传入。 |
+| `NODE_ENV` / `APP_PROFILE` | 正式服务为 `production` / `wechat-release`。 |
+| `PORT` | 云托管容器使用 `8080`，与服务暴露端口一致。 |
+| `APP_PERSISTENCE` | 正式入口强制为 `cloudbase`；镜像默认该值。不能在正式服务中回退为内存或 JSON。 |
+| `APP_CLOUD_ENV` | 目标数据库环境，本项目为 `lomo-wechat-d0gcakr952f0d90b8`；正式启动必填。 |
+| `APP_DB_COLLECTION` | 目标 NoSQL 集合，默认 `ape_game_state`；需预建、禁止客户端直接读写并配置查询索引。不要把 `ape_qa_persistence` 测试集合当生产集合。 |
+| `APP_CLOUD_REGION` | 数据库地域，默认 `ap-shanghai`；必须与目标环境一致。 |
+| 数据库运行身份 | 使用 Cloud Run 运行身份或 SDK 支持的运行期临时凭据，并在目标集合实际验证读写。Node SDK 使用 `TENCENTCLOUD_SECRETID` / `TENCENTCLOUD_SECRETKEY` / `TENCENTCLOUD_SESSIONTOKEN`；本地管理文件的带下划线别名不会被服务端入口自动加载。不要在客户端注入这些变量。 |
+| `APP_DATA_DIR` | 仅非正式、本地开发路径的可选 JSON 快照目录。CloudBase 持久化路径不读取该目录，也不自动迁移其中的数据；当前镜像不再默认设置它。 |
 
-### 部署流程（可复现）
+正式入口在 `APP_PROFILE=wechat-release` 或 `NODE_ENV=production` 时校验配置，缺失或无效即在监听端口前退出；日志仅列配置项名称。持久化初始化还执行集合查询，可达性失败会阻止监听；该查询不替代权限、索引、写入或备份恢复验收。正式生产环境禁止 synthetic auth。测试专用适配器和离线进程内登录不能用于正式部署。
+
+自有服务器部署也使用上述运行期凭据，先通过服务管理器安全注入，再启动：
 
 ```bash
-npm run build                 # 编译 dist（服务端 + 共享）
-npm run package:server        # 组装 build/cloudrun（Dockerfile + dist + configs，注入密钥）
-set -a; . ./.env.cloud; set +a
+NODE_ENV=production APP_PROFILE=wechat-release APP_PERSISTENCE=cloudbase \
+APP_CLOUD_ENV=lomo-wechat-d0gcakr952f0d90b8 APP_DB_COLLECTION=ape_game_state \
+APP_CLOUD_REGION=ap-shanghai PORT=8787 \
+node dist/server/src/index.js
+```
+
+自托管需配置 TLS、数据库运行身份、进程守护和访问控制。仅挂载 JSON 目录不能满足当前正式持久化配置。当前正式客户端构建以 CloudBase 为目标，改用其他网络后端需要配套修改客户端传输配置并重新验证。
+
+### 4.1 数据库准备与迁移
+
+持久化层使用管理员专用 NoSQL 集合，按玩家核心、钱包、功能分片、账本、会话及幂等回执等文档组织数据。事务成功提交后才返回成功；数据库不可用时不降级成内存成功。SDK 显式选择 `CLOUD_API`，并由应用层处理已实证的事务冲突错误包装及有限重试。字段、索引、事务预算和测试覆盖以 [PERSISTENCE.md](PERSISTENCE.md) 为准。
+
+隔离 SDK 探针见 [PERSISTENCE_CLOUD_PROBE_2026-09-06.md](PERSISTENCE_CLOUD_PROBE_2026-09-06.md)；应用集成验证输出 `build/qa-evidence/persistence-cloud-integration.json`。它们使用 `ape_qa_persistence` 合成数据，证明范围须按输出中的检查项目判断。SDK 原生自动重试探针保留已知失败，不可误记为应用适配器自动失败或全部持久化通过。
+
+最终应用隔离云集成 7 组通过，575 个逻辑文档操作，60.032 秒；60 个自建测试文档已清理，待清理列表为空。隔离集合的 `ADMINONLY` 及 5 个查询索引已设置并回读；这些状态不自动适用于生产集合和 Cloud Run 运行身份。
+
+生产切换前须预建目标集合并禁止客户端直接读写、配置所需索引、验证运行身份、备份旧数据，并完成旧 `store.json` 到新文档模型的迁移和逐玩家账本对账。当前没有完成生产迁移，也没有自动导入旧 JSON 的路径；直接切换到空集合会使旧玩家数据不可见。应安排停止旧写入、验证迁移、恢复演练及切流后的回退方案，不能删除旧数据后再验证。
+
+当前新登录确定性计算 playerId，并拒绝 identity 映射到不同 ID；旧 JSON 的 playerId 为随机生成。因此迁移器仅拆分文档不够：必须先实现“读取并接受已验证既有 identity 映射”的兼容，或执行经过完整对账的全引用 ID 重写，覆盖钱包、库存、会话、邮件、历史及幂等证据。当前这两条生产身份迁移路径均未完成；旧合成身份不能直接绑定成正式 openId。
+
+## 5. 云托管部署与验收
+
+以下是完成运行期配置、目标环境权限检查、数据库准备、迁移和备份恢复验收后使用的操作命令；本轮未执行部署。控制台需先开通云托管资源，并检查目标服务的环境、AppID 关联及访问配置。
+
+```bash
+export CLOUDBASE_ENV=lomo-wechat-d0gcakr952f0d90b8
 printf '\n' | npx -p @cloudbase/cli tcb cloudrun deploy -s lomo-wechat --port 8080 \
   --source build/cloudrun --wait --force -e "$CLOUDBASE_ENV"
 ```
 
-注意两点（踩过的坑）：
+该非交互写法采用现有 CLI 的默认灰度选择，成功后可能切换流量；部署前检查所用 CLI 版本与部署计划。上述命令没有传运行密钥，运行期变量须在云托管侧先配置并确认用于新版本。CAM 身份用于管理云资源，微信 AppSecret 用于 `code2Session`，两者不可互换。
 
-1. **云托管需先在控制台开通资源**，否则 CLI 报 `云托管资源未开通`（与套餐是否含该能力无关）；
-2. `cloudrun deploy` 会交互式询问「是否启用灰度部署」——非交互环境用 `printf '\n' | ...` 选默认 No（发布成功后自动切流）。
-
-### 环境变量与密钥
-
-CLI 的 `cloudrun deploy` **不支持注入环境变量**，当前通过 Dockerfile `ENV` 提供：
-
-- 非密钥：`NODE_ENV / PORT=8080 / APP_PROFILE=wechat-release / APP_DATA_DIR=/app/data / APP_ALLOW_ADMIN=0`
-- 密钥：`APP_SECRET`、`APP_ADMIN_TOKEN` 由 `package:server` 生成并写入本地 `.env.cloud` 后复用（**复用很关键**：每次换密钥会作废所有已登录用户的 token），产物 Dockerfile 中注入；
-- 生产建议：在云托管控制台用环境变量覆盖（控制台值优先于镜像 ENV），镜像内密钥视为可泄露处理并定期轮换。
-
-### 上线自检（已实测）
-
-| 接口 | 期望 | 实测 |
-|---|---|---|
-| `GET /v1/config/bootstrap` | 200，profile=wechat-release | ✅ `OWNED_LAUNCH_DEFAULTS`（自有默认值，非原服数据） |
-| `POST /v1/auth/wechat` | 200，返回 token/playerId/防沉迷 | ✅ |
-| `POST /v1/admin/reset` | 403 FEATURE_DISABLED | ✅（管理端已关闭） |
-
-### MP 后台白名单（两套域名都要加）
-
-```
-https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com        （资源 CDN）
-https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com             （服务端 API）
-```
-
-request / uploadFile / downloadFile 三处均需填写；真机（非调试模式）不填会被拦截。
-
-### 体积口径说明
-
-`verify` 的 `bundle-size-gate` 与构建日志按**文件实际字节**统计（当前主包 **2.48MB / 1535 文件**，红线 4MB）。
-`du -sh` 显示 7MB 是磁盘块分配（大量小帧文件每文件占 4KB），**不是**微信代码包计量口径，勿据此判断超限。
-
-### 已知限制（收费前必须解决）
-
-容器文件系统为临时存储：实例重启/重新部署会丢失 `store.json` 与内存中的玩家进度。
-要承载真实付费用户，必须改为外部持久化（云数据库 / 云托管 MySQL / Redis），否则会出现付费后丢档。
-
-### 微信开发者工具导入（CLI 限制与两种路径）
-
-- **CLI 必须有真实 AppID**：`cli open/preview/upload` 对 `touristappid` 与空 AppID 均返回 `code 10 不存在此 AppID`；
-  "无 AppID/测试号"模式**只有 GUI 手动导入**支持，命令行无法绕过。
-- 构建期注入 AppID（拿到后无需改代码）：
+公网基础探测：
 
 ```bash
-APP_WX_APPID=wxXXXXXXXXXXXXXX node dist/tools/src/build_wechat.js --profile wechat-release
+curl --fail --silent --show-error --max-time 15 \
+  https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com/v1/config/bootstrap
 ```
 
-命令行导入（需真实 AppID + 已开服务端口）：
+微信开发者工具 Console 的云调用探测：
 
-```bash
-/Applications/wechatwebdevtools.app/Contents/MacOS/cli open --project "<绝对路径>/build/wechat-release"
-/Applications/wechatwebdevtools.app/Contents/MacOS/cli preview --project "<绝对路径>/build/wechat-release" --qr-output terminal
+```js
+wx.cloud.callContainer({
+  config: { env: 'lomo-wechat-d0gcakr952f0d90b8' },
+  path: '/v1/config/bootstrap',
+  header: { 'X-WX-SERVICE': 'lomo-wechat' },
+  method: 'GET',
+  success: console.log,
+  fail: console.error
+});
 ```
 
-GUI 手动导入（无 AppID 也能用）：开发者工具 → 导入项目 → 选择 `build/wechat-release` → AppID 选测试号/无 AppID → 导入。
-项目模板已内置 `setting.urlCheck=false`（不校验合法域名），可直连已上线的服务端；
-**正式分发前需改回 true，并在 MP 后台补齐两个域名的白名单。**
+只有云调用成功且返回 `profile=wechat-release` 后，继续使用新取得的 `wx.login` code 验证真实登录、player state、退出再进及业务链路。不要把 code、返回 token 或 AppSecret 复制到公开报告；无效 code 必须无法创建身份。服务端官方交换设有 5 秒超时，失败返回通用 `WECHAT_AUTH_FAILED`，具体接口约束见 `BACKEND_API.md`。
+
+目标 AppID 的开发管理 → 开发设置 → 服务器域名，需要根据实际调用 API 配齐合法域名：公网 HTTP 请求检查 request 域名，资源下载检查 downloadFile 等对应域名；uploadFile/socket 仅在业务实际使用时配置。当前涉及的域名为：
+
+```text
+https://lomo-wechat-309031-6-1301149345.sh.run.tcloudbase.com
+https://lomo-wechat-d0gcakr952f0d90b8-1301149345.tcloudbaseapp.com
+```
+
+域名列表齐全不能替代 `callContainer` 的环境/服务访问验证，85088 与公网域名拦截需分别复查。最终保留 `urlCheck=true` 的开发者工具和真机结果。
+
+## 6. 仍需处理的发布风险
+
+- **玩家数据持久化**：当前工作区已实现 CloudBase 事务持久化并增加隔离真实云验收工具；线上旧版本未升级，生产集合配置、旧玩家迁移、备份恢复及实际 Cloud Run 多副本验收未完成。不能根据本地或隔离测试关闭运营/收费阻断。
+- **密钥历史暴露**：本轮清除了本地部署产物中的注入方式，不代表历史镜像、缓存或已暴露凭据已失效。运行期迁移和密钥轮换需确认云端配置、依赖与回滚，本轮未执行。
+- **登录限流范围**：当前每进程总量 300 次/分钟、每 socket peer 30 次/分钟，不信任 `X-Forwarded-For`。反向代理用户会共享 peer bucket，多副本也不共享计数；需在可信网关配置全局限流，并根据流量验证阈值。
+- **正式联网与认证**：85088、合法域名缺项及本地缺 AppSecret 的问题仍需平台配置与真实 code 验收。公网 200、离线全绿和 UI 展示均不能关闭这些风险。
+- **内容与合规**：`wechat-release` 的现金能力关闭不替代美术权利链、隐私、实名/防沉迷、内容安全及平台审核。相关边界见 `COMPLIANCE_CURRENT.md`、`PRIVACY_DATA_MAP.md`、`EXTERNAL_BLOCKERS.md`；不要复用研究归档中的原版基础设施。
+
+官方接口资料：<https://developers.weixin.qq.com/minigame/dev/wxcloud/>。
