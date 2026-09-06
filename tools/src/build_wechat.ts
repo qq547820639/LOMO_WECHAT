@@ -103,9 +103,22 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
         // 放进 node_modules/@ape/server：既随函数包部署（云函数只打包自身目录），
         // 又被 DevTools 排除在 cloudfunctionRoot 扫描之外（消除"非小程序结构"警告）。
         const modDir = path.join(fnDir, 'node_modules', '@ape', 'server');
-        fs.mkdirSync(path.join(modDir, 'src'), { recursive: true });
-        execFileSync('cp', ['-R', path.join(outDir, 'dist', 'server', 'src'), path.join(modDir, 'src', 'server')]);
-        execFileSync('cp', ['-R', path.join(outDir, 'dist', 'shared', 'src'), path.join(modDir, 'src', 'shared')]);
+        // 保持与原 dist/ 一致的层级（server/src/app.js 内部 require '../../shared/src/...'），
+        // 否则相对路径会解析失败
+        fs.mkdirSync(path.join(modDir, 'dist'), { recursive: true });
+        execFileSync('cp', ['-R', path.join(outDir, 'dist', 'server'), path.join(modDir, 'dist', 'server')]);
+        execFileSync('cp', ['-R', path.join(outDir, 'dist', 'shared'), path.join(modDir, 'dist', 'shared')]);
+        // 运行期配置（AppID/AppSecret/签名密钥）：云函数无 CLI 环境变量入口，随包注入。
+        // 该目录位于 gitignore 的 build/ 下，密钥不进仓库；部署后仅在云端代码包内。
+        const fnCfg: Record<string, string> = {};
+        for (const k of ['APP_WX_APPID', 'APP_WX_APPSECRET', 'APP_SECRET', 'APP_PROFILE', 'APP_PERSISTENCE', 'APP_DATA_DIR']) {
+          const v = process.env[k];
+          if (v) fnCfg[k] = v;
+        }
+        if (Object.keys(fnCfg).length) {
+          fs.writeFileSync(path.join(fnDir, 'config.local.js'),
+            `// 由构建器生成，勿入库；键来自构建机环境变量\nmodule.exports = ${JSON.stringify(fnCfg, null, 2)};\n`);
+        }
         fs.writeFileSync(path.join(modDir, 'package.json'), JSON.stringify({
           name: '@ape/server', version: '1.0.0', main: 'src/server/app.js',
         }, null, 2));
@@ -135,7 +148,9 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
 
   // 4. 游戏资源 bundle（P0-1 demo：game-assets → assets/game/ + manifest.json）
   const manifest = copyGameAssets(outDir, { cloudBase, bootBudget: opts.bootBudget });
-  const pkgBytes = dirSizeBytes(outDir);
+  // 主包大小必须**排除 cloudfunctionRoot**：云函数目录由云开发单独部署，
+  // 不会打进小游戏代码包（其 node_modules 可达数十 MB，计入会误触发 4MB 红线）
+  const pkgBytes = dirSizeBytes(outDir, ['cloudfunctions']);
   const mode = cloudBase ? `cloud-assets (boot pack ${manifest ? countBootAtlases(manifest, cloudBase) : 0})` : 'packaged-assets';
   const WECHAT_MAIN_PKG_LIMIT = 4 * 1024 * 1024; // 微信小游戏主包红线
   if (pkgBytes > WECHAT_MAIN_PKG_LIMIT && !opts.allowOversize) {
@@ -373,17 +388,20 @@ function copyGameAssets(outDir: string, opts: { cloudBase?: string; bootBudget?:
 }
 
 /** 目录总字节数（微信主包体积门禁用） */
-export function dirSizeBytes(dir: string): number {
+export function dirSizeBytes(dir: string, excludeTop: string[] = []): number {
   let total = 0;
-  const walk = (d: string): void => {
+  const skip = new Set(excludeTop);
+  const walk = (d: string, top: boolean): void => {
     for (const name of fs.readdirSync(d)) {
       const fp = path.join(d, name);
       const st = fs.statSync(fp);
-      if (st.isDirectory()) walk(fp);
-      else total += st.size;
+      if (st.isDirectory()) {
+        if (top && skip.has(name)) continue; // 仅排除根级指定目录（如 cloudfunctions）
+        walk(fp, false);
+      } else total += st.size;
     }
   };
-  walk(dir);
+  walk(dir, true);
   return total;
 }
 
