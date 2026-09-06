@@ -185,3 +185,24 @@ request / uploadFile / downloadFile 三处均需填写；真机（非调试模�
 
 容器文件系统为临时存储：实例重启/重新部署会丢失 `store.json` 与内存中的玩家进度。
 要承载真实付费用户，必须改为外部持久化（云数据库 / 云托管 MySQL / Redis），否则会出现付费后丢档。
+
+### 微信开发者工具导入（CLI 限制与两种路径）
+
+- **CLI 必须有真实 AppID**：`cli open/preview/upload` 对 `touristappid` 与空 AppID 均返回 `code 10 不存在此 AppID`；
+  "无 AppID/测试号"模式**只有 GUI 手动导入**支持，命令行无法绕过。
+- 构建期注入 AppID（拿到后无需改代码）：
+
+```bash
+APP_WX_APPID=wxXXXXXXXXXXXXXX node dist/tools/src/build_wechat.js --profile wechat-release
+```
+
+命令行导入（需真实 AppID + 已开服务端口）：
+
+```bash
+/Applications/wechatwebdevtools.app/Contents/MacOS/cli open --project "<绝对路径>/build/wechat-release"
+/Applications/wechatwebdevtools.app/Contents/MacOS/cli preview --project "<绝对路径>/build/wechat-release" --qr-output terminal
+```
+
+GUI 手动导入（无 AppID 也能用）：开发者工具 → 导入项目 → 选择 `build/wechat-release` → AppID 选测试号/无 AppID → 导入。
+项目模板已内置 `setting.urlCheck=false`（不校验合法域名），可直连已上线的服务端；
+**正式分发前需改回 true，并在 MP 后台补齐两个域名的白名单。**

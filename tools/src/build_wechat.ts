@@ -55,6 +55,9 @@ export function build(profile: 'full-clone' | 'wechat-release', opts: { cloudBas
   fs.copyFileSync(path.join(root, 'wechat', 'game.json'), path.join(outDir, 'game.json'));
   const projCfg = JSON.parse(fs.readFileSync(path.join(root, 'wechat', 'project.config.json'), 'utf8'));
   projCfg.projectname = `ape-island-${profile}`;
+  // AppID：CLI（cli open/preview/upload）只接受**真实 AppID**，touristappid 与空值均报 code 10；
+  // 未配置 APP_WX_APPID 时保留 touristappid，仅供 GUI 手动以“测试号/无 AppID”方式导入。
+  projCfg.appid = process.env.APP_WX_APPID || projCfg.appid;
   fs.writeFileSync(path.join(outDir, 'project.config.json'), JSON.stringify(projCfg, null, 2));
   fs.copyFileSync(path.join(root, 'configs', profile === 'full-clone' ? 'full-clone.json' : 'wechat-release.json'), path.join(outDir, 'config.json'));
 
